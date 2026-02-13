@@ -16,6 +16,13 @@ public class SIPProDbContext : DbContext, ISipProDbContext
     public DbSet<AppSetting> AppSettings { get; set; }
     public DbSet<User> Users { get; set; }
     public DbSet<SidebarMenu> SidebarMenus { get; set; }
+    public DbSet<Perusahaan> Perusahaans { get; set; }
+    public DbSet<BahanBaku> BahanBakus { get; set; }
+    public DbSet<Material> Materials { get; set; }
+    public DbSet<BalanceStok> BalanceStoks { get; set; }
+    public DbSet<BalanceStokDetail> BalanceStokDetails { get; set; }
+    public DbSet<MasterItem> MasterItems { get; set; }
+    public DbSet<ProductMaterial> ProductMaterials { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

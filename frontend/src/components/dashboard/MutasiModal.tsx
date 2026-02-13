@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover";
+import { masterItemService, ProductMaterial } from "@/lib/masterItemService";
 
 /* ─── Icons ─── */
 
@@ -46,10 +47,6 @@ function UploadIcon() {
 /* ─── Options ─── */
 
 const JENIS_OPTIONS = ['Bahan Baku', 'Bahan Penolong'];
-const NAMA_BAHAN_OPTIONS: Record<string, string[]> = {
-    'Bahan Baku': ['Gambut', 'Dolomite', 'ZA Curah', 'Phosphate'],
-    'Bahan Penolong': ['Botol Petro Gladiator', 'Kantong Filler Plus', 'Karton', 'Label'],
-};
 const SATUAN_OPTIONS = ['Kg', 'Ton', 'Liter', 'Pcs', 'Zak', 'Box', 'Can'];
 
 /* ─── Types ─── */
@@ -58,9 +55,10 @@ interface MutasiModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSubmit: (data: any) => void;
+    productSlug: string;
 }
 
-export function MutasiModal({ isOpen, onClose, onSubmit }: MutasiModalProps) {
+export function MutasiModal({ isOpen, onClose, onSubmit, productSlug }: MutasiModalProps) {
     const [date, setDate] = useState<Date | undefined>(undefined);
     const [jenis, setJenis] = useState('');
     const [namaBahan, setNamaBahan] = useState('');
@@ -69,9 +67,21 @@ export function MutasiModal({ isOpen, onClose, onSubmit }: MutasiModalProps) {
     const [file, setFile] = useState<File | null>(null);
     const [keterangan, setKeterangan] = useState('');
 
+    // Metadata
+    const [availableBaku, setAvailableBaku] = useState<ProductMaterial[]>([]);
+    const [availablePenolong, setAvailablePenolong] = useState<ProductMaterial[]>([]);
+
+    useEffect(() => {
+        if (isOpen && productSlug) {
+            masterItemService.getProductMaterials(productSlug, 'Baku').then(setAvailableBaku);
+            masterItemService.getProductMaterials(productSlug, 'Penolong').then(setAvailablePenolong);
+        }
+    }, [isOpen, productSlug]);
+
     if (!isOpen) return null;
 
-    const availableBahan = jenis ? NAMA_BAHAN_OPTIONS[jenis] || [] : [];
+    const availableBahan = jenis === 'Bahan Baku' ? availableBaku :
+        jenis === 'Bahan Penolong' ? availablePenolong : [];
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -165,9 +175,8 @@ export function MutasiModal({ isOpen, onClose, onSubmit }: MutasiModalProps) {
                                 className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all appearance-none cursor-pointer"
                             >
                                 <option value="" disabled>Pilih</option>
-                                {JENIS_OPTIONS.map((opt) => (
-                                    <option key={opt} value={opt}>{opt}</option>
-                                ))}
+                                <option value="Bahan Baku">Bahan Baku</option>
+                                <option value="Bahan Penolong">Bahan Penolong</option>
                             </select>
                         </div>
 
@@ -176,21 +185,30 @@ export function MutasiModal({ isOpen, onClose, onSubmit }: MutasiModalProps) {
                             <label className="block text-sm font-medium text-gray-700 mb-1.5">
                                 Nama Bahan <span className="text-red-500">*</span>
                             </label>
-                            <select
-                                value={namaBahan}
-                                onChange={(e) => setNamaBahan(e.target.value)}
-                                required
-                                disabled={!jenis}
-                                className={cn(
-                                    "w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all appearance-none cursor-pointer",
-                                    !jenis && "bg-gray-50 text-gray-400 cursor-not-allowed"
-                                )}
-                            >
-                                <option value="" disabled>Pilih</option>
-                                {availableBahan.map((opt) => (
-                                    <option key={opt} value={opt}>{opt}</option>
-                                ))}
-                            </select>
+                            {availableBahan.length > 0 ? (
+                                <select
+                                    value={namaBahan}
+                                    onChange={(e) => setNamaBahan(e.target.value)}
+                                    required
+                                    disabled={!jenis}
+                                    className={cn(
+                                        "w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all appearance-none cursor-pointer",
+                                        !jenis && "bg-gray-50 text-gray-400 cursor-not-allowed"
+                                    )}
+                                >
+                                    <option value="" disabled>Pilih</option>
+                                    {availableBahan.map((item) => (
+                                        <option key={item.id} value={item.nama}>{item.nama}</option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <div className={cn(
+                                    "w-full px-4 py-2.5 bg-gray-50 border border-gray-200 border-dashed rounded-lg text-sm text-gray-400 italic",
+                                    !jenis && "bg-gray-50"
+                                )}>
+                                    {!jenis ? 'Pilih jenis terlebih dahulu' : 'Belum ada material dikonfigurasi'}
+                                </div>
+                            )}
                         </div>
 
                         {/* Kuantum + Satuan */}

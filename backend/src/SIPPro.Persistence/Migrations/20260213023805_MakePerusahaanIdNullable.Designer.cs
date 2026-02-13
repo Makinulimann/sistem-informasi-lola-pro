@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SIPPro.Persistence;
@@ -11,9 +12,11 @@ using SIPPro.Persistence;
 namespace SIPPro.Persistence.Migrations
 {
     [DbContext(typeof(SIPProDbContext))]
-    partial class SIPProDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260213023805_MakePerusahaanIdNullable")]
+    partial class MakePerusahaanIdNullable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -167,39 +170,6 @@ namespace SIPPro.Persistence.Migrations
                     b.ToTable("BalanceStokDetails");
                 });
 
-            modelBuilder.Entity("SIPPro.Domain.Entities.MasterItem", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Kode")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("Nama")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("SatuanDefault")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("ScopeProductSlug")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("MasterItems");
-                });
-
             modelBuilder.Entity("SIPPro.Domain.Entities.Material", b =>
                 {
                     b.Property<int>("Id")
@@ -251,34 +221,6 @@ namespace SIPPro.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Perusahaans");
-                });
-
-            modelBuilder.Entity("SIPPro.Domain.Entities.ProductMaterial", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Jenis")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<int>("MasterItemId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ProductSlug")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("MasterItemId");
-
-                    b.ToTable("ProductMaterials");
                 });
 
             modelBuilder.Entity("SIPPro.Domain.Entities.SidebarMenu", b =>
@@ -412,17 +354,6 @@ namespace SIPPro.Persistence.Migrations
                     b.Navigation("BalanceStok");
 
                     b.Navigation("Material");
-                });
-
-            modelBuilder.Entity("SIPPro.Domain.Entities.ProductMaterial", b =>
-                {
-                    b.HasOne("SIPPro.Domain.Entities.MasterItem", "MasterItem")
-                        .WithMany()
-                        .HasForeignKey("MasterItemId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("MasterItem");
                 });
 
             modelBuilder.Entity("SIPPro.Domain.Entities.SidebarMenu", b =>

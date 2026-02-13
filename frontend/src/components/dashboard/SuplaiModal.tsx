@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover";
+import { masterItemService, ProductMaterial } from "@/lib/masterItemService";
 
 /* ─── Icons ─── */
 
@@ -63,8 +64,6 @@ function UploadIcon() {
 
 /* ─── Mock Options ─── */
 
-const BAHAN_BAKU_OPTIONS = ['Gambut', 'Dolomite', 'ZA Curah', 'Phosphate'];
-const BAHAN_PENOLONG_OPTIONS = ['Botol Petro Gladiator', 'Kantong Filler Plus', 'Karton', 'Label'];
 const SATUAN_OPTIONS = ['Kg', 'Ton', 'Liter', 'Pcs', 'Zak', 'Box', 'Can'];
 
 /* ─── Types ─── */
@@ -80,14 +79,26 @@ interface SuplaiModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSubmit: (data: any) => void;
+    productSlug: string;
 }
 
-export function SuplaiModal({ isOpen, onClose, onSubmit }: SuplaiModalProps) {
+export function SuplaiModal({ isOpen, onClose, onSubmit, productSlug }: SuplaiModalProps) {
     const [date, setDate] = useState<Date | undefined>(undefined);
     const [bahanBakuList, setBahanBakuList] = useState<MaterialRow[]>([{ id: '1', name: '', quantum: '', satuan: 'Kg' }]);
     const [bahanPenolongList, setBahanPenolongList] = useState<MaterialRow[]>([{ id: '1', name: '', quantum: '', satuan: 'Pcs' }]);
     const [file, setFile] = useState<File | null>(null);
     const [keterangan, setKeterangan] = useState('');
+
+    // Metadata state
+    const [availableBaku, setAvailableBaku] = useState<ProductMaterial[]>([]);
+    const [availablePenolong, setAvailablePenolong] = useState<ProductMaterial[]>([]);
+
+    useEffect(() => {
+        if (isOpen && productSlug) {
+            masterItemService.getProductMaterials(productSlug, 'Baku').then(setAvailableBaku);
+            masterItemService.getProductMaterials(productSlug, 'Penolong').then(setAvailablePenolong);
+        }
+    }, [isOpen, productSlug]);
 
     if (!isOpen) return null;
 
@@ -197,16 +208,22 @@ export function SuplaiModal({ isOpen, onClose, onSubmit }: SuplaiModalProps) {
                                 {bahanBakuList.map((row) => (
                                     <div key={row.id} className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
                                         <div className="flex-1 w-full">
-                                            <select
-                                                value={row.name}
-                                                onChange={(e) => updateBahanBaku(row.id, 'name', e.target.value)}
-                                                className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
-                                            >
-                                                <option value="" disabled>Pilih Bahan Baku</option>
-                                                {BAHAN_BAKU_OPTIONS.map((opt) => (
-                                                    <option key={opt} value={opt}>{opt}</option>
-                                                ))}
-                                            </select>
+                                            {availableBaku.length > 0 ? (
+                                                <select
+                                                    value={row.name}
+                                                    onChange={(e) => updateBahanBaku(row.id, 'name', e.target.value)}
+                                                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+                                                >
+                                                    <option value="" disabled>Pilih Bahan Baku</option>
+                                                    {availableBaku.map((item) => (
+                                                        <option key={item.id} value={item.nama}>{item.nama}</option>
+                                                    ))}
+                                                </select>
+                                            ) : (
+                                                <div className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 border-dashed rounded-lg text-sm text-gray-400 italic">
+                                                    Belum ada bahan baku dikonfigurasi.
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="flex gap-3 w-full sm:w-auto">
                                             <div className="w-full sm:w-32">
@@ -262,16 +279,22 @@ export function SuplaiModal({ isOpen, onClose, onSubmit }: SuplaiModalProps) {
                                 {bahanPenolongList.map((row) => (
                                     <div key={row.id} className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
                                         <div className="flex-1 w-full">
-                                            <select
-                                                value={row.name}
-                                                onChange={(e) => updateBahanPenolong(row.id, 'name', e.target.value)}
-                                                className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
-                                            >
-                                                <option value="" disabled>Pilih Bahan Penolong</option>
-                                                {BAHAN_PENOLONG_OPTIONS.map((opt) => (
-                                                    <option key={opt} value={opt}>{opt}</option>
-                                                ))}
-                                            </select>
+                                            {availablePenolong.length > 0 ? (
+                                                <select
+                                                    value={row.name}
+                                                    onChange={(e) => updateBahanPenolong(row.id, 'name', e.target.value)}
+                                                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+                                                >
+                                                    <option value="" disabled>Pilih Bahan Penolong</option>
+                                                    {availablePenolong.map((item) => (
+                                                        <option key={item.id} value={item.nama}>{item.nama}</option>
+                                                    ))}
+                                                </select>
+                                            ) : (
+                                                <div className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 border-dashed rounded-lg text-sm text-gray-400 italic">
+                                                    Belum ada bahan penolong dikonfigurasi.
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="flex gap-3 w-full sm:w-auto">
                                             <div className="w-full sm:w-32">
@@ -308,6 +331,8 @@ export function SuplaiModal({ isOpen, onClose, onSubmit }: SuplaiModalProps) {
                                 ))}
                             </div>
                             <button
+                                type="button"
+                                onClick={addBahanPenolong}
                                 className="mt-3 inline-flex items-center justify-center w-8 h-8 rounded-full bg-emerald-600 text-white hover:bg-emerald-700 transition-all shadow-sm hover:shadow-md"
                             >
                                 <PlusIcon />

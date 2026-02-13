@@ -25,6 +25,18 @@ export const sidebarService = {
         return api.post<SidebarMenu>('/sidebar', menu);
     },
 
+    createWithChildren: async (data: {
+        label: string;
+        icon?: string;
+        href?: string;
+        parentId?: number | null;
+        order: number;
+        roleAccess?: string;
+        children?: { label: string; icon?: string; href?: string }[];
+    }) => {
+        return api.post<SidebarMenu>('/sidebar/create-with-children', data);
+    },
+
     update: async (id: number, menu: Partial<SidebarMenu>) => {
         return api.put<void>(`/sidebar/${id}`, menu);
     },

@@ -31,6 +31,103 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+    PopoverAnchor,
+} from "@/components/ui/popover";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+// Internal Searchable Select Component (Combobox Style)
+function ParentSelector({
+    value,
+    onChange,
+    options,
+    level
+}: {
+    value?: number | null;
+    onChange: (val: number | undefined) => void;
+    options: { id: number; label: string }[];
+    level: number;
+}) {
+    const [open, setOpen] = useState(false);
+    const [inputValue, setInputValue] = useState("");
+
+    // Sync input with selected value when controlled value changes
+    useEffect(() => {
+        const selected = options.find(o => o.id === value);
+        if (selected) {
+            setInputValue(selected.label);
+        } else if (!value) {
+            setInputValue("");
+        }
+    }, [value, options]);
+
+    const filteredOptions = options.filter(opt =>
+        opt.label.toLowerCase().includes(inputValue.toLowerCase())
+    );
+
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverAnchor asChild>
+                <div className="relative">
+                    <Input
+                        value={inputValue}
+                        onChange={(e) => {
+                            setInputValue(e.target.value);
+                            setOpen(true);
+                            if (!e.target.value) onChange(undefined);
+                        }}
+                        onFocus={() => setOpen(true)}
+                        onClick={() => setOpen(true)}
+                        placeholder={`— Pilih Parent (${filteredOptions.length} opsi) —`}
+                        className="pr-8 cursor-text bg-white"
+                    />
+                    <ChevronsUpDown className="absolute right-2 top-2.5 h-4 w-4 text-gray-400 opacity-50 pointer-events-none" />
+                </div>
+            </PopoverAnchor>
+            <PopoverContent
+                className="w-[--radix-popover-trigger-width] p-0"
+                align="start"
+                onOpenAutoFocus={(e) => e.preventDefault()}
+                collisionPadding={10}
+            >
+                <div className="max-h-[200px] overflow-y-auto p-1">
+                    {filteredOptions.length === 0 ? (
+                        <p className="p-2 text-xs text-center text-gray-500">
+                            {inputValue ? "Tidak ditemukan." : "Ketik untuk mencari..."}
+                        </p>
+                    ) : (
+                        filteredOptions.map((option) => (
+                            <div
+                                key={option.id}
+                                onClick={() => {
+                                    onChange(option.id);
+                                    setInputValue(option.label);
+                                    setOpen(false);
+                                }}
+                                className={cn(
+                                    "flex items-center px-2 py-2 text-sm rounded-sm cursor-pointer transition-colors hover:bg-emerald-50 hover:text-emerald-700",
+                                    value === option.id ? "bg-emerald-50 text-emerald-700 font-medium" : "text-gray-700"
+                                )}
+                            >
+                                <Check
+                                    className={cn(
+                                        "mr-2 h-4 w-4",
+                                        value === option.id ? "opacity-100" : "opacity-0"
+                                    )}
+                                />
+                                {option.label}
+                            </div>
+                        ))
+                    )}
+                </div>
+            </PopoverContent>
+        </Popover>
+    );
+}
 
 export default function SidebarManagementPage() {
     const [menus, setMenus] = useState<SidebarMenu[]>([]);
@@ -49,16 +146,128 @@ export default function SidebarManagementPage() {
     const [editingId, setEditingId] = useState<number | null>(null);
     const [editForm, setEditForm] = useState<Partial<SidebarMenu>>({});
     const [isCreating, setIsCreating] = useState(false);
+    const [createStep, setCreateStep] = useState<1 | 2 | 3>(1);
+    const [createLevel, setCreateLevel] = useState<1 | 2 | 3>(1);
+    const [createMenuType, setCreateMenuType] = useState<'page' | 'with-children'>('page');
     const [newMenu, setNewMenu] = useState<Partial<SidebarMenu>>({
         label: '',
-        icon: 'circle',
+        icon: 'package',
         href: '#',
         order: 0,
         isActive: true,
         roleAccess: 'All'
     });
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const availableRoles = ['Admin', 'VP', 'KPP', 'KP', 'KNP'];
+
+    const defaultLevel3Labels = ['Bahan Baku', 'Produksi', 'Analisa', 'RKAP'];
+
+    // Helper: slugify label for href generation
+    const slugify = (text: string) =>
+        text.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+
+    // Helper: get items at a specific depth
+    const getItemsAtDepth = (depth: number) =>
+        menus.filter(m => getDepth(m, menus) === depth);
+
+    // Helper: calculate next order among siblings
+    const getNextOrder = (parentId?: number | null) => {
+        const siblings = menus.filter(m =>
+            parentId ? m.parentId === parentId : !m.parentId
+        );
+        return siblings.length > 0 ? Math.max(...siblings.map(s => s.order)) + 1 : 1;
+    };
+
+    // Helper: build href based on level and parent chain
+    const buildHref = (label: string, parentId?: number | null): string => {
+        if (!parentId) return `/dashboard/${slugify(label)}`;
+
+        const parent = menus.find(m => m.id === parentId);
+        if (!parent) return `/dashboard/${slugify(label)}`;
+
+        const grandParent = parent.parentId ? menus.find(m => m.id === parent.parentId) : null;
+
+        if (grandParent) {
+            // Level 3: /dashboard/{grandparent-slug}/{parent-slug}/{label-slug}
+            const gpParent = grandParent.parentId ? menus.find(m => m.id === grandParent.parentId) : null;
+            const basePath = grandParent.href !== '#' ? grandParent.href : `/dashboard/${slugify(grandParent.label)}`;
+            return `${basePath}/${slugify(label)}`;
+        }
+
+        // Level 2: Use parent's existing path structure or build from parent label
+        const l1 = menus.find(m => m.id === parentId);
+        if (!l1) return `/dashboard/${slugify(label)}`;
+
+        // Find the category path from existing siblings or parent
+        const existingSiblings = menus.filter(m => m.parentId === parentId);
+        const siblingWithHref = existingSiblings.find(s => s.href && s.href !== '#');
+        if (siblingWithHref) {
+            const parts = siblingWithHref.href.split('/');
+            parts.pop();
+            return `${parts.join('/')}/${slugify(label)}`;
+        }
+
+        // Derive from parent label
+        return `/dashboard/${slugify(l1.label)}/${slugify(label)}`;
+    };
+
+    // Reset create form
+    const resetCreateForm = () => {
+        setIsCreating(false);
+        setCreateStep(1);
+        setCreateLevel(1);
+        setCreateMenuType('page');
+        setNewMenu({ label: '', icon: 'package', href: '#', order: 0, isActive: true, roleAccess: 'All', parentId: undefined });
+    };
+
+    // Enhanced create handler
+    const handleCreate = async () => {
+        if (!newMenu.label?.trim()) return;
+        setIsSubmitting(true);
+        try {
+            const parentId = newMenu.parentId || null;
+            const order = getNextOrder(parentId);
+            const icon = createLevel === 1 ? 'package' : '';
+            const isWithChildren = (createLevel === 1 || createLevel === 2) && createMenuType === 'with-children';
+            const href = isWithChildren ? '#' : buildHref(newMenu.label!, parentId);
+
+            if (createLevel === 2 && createMenuType === 'with-children') {
+                // Build href for L3 children based on L2 parent path
+                const l2BasePath = buildHref(newMenu.label!, parentId);
+                const children = defaultLevel3Labels.map(childLabel => ({
+                    label: childLabel,
+                    icon: '',
+                    href: `${l2BasePath}/${slugify(childLabel)}`,
+                }));
+
+                await sidebarService.createWithChildren({
+                    label: newMenu.label!,
+                    icon,
+                    href: '#',
+                    parentId: parentId,
+                    order,
+                    roleAccess: newMenu.roleAccess || 'All',
+                    children,
+                });
+            } else {
+                await sidebarService.create({
+                    ...newMenu,
+                    icon,
+                    href,
+                    order,
+                    parentId: parentId,
+                });
+            }
+
+            resetCreateForm();
+            loadMenus();
+        } catch (error) {
+            console.error("Failed to create menu", error);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
     useEffect(() => {
         loadMenus();
@@ -157,17 +366,8 @@ export default function SidebarManagementPage() {
         setEditForm({ ...menu });
     };
 
-    // CRUD Handlers
-    const handleCreate = async () => {
-        try {
-            await sidebarService.create(newMenu);
-            setIsCreating(false);
-            setNewMenu({ label: '', icon: 'circle', href: '#', order: 0, isActive: true, roleAccess: 'All' });
-            loadMenus();
-        } catch (error) {
-            console.error("Failed to create menu", error);
-        }
-    };
+
+
 
     const handleUpdate = async (id: number) => {
         try {
@@ -247,14 +447,7 @@ export default function SidebarManagementPage() {
                     </p>
                 </div>
                 <div className="flex gap-3">
-                    <Button
-                        variant="outline"
-                        onClick={() => sidebarService.seed().then(loadMenus)}
-                        className="text-gray-600 border-gray-300 hover:bg-gray-50 hover:text-emerald-700"
-                    >
-                        <FolderTree className="w-4 h-4 mr-2" />
-                        Reset / Seed Default
-                    </Button>
+
                     <Button
                         onClick={() => setIsCreating(true)}
                         className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-md hover:shadow-lg transition-all"
@@ -290,91 +483,280 @@ export default function SidebarManagementPage() {
                 </div>
             </div>
 
-            {/* Create Form */}
+            {/* Create Form - Wizard */}
             {isCreating && (
-                <div className="bg-white p-6 rounded-xl border border-emerald-100 shadow-lg ring-1 ring-emerald-50 mb-6 animate-in slide-in-from-top-4 duration-300">
-                    <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100">
-                        <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                <div className="bg-white p-5 md:p-6 rounded-xl border border-emerald-100 shadow-lg ring-1 ring-emerald-50 mb-0 animate-in slide-in-from-top-4 duration-300">
+                    {/* Header */}
+                    <div className="flex items-center justify-between mb-5 pb-3 border-b border-gray-100">
+                        <h3 className="font-semibold text-gray-800 flex items-center gap-2 text-base">
                             <Plus className="w-4 h-4 text-emerald-600" />
                             Buat Menu Baru
                         </h3>
-                        <Button variant="ghost" size="sm" onClick={() => setIsCreating(false)} className="h-8 w-8 p-0 rounded-full hover:bg-red-50 hover:text-red-500">
+                        <Button variant="ghost" size="sm" onClick={resetCreateForm} className="h-8 w-8 p-0 rounded-full hover:bg-red-50 hover:text-red-500">
                             <X className="w-4 h-4" />
                         </Button>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-5">
-                        <div className="lg:col-span-4">
-                            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Label Menu</label>
-                            <Input
-                                placeholder="Contoh: Produk Baru"
-                                value={newMenu.label}
-                                onChange={e => setNewMenu({ ...newMenu, label: e.target.value })}
-                                className="border-gray-300 focus:border-emerald-500"
-                            />
-                        </div>
-                        <div className="lg:col-span-4">
-                            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Link (Href)</label>
-                            <Input
-                                placeholder="/dashboard/..."
-                                value={newMenu.href}
-                                onChange={e => setNewMenu({ ...newMenu, href: e.target.value })}
-                                className="font-mono text-xs border-gray-300 focus:border-emerald-500"
-                            />
-                        </div>
-                        <div className="lg:col-span-2">
-                            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Icon</label>
-                            <Input
-                                placeholder="package"
-                                value={newMenu.icon}
-                                onChange={e => setNewMenu({ ...newMenu, icon: e.target.value })}
-                                className="border-gray-300 focus:border-emerald-500"
-                            />
-                        </div>
-                        <div className="lg:col-span-2">
-                            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Order</label>
-                            <Input
-                                type="number"
-                                value={newMenu.order}
-                                onChange={e => setNewMenu({ ...newMenu, order: parseInt(e.target.value) })}
-                                className="border-gray-300 focus:border-emerald-500"
-                            />
-                        </div>
+                    {/* Step Indicator */}
+                    <div className="flex items-center gap-2 mb-6">
+                        {[1, 2, 3].map((step) => (
+                            <div key={step} className="flex items-center gap-2 flex-1">
+                                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 shrink-0 ${createStep === step
+                                    ? 'bg-emerald-600 text-white shadow-md scale-110'
+                                    : createStep > step
+                                        ? 'bg-emerald-100 text-emerald-700'
+                                        : 'bg-gray-100 text-gray-400'
+                                    }`}>
+                                    {createStep > step ? '✓' : step}
+                                </div>
+                                <span className={`text-[11px] font-medium hidden sm:block transition-colors ${createStep >= step ? 'text-gray-700' : 'text-gray-400'
+                                    }`}>
+                                    {step === 1 ? 'Level' : step === 2 ? 'Konfigurasi' : 'Hak Akses'}
+                                </span>
+                                {step < 3 && <div className={`flex-1 h-px transition-colors ${createStep > step ? 'bg-emerald-300' : 'bg-gray-200'}`} />}
+                            </div>
+                        ))}
                     </div>
 
-                    <div className="mt-5 bg-gray-50 p-4 rounded-lg border border-gray-100">
-                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 block">Hak Akses Role</span>
-                        <div className="flex flex-wrap gap-2">
-                            {availableRoles.map(role => (
-                                <button
-                                    key={role}
-                                    onClick={() => toggleRoleInForm(role, true)}
-                                    className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-all duration-200 ${(newMenu.roleAccess?.includes(role) && newMenu.roleAccess !== 'All')
-                                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-                                        : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-300 hover:text-emerald-700'
-                                        }`}
+                    {/* Step 1: Choose Level */}
+                    {createStep === 1 && (
+                        <div className="space-y-3">
+                            <p className="text-sm text-gray-500 mb-4">Pilih level menu yang ingin ditambahkan:</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                {[
+                                    { level: 1 as const, title: 'Level 1', subtitle: 'Menu Utama', desc: 'Menu utama di sidebar (contoh: Produk Petroganik)', icon: '📁' },
+                                    { level: 2 as const, title: 'Level 2', subtitle: 'Sub Menu', desc: 'Menu di bawah menu utama (contoh: Nitrea 5Kg)', icon: '📂' },
+                                    { level: 3 as const, title: 'Level 3', subtitle: 'Halaman', desc: 'Halaman di bawah sub menu (contoh: Bahan Baku)', icon: '📄' },
+                                ].map(({ level, title, subtitle, desc, icon }) => (
+                                    <button
+                                        key={level}
+                                        onClick={() => { setCreateLevel(level); setCreateStep(2); setNewMenu(prev => ({ ...prev, parentId: undefined })); setCreateMenuType('page'); }}
+                                        className={`group relative text-left p-4 rounded-xl border-2 transition-all duration-200 hover:shadow-md ${createLevel === level
+                                            ? 'border-emerald-500 bg-emerald-50/50 shadow-sm'
+                                            : 'border-gray-200 bg-white hover:border-emerald-300'
+                                            }`}
+                                    >
+                                        <div className="text-2xl mb-2">{icon}</div>
+                                        <p className="font-semibold text-sm text-gray-800">{title}</p>
+                                        <p className="text-[11px] font-medium text-emerald-600 mb-1">{subtitle}</p>
+                                        <p className="text-[11px] text-gray-400 leading-relaxed">{desc}</p>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Step 2: Configuration */}
+                    {createStep === 2 && (
+                        <div className="space-y-4">
+                            <p className="text-sm text-gray-500">Konfigurasi menu Level {createLevel}:</p>
+
+                            {/* Parent Selection for L2 and L3 */}
+                            {createLevel >= 2 && (
+                                <div>
+                                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">
+                                        {createLevel === 2 ? 'Parent Menu (Level 1)' : 'Parent Menu (Level 2)'}
+                                    </label>
+                                    <ParentSelector
+                                        level={createLevel}
+                                        value={newMenu.parentId}
+                                        onChange={(val) => setNewMenu({ ...newMenu, parentId: val })}
+                                        options={getItemsAtDepth(createLevel - 2)
+                                            .filter(m => m.href === '#') // Only allow containers (href='#') as parents
+                                            .map(m => ({ id: m.id, label: m.label }))}
+                                    />
+                                </div>
+                            )}
+
+                            {/* Label */}
+                            <div>
+                                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Nama Menu</label>
+                                <Input
+                                    placeholder={createLevel === 1 ? 'Contoh: Produk Baru' : createLevel === 2 ? 'Contoh: Nitrea 5Kg' : 'Contoh: Bahan Baku'}
+                                    value={newMenu.label}
+                                    onChange={e => setNewMenu({ ...newMenu, label: e.target.value })}
+                                    className="border-gray-300 focus:border-emerald-500 h-10"
+                                />
+                            </div>
+
+                            {/* Menu Type for L1 and L2 */}
+                            {(createLevel === 1 || createLevel === 2) && (
+                                <div>
+                                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">Tipe Menu</label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <button
+                                            onClick={() => setCreateMenuType('page')}
+                                            className={`text-left p-3 rounded-lg border-2 transition-all duration-200 ${createMenuType === 'page'
+                                                ? 'border-emerald-500 bg-emerald-50/50'
+                                                : 'border-gray-200 hover:border-emerald-300'
+                                                }`}
+                                        >
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${createMenuType === 'page' ? 'border-emerald-500' : 'border-gray-300'}`}>
+                                                    {createMenuType === 'page' && <div className="w-2 h-2 rounded-full bg-emerald-500" />}
+                                                </div>
+                                                <span className="text-sm font-medium text-gray-700">Halaman Baru</span>
+                                            </div>
+                                            <p className="text-[11px] text-gray-400 ml-6">Menu langsung menuju ke halaman (link otomatis)</p>
+                                        </button>
+                                        <button
+                                            onClick={() => setCreateMenuType('with-children')}
+                                            className={`text-left p-3 rounded-lg border-2 transition-all duration-200 ${createMenuType === 'with-children'
+                                                ? 'border-emerald-500 bg-emerald-50/50'
+                                                : 'border-gray-200 hover:border-emerald-300'
+                                                }`}
+                                        >
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${createMenuType === 'with-children' ? 'border-emerald-500' : 'border-gray-300'}`}>
+                                                    {createMenuType === 'with-children' && <div className="w-2 h-2 rounded-full bg-emerald-500" />}
+                                                </div>
+                                                <span className="text-sm font-medium text-gray-700">Dengan Sub-Menu</span>
+                                            </div>
+                                            <p className="text-[11px] text-gray-400 ml-6">
+                                                {createLevel === 2
+                                                    ? 'Otomatis membuat sub halaman: Bahan Baku, Produksi, Analisa, RKAP'
+                                                    : 'Menu yang memiliki child menu di bawahnya'}
+                                            </p>
+                                        </button>
+                                    </div>
+
+                                    {/* Preview default children for L2 with-children */}
+                                    {createLevel === 2 && createMenuType === 'with-children' && (
+                                        <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                                            <p className="text-[11px] font-semibold text-blue-700 mb-2 flex items-center gap-1">
+                                                <FolderTree className="w-3 h-3" />
+                                                Sub-halaman yang akan otomatis dibuat:
+                                            </p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {defaultLevel3Labels.map(label => (
+                                                    <span key={label} className="px-2.5 py-1 bg-white rounded-md text-[11px] text-blue-700 border border-blue-200 font-medium">
+                                                        {label}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Step 3: Role Access */}
+                    {createStep === 3 && (
+                        <div className="space-y-4">
+                            <p className="text-sm text-gray-500">Atur hak akses role untuk menu ini:</p>
+
+                            {/* Summary */}
+                            <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                    <div>
+                                        <span className="text-gray-400">Level:</span>
+                                        <span className="ml-1 font-medium text-gray-700">{createLevel}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-400">Tipe:</span>
+                                        <span className="ml-1 font-medium text-gray-700">
+                                            {createLevel === 3 ? 'Halaman' : createMenuType === 'page' ? 'Halaman' : 'Dengan Sub-Menu'}
+                                        </span>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <span className="text-gray-400">Nama:</span>
+                                        <span className="ml-1 font-semibold text-gray-800">{newMenu.label}</span>
+                                    </div>
+                                    {newMenu.parentId && (
+                                        <div className="col-span-2">
+                                            <span className="text-gray-400">Parent:</span>
+                                            <span className="ml-1 font-medium text-gray-700">
+                                                {menus.find(m => m.id === newMenu.parentId)?.label || '-'}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
+                                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 block">Hak Akses Role</span>
+                                <div className="flex flex-wrap gap-2">
+                                    {availableRoles.map(role => (
+                                        <button
+                                            key={role}
+                                            onClick={() => toggleRoleInForm(role, true)}
+                                            className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-all duration-200 ${(newMenu.roleAccess?.split(',').includes(role) && newMenu.roleAccess !== 'All')
+                                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                                                : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-300 hover:text-emerald-700'
+                                                }`}
+                                        >
+                                            {role}
+                                        </button>
+                                    ))}
+                                    <button
+                                        onClick={() => setNewMenu({ ...newMenu, roleAccess: 'All' })}
+                                        className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-all duration-200 ${newMenu.roleAccess === 'All'
+                                            ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                                            : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:text-blue-700'}`}
+                                    >
+                                        All (Public)
+                                    </button>
+                                </div>
+                                <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+                                    <Shield className="w-3 h-3" />
+                                    Akses saat ini: <span className="text-gray-700 font-medium">{newMenu.roleAccess}</span>
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Navigation Buttons */}
+                    <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-100">
+                        <div>
+                            {createStep > 1 && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCreateStep((createStep - 1) as 1 | 2 | 3)}
+                                    className="text-gray-600"
                                 >
-                                    {role}
-                                </button>
-                            ))}
-                            <button
-                                onClick={() => setNewMenu({ ...newMenu, roleAccess: 'All' })}
-                                className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-all duration-200 ${newMenu.roleAccess === 'All'
-                                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                                    : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:text-blue-700'}`}
-                            >
-                                All (Public)
-                            </button>
+                                    <ChevronLeft className="w-4 h-4 mr-1" />
+                                    Kembali
+                                </Button>
+                            )}
                         </div>
-                        <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
-                            <Shield className="w-3 h-3" />
-                            Akses saat ini: <span className="text-gray-700 font-medium">{newMenu.roleAccess}</span>
-                        </p>
-                    </div>
-
-                    <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-100">
-                        <Button variant="outline" onClick={() => setIsCreating(false)}>Batal</Button>
-                        <Button onClick={handleCreate} className="bg-emerald-600 hover:bg-emerald-700 text-white px-6">Simpan Menu</Button>
+                        <div className="flex gap-3">
+                            <Button variant="outline" size="sm" onClick={resetCreateForm}>Batal</Button>
+                            {createStep < 3 ? (
+                                <Button
+                                    size="sm"
+                                    onClick={() => setCreateStep((createStep + 1) as 1 | 2 | 3)}
+                                    disabled={
+                                        (createStep === 1 && !createLevel) ||
+                                        (createStep === 2 && (!newMenu.label?.trim() || (createLevel >= 2 && !newMenu.parentId)))
+                                    }
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-4"
+                                >
+                                    Lanjut
+                                    <ChevronRight className="w-4 h-4 ml-1" />
+                                </Button>
+                            ) : (
+                                <Button
+                                    size="sm"
+                                    onClick={handleCreate}
+                                    disabled={isSubmitting}
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-5"
+                                >
+                                    {isSubmitting ? (
+                                        <span className="flex items-center gap-2">
+                                            <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                            Menyimpan...
+                                        </span>
+                                    ) : (
+                                        <>
+                                            <Save className="w-4 h-4 mr-1" />
+                                            Simpan Menu
+                                        </>
+                                    )}
+                                </Button>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}
@@ -474,7 +856,7 @@ export default function SidebarManagementPage() {
                                                             <button
                                                                 key={role}
                                                                 onClick={() => toggleRoleInForm(role, false)}
-                                                                className={`px-2 py-1 rounded text-xs border transition-colors ${editForm.roleAccess?.includes(role) && editForm.roleAccess !== 'All'
+                                                                className={`px-2 py-1 rounded text-xs border transition-colors ${editForm.roleAccess?.split(',').includes(role) && editForm.roleAccess !== 'All'
                                                                     ? 'bg-emerald-100 text-emerald-800 border-emerald-200 font-medium'
                                                                     : 'bg-white text-gray-500 border-gray-200'}`}
                                                             >

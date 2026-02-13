@@ -195,9 +195,10 @@ function usePagination<T>(data: T[], pageSize = 15) {
 interface ProduksiPageProps {
     productCategory: string;
     productName: string;
+    productSlug?: string;
 }
 
-export function ProduksiPage({ productCategory, productName }: ProduksiPageProps) {
+export function ProduksiPage({ productCategory, productName, productSlug }: ProduksiPageProps) {
     const [perusahaan, setPerusahaan] = useState('Semua Perusahaan');
     const [bulan, setBulan] = useState('02');
     const [tahun, setTahun] = useState('2026');

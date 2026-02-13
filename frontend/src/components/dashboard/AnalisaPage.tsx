@@ -282,9 +282,10 @@ function RowActions() {
 interface AnalisaPageProps {
     productCategory: string;
     productName: string;
+    productSlug?: string;
 }
 
-export function AnalisaPage({ productCategory, productName }: AnalisaPageProps) {
+export function AnalisaPage({ productCategory, productName, productSlug }: AnalisaPageProps) {
     const [activeTab, setActiveTab] = useState<TabKey>('kegiatan-sampling');
     const [perusahaan, setPerusahaan] = useState('Semua Perusahaan');
     const [bulan, setBulan] = useState('');

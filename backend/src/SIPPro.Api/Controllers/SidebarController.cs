@@ -56,6 +56,69 @@ public class SidebarController : ControllerBase
         return CreatedAtAction(nameof(GetSidebar), new { id = menu.Id }, menu);
     }
 
+    /// <summary>
+    /// Creates a parent menu and its default children in a single request.
+    /// Used for creating Level 2 menus with default Level 3 sub-pages.
+    /// </summary>
+    [HttpPost("create-with-children")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> CreateWithChildren([FromBody] CreateWithChildrenRequest request)
+    {
+        // Create the parent menu first
+        var parent = new SidebarMenu
+        {
+            Label = request.Label,
+            Icon = request.Icon ?? "",
+            Href = request.Href ?? "#",
+            ParentId = request.ParentId,
+            Order = request.Order,
+            IsActive = true,
+            RoleAccess = request.RoleAccess ?? "All"
+        };
+        _context.SidebarMenus.Add(parent);
+        await _context.SaveChangesAsync(CancellationToken.None);
+
+        // Create children
+        if (request.Children != null && request.Children.Any())
+        {
+            var order = 1;
+            foreach (var child in request.Children)
+            {
+                _context.SidebarMenus.Add(new SidebarMenu
+                {
+                    Label = child.Label,
+                    Icon = child.Icon ?? "",
+                    Href = child.Href ?? "#",
+                    ParentId = parent.Id,
+                    Order = order++,
+                    IsActive = true,
+                    RoleAccess = parent.RoleAccess
+                });
+            }
+            await _context.SaveChangesAsync(CancellationToken.None);
+        }
+
+        return Ok(parent);
+    }
+
+    public class CreateWithChildrenRequest
+    {
+        public string Label { get; set; } = "";
+        public string? Icon { get; set; }
+        public string? Href { get; set; }
+        public int? ParentId { get; set; }
+        public int Order { get; set; }
+        public string? RoleAccess { get; set; }
+        public List<ChildMenuRequest>? Children { get; set; }
+    }
+
+    public class ChildMenuRequest
+    {
+        public string Label { get; set; } = "";
+        public string? Icon { get; set; }
+        public string? Href { get; set; }
+    }
+
     [HttpPut("{id}")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(int id, [FromBody] SidebarMenu menu)

@@ -38,8 +38,8 @@ You should see `sippro-postgres` (port 5432) and `sippro-pgadmin` (port 5050) bo
 
 **pgAdmin** (optional): Open http://localhost:5050
 - Email: `admin@sippro.local`
-- Password: `admin`
-- Add server: Host=`postgres`, Port=`5432`, User=`sippro`, Password=`sippro_dev_2024`
+- Password: `[YOUR_ADMIN_PASSWORD]`
+- Add server: Host=`postgres`, Port=`5432`, User=`sippro`, Password=`[YOUR_DB_PASSWORD]`
 
 ### 2. Run Database Migrations
 
@@ -126,7 +126,7 @@ SIPP/
 
 | Variable               | Default                                                                   |
 | ---------------------- | ------------------------------------------------------------------------- |
-| `DATABASE_URL`         | `Host=localhost;Port=5432;Database=sippro_db;Username=sippro;Password=sippro_dev_2024` |
+| `DATABASE_URL`         | `Host=localhost;Port=5432;Database=sippro_db;Username=sippro;Password=[YOUR_DB_PASSWORD]` |
 | `ASPNETCORE_ENVIRONMENT` | `Development`                                                           |
 
 ### Frontend (`frontend/.env.example`)

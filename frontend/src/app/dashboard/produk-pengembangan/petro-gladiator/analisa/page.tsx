@@ -5,6 +5,7 @@ export default function PetroGladiatorAnalisaPage() {
         <AnalisaPage
             productCategory="Produk Pengembangan"
             productName="PetroGladiator"
+            productSlug="petro-gladiator"
         />
     );
 }

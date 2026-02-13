@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SIPPro.Persistence;
@@ -11,9 +12,11 @@ using SIPPro.Persistence;
 namespace SIPPro.Persistence.Migrations
 {
     [DbContext(typeof(SIPProDbContext))]
-    partial class SIPProDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260213030818_AddMaterialsSystem")]
+    partial class AddMaterialsSystem
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -190,10 +193,6 @@ namespace SIPPro.Persistence.Migrations
                     b.Property<string>("SatuanDefault")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
-
-                    b.Property<string>("ScopeProductSlug")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
 
                     b.HasKey("Id");
 
