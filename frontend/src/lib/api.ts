@@ -1,7 +1,5 @@
 import Cookies from 'js-cookie';
 
-// Dynamically determine API URL based on current window location
-// This allows access via localhost, LAN IP (WiFi), or other interfaces without changing config
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? (
     typeof window !== 'undefined'
         ? `${window.location.protocol}//${window.location.hostname}:5062/api`

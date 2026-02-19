@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, Fragment } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -9,6 +9,16 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+    getTabs,
+    createTab,
+    renameTab as renameTabApi,
+    deleteTab as deleteTabApi,
+    getProduksi,
+    type ProduksiTab,
+    type ProduksiRow,
+    type ProduksiSummary,
+} from '@/lib/produksiService';
 
 /* ─── Icons ─── */
 
@@ -76,96 +86,69 @@ function PackageIcon() {
     );
 }
 
-/* ─── Types ─── */
-
-interface ProduksiRow {
-    tanggal: string;
-    produksi: number;
-    kumulatif: number;
-    keluar: number;
-    stokAkhir: number;
-    coa: number;
-    jam: string;
-    keterangan: string;
-    crPercent: number;
-    analisa: string;
+function PlusIcon() {
+    return (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+    );
 }
 
-type ProductVariant = string;
+function PencilIcon() {
+    return (
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+        </svg>
+    );
+}
 
-/* ─── Mock Data ─── */
+function TrashIcon() {
+    return (
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+        </svg>
+    );
+}
 
+function XIcon() {
+    return (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+    );
+}
 
+/* ─── Constants ─── */
 
 const BULAN_OPTIONS = [
-    { value: '', label: 'Pilih Bulan' },
-    { value: '01', label: 'Januari' },
-    { value: '02', label: 'Februari' },
-    { value: '03', label: 'Maret' },
-    { value: '04', label: 'April' },
-    { value: '05', label: 'Mei' },
-    { value: '06', label: 'Juni' },
-    { value: '07', label: 'Juli' },
-    { value: '08', label: 'Agustus' },
-    { value: '09', label: 'September' },
-    { value: '10', label: 'Oktober' },
-    { value: '11', label: 'November' },
-    { value: '12', label: 'Desember' },
+    { value: 1, label: 'Januari' },
+    { value: 2, label: 'Februari' },
+    { value: 3, label: 'Maret' },
+    { value: 4, label: 'April' },
+    { value: 5, label: 'Mei' },
+    { value: 6, label: 'Juni' },
+    { value: 7, label: 'Juli' },
+    { value: 8, label: 'Agustus' },
+    { value: 9, label: 'September' },
+    { value: 10, label: 'Oktober' },
+    { value: 11, label: 'November' },
+    { value: 12, label: 'Desember' },
 ];
 
-const TAHUN_OPTIONS = [
-    { value: '', label: 'Pilih Tahun' },
-    { value: '2026', label: '2026' },
-    { value: '2025', label: '2025' },
-    { value: '2024', label: '2024' },
-    { value: '2023', label: '2023' },
-];
+const BULAN_NAMES: Record<number, string> = Object.fromEntries(BULAN_OPTIONS.map(o => [o.value, o.label]));
 
-const PRODUCT_VARIANTS: ProductVariant[] = [
-    'Padat @1Kg',
-    'Padat @2Kg',
-    'Padat @10Kg',
-    'Cair 1 Liter',
-    'Cair 500ml',
-];
+const currentDate = new Date();
+const currentMonth = currentDate.getMonth() + 1;
+const currentYear = currentDate.getFullYear();
 
-const BULAN_NAMES: Record<string, string> = {
-    '01': 'Januari',
-    '02': 'Februari',
-    '03': 'Maret',
-    '04': 'April',
-    '05': 'Mei',
-    '06': 'Juni',
-    '07': 'Juli',
-    '08': 'Agustus',
-    '09': 'September',
-    '10': 'Oktober',
-    '11': 'November',
-    '12': 'Desember',
-};
-
-function getDaysInMonth(month: string, year: string): number {
-    if (!month || !year) return 28;
-    return new Date(parseInt(year), parseInt(month), 0).getDate();
-}
-
-function generateMockData(month: string, year: string): ProduksiRow[] {
-    const days = getDaysInMonth(month, year);
-    const monthName = BULAN_NAMES[month] || 'Februari';
-    const baseStok = 1232.50;
-
-    return Array.from({ length: days }, (_, i) => ({
-        tanggal: `${String(i + 1).padStart(2, '0')} ${monthName} ${year || '2026'}`,
-        produksi: 0,
-        kumulatif: baseStok,
-        keluar: 0,
-        stokAkhir: baseStok,
-        coa: 0,
-        jam: '',
-        keterangan: '',
-        crPercent: 0,
-        analisa: '',
-    }));
+function generateYearOptions() {
+    const years = [];
+    for (let y = currentYear; y >= currentYear - 3; y--) {
+        years.push(y);
+    }
+    return years;
 }
 
 /* ─── Number formatting ─── */
@@ -194,42 +177,156 @@ interface ProduksiPageProps {
 }
 
 export function ProduksiPage({ productCategory, productName, productSlug }: ProduksiPageProps) {
+    const slug = productSlug || 'petro-gladiator';
 
-    const [bulan, setBulan] = useState('02');
-    const [tahun, setTahun] = useState('2026');
-    const [activeVariant, setActiveVariant] = useState<ProductVariant>(PRODUCT_VARIANTS[0]);
+    // ─── State ───
+    const [bulan, setBulan] = useState<number | null>(currentMonth);
+    const [tahun, setTahun] = useState<number | null>(currentYear);
     const [search, setSearch] = useState('');
 
-    const data = useMemo(() => generateMockData(bulan, tahun), [bulan, tahun]);
+    // Tabs
+    const [tabs, setTabs] = useState<ProduksiTab[]>([]);
+    const [activeTabId, setActiveTabId] = useState<number | null>(null);
+    const [tabsLoading, setTabsLoading] = useState(true);
 
-    const filtered = useMemo(() =>
-        data.filter((row) =>
-            search === '' ||
-            row.tanggal.toLowerCase().includes(search.toLowerCase()) ||
-            row.keterangan.toLowerCase().includes(search.toLowerCase())
-        ), [data, search]);
+    // Tab management modal
+    const [showAddTab, setShowAddTab] = useState(false);
+    const [newTabName, setNewTabName] = useState('');
+    const [renamingTabId, setRenamingTabId] = useState<number | null>(null);
+    const [renameValue, setRenameValue] = useState('');
 
-    const { page, setPage, totalPages, paginated, total } = usePagination(filtered);
+    // Data
+    const [data, setData] = useState<ProduksiRow[]>([]);
+    const [summary, setSummary] = useState<ProduksiSummary>({ totalProduksi: 0, totalKeluar: 0, kumulatif: 0, stokAkhir: 0 });
+    const [loading, setLoading] = useState(false);
 
-    // Summary calculations
-    const summary = useMemo(() => {
-        const totalProd = data.reduce((acc, r) => acc + r.produksi, 0);
-        const totalKeluar = data.reduce((acc, r) => acc + r.keluar, 0);
-        const lastStok = data.length > 0 ? data[data.length - 1].stokAkhir : 0;
-        const kumulatif = data.length > 0 ? data[data.length - 1].kumulatif : 0;
-        return { totalProd, totalKeluar, lastStok, kumulatif };
-    }, [data]);
+    // ─── Fetch Tabs ───
+    const fetchTabs = useCallback(async () => {
+        setTabsLoading(true);
+        try {
+            const result = await getTabs(slug);
+            setTabs(result);
+            // If no tabs, auto-create "Padat" as default
+            if (result.length === 0) {
+                const defaultTab = await createTab(slug, 'Padat');
+                setTabs([defaultTab]);
+                setActiveTabId(defaultTab.id);
+            } else if (!activeTabId || !result.find(t => t.id === activeTabId)) {
+                setActiveTabId(result[0].id);
+            }
+        } catch (err) {
+            console.error('Failed to load tabs:', err);
+        } finally {
+            setTabsLoading(false);
+        }
+    }, [slug, activeTabId]);
+
+    useEffect(() => { fetchTabs(); }, [slug]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // ─── Fetch Data ───
+    const fetchData = useCallback(async () => {
+        if (!activeTabId) return;
+        setLoading(true);
+        try {
+            const result = await getProduksi(
+                slug,
+                activeTabId,
+                bulan ?? undefined,
+                tahun ?? undefined
+            );
+            setData(result.data);
+            setSummary(result.summary);
+        } catch (err) {
+            console.error('Failed to load produksi data:', err);
+            setData([]);
+            setSummary({ totalProduksi: 0, totalKeluar: 0, kumulatif: 0, stokAkhir: 0 });
+        } finally {
+            setLoading(false);
+        }
+    }, [slug, activeTabId, bulan, tahun]);
+
+    useEffect(() => { fetchData(); }, [fetchData]);
+
+    // ─── Tab actions ───
+    const handleAddTab = async () => {
+        if (!newTabName.trim()) return;
+        try {
+            const tab = await createTab(slug, newTabName.trim());
+            setTabs(prev => [...prev, tab]);
+            setActiveTabId(tab.id);
+            setNewTabName('');
+            setShowAddTab(false);
+        } catch (err) {
+            console.error('Failed to create tab:', err);
+        }
+    };
+
+    const handleRenameTab = async (id: number) => {
+        if (!renameValue.trim()) return;
+        try {
+            const updated = await renameTabApi(id, renameValue.trim());
+            setTabs(prev => prev.map(t => t.id === id ? { ...t, nama: updated.nama } : t));
+            setRenamingTabId(null);
+            setRenameValue('');
+        } catch (err) {
+            console.error('Failed to rename tab:', err);
+        }
+    };
+
+    const handleDeleteTab = async (id: number) => {
+        if (!confirm('Hapus tab ini beserta semua data produksinya?')) return;
+        try {
+            await deleteTabApi(id);
+            setTabs(prev => prev.filter(t => t.id !== id));
+            if (activeTabId === id) {
+                const remaining = tabs.filter(t => t.id !== id);
+                setActiveTabId(remaining.length > 0 ? remaining[0].id : null);
+            }
+        } catch (err) {
+            console.error('Failed to delete tab:', err);
+        }
+    };
+
+    // ─── Filter helpers ───
+    const hasFilter = bulan !== null || tahun !== null;
+    const clearFilter = () => {
+        setBulan(null);
+        setTahun(null);
+    };
 
     const periodLabel = bulan && tahun
         ? `${BULAN_NAMES[bulan]} ${tahun}`
-        : 'Belum dipilih';
+        : tahun
+            ? `Tahun ${tahun}`
+            : 'Semua Periode';
 
-    const isToday = (tanggal: string) => {
+    // ─── Search ───
+    const filtered = useMemo(() => {
+        if (!search) return data;
+        const q = search.toLowerCase();
+        return data.filter(row =>
+            new Date(row.tanggal).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }).toLowerCase().includes(q) ||
+            row.keterangan.toLowerCase().includes(q)
+        );
+    }, [data, search]);
+
+    const { page, setPage, totalPages, paginated, total } = usePagination(filtered);
+
+    // Reset page when filter/tab changes
+    useEffect(() => { setPage(1); }, [activeTabId, bulan, tahun, search]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // ─── Date formatting ───
+    const formatDate = (dateStr: string) => {
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+    };
+
+    const isToday = (dateStr: string) => {
+        const d = new Date(dateStr);
         const today = new Date();
-        const dayStr = String(today.getDate()).padStart(2, '0');
-        const monthName = BULAN_NAMES[String(today.getMonth() + 1).padStart(2, '0')] || '';
-        const yearStr = String(today.getFullYear());
-        return tanggal === `${dayStr} ${monthName} ${yearStr}`;
+        return d.getDate() === today.getDate() &&
+            d.getMonth() === today.getMonth() &&
+            d.getFullYear() === today.getFullYear();
     };
 
     return (
@@ -257,8 +354,6 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                 </div>
             </div>
 
-
-
             {/* Summary Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <SummaryCard
@@ -269,7 +364,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                 />
                 <SummaryCard
                     label="Total Produksi"
-                    value={fmt(summary.totalProd)}
+                    value={fmt(summary.totalProduksi)}
                     icon={<FactoryIcon />}
                     color="blue"
                 />
@@ -281,35 +376,116 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                 />
                 <SummaryCard
                     label="Stok Akhir"
-                    value={fmt(summary.lastStok)}
+                    value={fmt(summary.stokAkhir)}
                     icon={<PackageIcon />}
                     color="violet"
                 />
             </div>
 
-            {/* Product Variant Tabs */}
+            {/* Data Table Card */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
 
-                {/* Variant Tabs + Actions */}
+                {/* Tabs + Actions */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-gray-100">
-                    {/* Scrollable tabs */}
-                    <div className="flex overflow-x-auto scrollbar-hide">
-                        {PRODUCT_VARIANTS.map((variant) => (
-                            <button
-                                key={variant}
-                                onClick={() => { setActiveVariant(variant); setPage(1); }}
-                                className={`px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap
-                                    ${activeVariant === variant
-                                        ? 'text-emerald-700'
-                                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                                    }`}
-                            >
-                                {variant}
-                                {activeVariant === variant && (
-                                    <span className="absolute bottom-0 left-0 w-full h-0.5 bg-emerald-600 rounded-t" />
+                    {/* Tabs */}
+                    <div className="flex overflow-x-auto scrollbar-hide items-center">
+                        {tabsLoading ? (
+                            <div className="px-4 py-3 text-sm text-gray-400">Memuat tab...</div>
+                        ) : (
+                            <>
+                                {tabs.map(tab => (
+                                    <div key={tab.id} className="relative group flex items-center">
+                                        {renamingTabId === tab.id ? (
+                                            <div className="flex items-center gap-1 px-2 py-2">
+                                                <input
+                                                    autoFocus
+                                                    value={renameValue}
+                                                    onChange={e => setRenameValue(e.target.value)}
+                                                    onKeyDown={e => {
+                                                        if (e.key === 'Enter') handleRenameTab(tab.id);
+                                                        if (e.key === 'Escape') { setRenamingTabId(null); setRenameValue(''); }
+                                                    }}
+                                                    className="text-sm px-2 py-1 border border-emerald-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-500 w-24"
+                                                />
+                                                <button onClick={() => handleRenameTab(tab.id)} className="text-emerald-600 hover:text-emerald-800 p-1">
+                                                    ✓
+                                                </button>
+                                                <button onClick={() => { setRenamingTabId(null); setRenameValue(''); }} className="text-gray-400 hover:text-gray-600 p-1">
+                                                    <XIcon />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                onClick={() => setActiveTabId(tab.id)}
+                                                className={`px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap
+                                                    ${activeTabId === tab.id
+                                                        ? 'text-emerald-700'
+                                                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                                                    }`}
+                                            >
+                                                {tab.nama}
+                                                {activeTabId === tab.id && (
+                                                    <span className="absolute bottom-0 left-0 w-full h-0.5 bg-emerald-600 rounded-t" />
+                                                )}
+                                            </button>
+                                        )}
+
+                                        {/* Tab context menu */}
+                                        {activeTabId === tab.id && renamingTabId !== tab.id && (
+                                            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity mr-1">
+                                                <button
+                                                    onClick={() => { setRenamingTabId(tab.id); setRenameValue(tab.nama); }}
+                                                    className="p-1 rounded text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                                                    title="Rename"
+                                                >
+                                                    <PencilIcon />
+                                                </button>
+                                                {tabs.length > 1 && (
+                                                    <button
+                                                        onClick={() => handleDeleteTab(tab.id)}
+                                                        className="p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                                        title="Hapus"
+                                                    >
+                                                        <TrashIcon />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+
+                                {/* Add tab button */}
+                                {showAddTab ? (
+                                    <div className="flex items-center gap-1 px-2 py-2">
+                                        <input
+                                            autoFocus
+                                            value={newTabName}
+                                            onChange={e => setNewTabName(e.target.value)}
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter') handleAddTab();
+                                                if (e.key === 'Escape') { setShowAddTab(false); setNewTabName(''); }
+                                            }}
+                                            placeholder="Nama tab..."
+                                            className="text-sm px-2 py-1 border border-emerald-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-500 w-28"
+                                        />
+                                        <button onClick={handleAddTab} className="text-emerald-600 hover:text-emerald-800 p-1 text-sm font-medium">
+                                            ✓
+                                        </button>
+                                        <button onClick={() => { setShowAddTab(false); setNewTabName(''); }} className="text-gray-400 hover:text-gray-600 p-1">
+                                            <XIcon />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => setShowAddTab(true)}
+                                        className="flex items-center gap-1 px-3 py-3 text-sm text-gray-400 hover:text-emerald-600 hover:bg-emerald-50/50 transition-colors whitespace-nowrap"
+                                        title="Tambah Tab"
+                                    >
+                                        <PlusIcon />
+                                    </button>
                                 )}
-                            </button>
-                        ))}
+                            </>
+                        )}
                     </div>
 
                     {/* Export */}
@@ -341,33 +517,40 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                 {/* Filter Row */}
                 <div className="p-4 border-b border-gray-100 bg-gray-50/50">
                     <div className="flex flex-col md:flex-row md:items-end gap-4 justify-between">
-                        {/* Left: Period */}
+                        {/* Left: Period filter (auto-apply) */}
                         <div className="flex flex-col sm:flex-row gap-3 items-end">
                             <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
                                 <span className="text-sm font-medium text-gray-500 mr-1">Periode:</span>
                                 <select
-                                    value={bulan}
-                                    onChange={(e) => { setBulan(e.target.value); setPage(1); }}
+                                    value={bulan ?? ''}
+                                    onChange={e => setBulan(e.target.value ? Number(e.target.value) : null)}
                                     className="bg-transparent text-sm font-medium text-gray-700 focus:outline-none cursor-pointer hover:text-emerald-600 transition-colors"
                                 >
-                                    {BULAN_OPTIONS.map((opt) => (
+                                    <option value="">Semua Bulan</option>
+                                    {BULAN_OPTIONS.map(opt => (
                                         <option key={opt.value} value={opt.value}>{opt.label}</option>
                                     ))}
                                 </select>
                                 <span className="text-gray-300">/</span>
                                 <select
-                                    value={tahun}
-                                    onChange={(e) => { setTahun(e.target.value); setPage(1); }}
+                                    value={tahun ?? ''}
+                                    onChange={e => setTahun(e.target.value ? Number(e.target.value) : null)}
                                     className="bg-transparent text-sm font-medium text-gray-700 focus:outline-none cursor-pointer hover:text-emerald-600 transition-colors"
                                 >
-                                    {TAHUN_OPTIONS.map((opt) => (
-                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                    <option value="">Semua Tahun</option>
+                                    {generateYearOptions().map(y => (
+                                        <option key={y} value={y}>{y}</option>
                                     ))}
                                 </select>
                             </div>
-                            <button className="px-4 py-2 bg-white text-emerald-600 text-sm font-medium rounded-lg border border-emerald-200 hover:bg-emerald-50 hover:border-emerald-300 transition-all shadow-sm">
-                                Terapkan Filter
-                            </button>
+                            {hasFilter && (
+                                <button
+                                    onClick={clearFilter}
+                                    className="px-3 py-2 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg border border-red-200 transition-colors flex items-center gap-1.5"
+                                >
+                                    <XIcon /> Hapus Filter
+                                </button>
+                            )}
                         </div>
 
                         {/* Right: Search */}
@@ -378,7 +561,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                             <input
                                 type="text"
                                 value={search}
-                                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                                onChange={e => setSearch(e.target.value)}
                                 placeholder="Cari data..."
                                 className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow shadow-sm"
                             />
@@ -386,7 +569,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                     </div>
                 </div>
 
-                {/* Previous Month Summary Row */}
+                {/* Summary Strip */}
                 {bulan && tahun && (
                     <div className="px-4 py-3 bg-emerald-50/60 border-b border-emerald-100">
                         <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
@@ -400,145 +583,143 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Stok Akhir</span>
-                                <span className="text-sm font-bold text-gray-800">{fmt(summary.lastStok)}</span>
+                                <span className="text-sm font-bold text-gray-800">{fmt(summary.stokAkhir)}</span>
                             </div>
                         </div>
                     </div>
                 )}
 
+                {/* Loading Indicator */}
+                {loading && (
+                    <div className="px-4 py-8 text-center text-gray-400 text-sm">
+                        <div className="inline-flex items-center gap-2">
+                            <div className="w-4 h-4 border-2 border-emerald-300 border-t-transparent rounded-full animate-spin" />
+                            Memuat data...
+                        </div>
+                    </div>
+                )}
+
                 {/* Desktop Table */}
-                <div className="overflow-x-auto hidden sm:block">
-                    <table className="w-full text-sm">
-                        <thead>
-                            <tr className="bg-gray-50 text-left">
-                                <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap sticky left-0 bg-gray-50 z-10">Tanggal</th>
-                                <th className="px-4 py-3 font-semibold text-gray-600 text-right whitespace-nowrap">Prod.</th>
-                                <th className="px-4 py-3 font-semibold text-gray-600 text-right whitespace-nowrap">Kumulatif</th>
-                                <th className="px-4 py-3 font-semibold text-gray-600 text-right whitespace-nowrap">Keluar</th>
-                                <th className="px-4 py-3 font-semibold text-gray-600 text-right whitespace-nowrap">Stok Akhir</th>
-                                <th className="px-4 py-3 font-semibold text-gray-600 text-right whitespace-nowrap">COA</th>
-                                <th className="px-4 py-3 font-semibold text-gray-600 text-center whitespace-nowrap">Jam</th>
-                                <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">Ket.</th>
-                                <th className="px-4 py-3 font-semibold text-gray-600 text-right whitespace-nowrap">CR%</th>
-                                <th className="px-4 py-3 font-semibold text-gray-600 text-center whitespace-nowrap">Analisa</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {paginated.length === 0 ? (
-                                <tr>
-                                    <td colSpan={10} className="px-4 py-12 text-center text-gray-400">
-                                        Tidak ada data ditemukan.
-                                    </td>
+                {!loading && (
+                    <div className="overflow-x-auto hidden sm:block">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="bg-gray-50 text-left">
+                                    <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap sticky left-0 bg-gray-50 z-10">Tanggal</th>
+                                    <th className="px-4 py-3 font-semibold text-gray-600 text-right whitespace-nowrap">Prod.</th>
+                                    <th className="px-4 py-3 font-semibold text-gray-600 text-right whitespace-nowrap">Kumulatif</th>
+                                    <th className="px-4 py-3 font-semibold text-gray-600 text-right whitespace-nowrap">Keluar</th>
+                                    <th className="px-4 py-3 font-semibold text-gray-600 text-right whitespace-nowrap">Stok Akhir</th>
+                                    <th className="px-4 py-3 font-semibold text-gray-600 text-right whitespace-nowrap">COA</th>
+                                    <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">Ket.</th>
                                 </tr>
-                            ) : (
-                                paginated.map((row, i) => {
-                                    const highlight = isToday(row.tanggal);
-                                    return (
-                                        <tr
-                                            key={i}
-                                            className={`transition-colors ${highlight
-                                                ? 'bg-amber-50/80 hover:bg-amber-50'
-                                                : 'hover:bg-emerald-50/30'
-                                                }`}
-                                        >
-                                            <td className={`px-4 py-3 font-medium whitespace-nowrap sticky left-0 z-10 ${highlight ? 'text-amber-700 bg-amber-50/80' : 'text-gray-700 bg-white'}`}>
-                                                {row.tanggal}
-                                            </td>
-                                            <td className="px-4 py-3 text-right font-mono text-gray-600 tabular-nums">
-                                                {fmt(row.produksi)}
-                                            </td>
-                                            <td className="px-4 py-3 text-right font-mono text-gray-700 font-medium tabular-nums">
-                                                {fmt(row.kumulatif)}
-                                            </td>
-                                            <td className="px-4 py-3 text-right font-mono text-gray-600 tabular-nums">
-                                                {fmt(row.keluar)}
-                                            </td>
-                                            <td className="px-4 py-3 text-right font-mono font-semibold tabular-nums text-emerald-700">
-                                                {fmt(row.stokAkhir)}
-                                            </td>
-                                            <td className="px-4 py-3 text-right font-mono text-gray-600 tabular-nums">
-                                                {fmt(row.coa)}
-                                            </td>
-                                            <td className="px-4 py-3 text-center text-gray-500 text-xs">
-                                                {row.jam || '—'}
-                                            </td>
-                                            <td className="px-4 py-3 text-gray-500 text-xs max-w-[150px] truncate">
-                                                {row.keterangan || '—'}
-                                            </td>
-                                            <td className="px-4 py-3 text-right font-mono text-gray-600 tabular-nums">
-                                                {row.crPercent > 0 ? `${fmt(row.crPercent)}%` : '—'}
-                                            </td>
-                                            <td className="px-4 py-3 text-center text-gray-500 text-xs">
-                                                {row.analisa || '—'}
-                                            </td>
-                                        </tr>
-                                    );
-                                })
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {paginated.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={7} className="px-4 py-12 text-center text-gray-400">
+                                            {data.length === 0 ? 'Belum ada data produksi.' : 'Tidak ada data ditemukan.'}
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    paginated.map((row) => {
+                                        const highlight = isToday(row.tanggal);
+                                        return (
+                                            <tr
+                                                key={row.id}
+                                                className={`transition-colors ${highlight
+                                                    ? 'bg-amber-50/80 hover:bg-amber-50'
+                                                    : 'hover:bg-emerald-50/30'
+                                                    }`}
+                                            >
+                                                <td className={`px-4 py-3 font-medium whitespace-nowrap sticky left-0 z-10 ${highlight ? 'text-amber-700 bg-amber-50/80' : 'text-gray-700 bg-white'}`}>
+                                                    {formatDate(row.tanggal)}
+                                                </td>
+                                                <td className="px-4 py-3 text-right font-mono text-gray-600 tabular-nums">
+                                                    {fmt(row.produksi)}
+                                                </td>
+                                                <td className="px-4 py-3 text-right font-mono text-gray-700 font-medium tabular-nums">
+                                                    {fmt(row.kumulatif)}
+                                                </td>
+                                                <td className="px-4 py-3 text-right font-mono text-gray-600 tabular-nums">
+                                                    {fmt(row.keluar)}
+                                                </td>
+                                                <td className="px-4 py-3 text-right font-mono font-semibold tabular-nums text-emerald-700">
+                                                    {fmt(row.stokAkhir)}
+                                                </td>
+                                                <td className="px-4 py-3 text-right font-mono text-gray-600 tabular-nums">
+                                                    {fmt(row.coa)}
+                                                </td>
+                                                <td className="px-4 py-3 text-gray-500 text-xs max-w-[200px] truncate">
+                                                    {row.keterangan || '—'}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
 
                 {/* Mobile Cards */}
-                <div className="sm:hidden divide-y divide-gray-100">
-                    {paginated.length === 0 ? (
-                        <div className="px-4 py-12 text-center text-gray-400">Tidak ada data ditemukan.</div>
-                    ) : (
-                        paginated.map((row, i) => {
-                            const highlight = isToday(row.tanggal);
-                            return (
-                                <div key={i} className={`p-4 space-y-3 ${highlight ? 'bg-amber-50/60' : ''}`}>
-                                    <div className="flex items-center justify-between">
-                                        <span className={`text-sm font-semibold ${highlight ? 'text-amber-700' : 'text-gray-800'}`}>
-                                            {row.tanggal}
-                                        </span>
-                                        {highlight && (
-                                            <span className="inline-flex px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-100 text-amber-700 border border-amber-200">
-                                                Hari ini
+                {!loading && (
+                    <div className="sm:hidden divide-y divide-gray-100">
+                        {paginated.length === 0 ? (
+                            <div className="px-4 py-12 text-center text-gray-400">
+                                {data.length === 0 ? 'Belum ada data produksi.' : 'Tidak ada data ditemukan.'}
+                            </div>
+                        ) : (
+                            paginated.map((row) => {
+                                const highlight = isToday(row.tanggal);
+                                return (
+                                    <div key={row.id} className={`p-4 space-y-3 ${highlight ? 'bg-amber-50/60' : ''}`}>
+                                        <div className="flex items-center justify-between">
+                                            <span className={`text-sm font-semibold ${highlight ? 'text-amber-700' : 'text-gray-800'}`}>
+                                                {formatDate(row.tanggal)}
                                             </span>
+                                            {highlight && (
+                                                <span className="inline-flex px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+                                                    Hari ini
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                                            <div>
+                                                <span className="text-[11px] text-gray-400 uppercase tracking-wide">Produksi</span>
+                                                <p className="font-mono text-gray-700">{fmt(row.produksi)}</p>
+                                            </div>
+                                            <div>
+                                                <span className="text-[11px] text-gray-400 uppercase tracking-wide">Kumulatif</span>
+                                                <p className="font-mono text-gray-700 font-medium">{fmt(row.kumulatif)}</p>
+                                            </div>
+                                            <div>
+                                                <span className="text-[11px] text-gray-400 uppercase tracking-wide">Keluar</span>
+                                                <p className="font-mono text-gray-700">{fmt(row.keluar)}</p>
+                                            </div>
+                                            <div>
+                                                <span className="text-[11px] text-gray-400 uppercase tracking-wide">Stok Akhir</span>
+                                                <p className="font-mono font-semibold text-emerald-700">{fmt(row.stokAkhir)}</p>
+                                            </div>
+                                            <div>
+                                                <span className="text-[11px] text-gray-400 uppercase tracking-wide">COA</span>
+                                                <p className="font-mono text-gray-700">{fmt(row.coa)}</p>
+                                            </div>
+                                        </div>
+                                        {row.keterangan && (
+                                            <div className="pt-1 text-xs text-gray-500 border-t border-gray-100">
+                                                Ket: <span className="font-medium text-gray-700">{row.keterangan}</span>
+                                            </div>
                                         )}
                                     </div>
-                                    <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
-                                        <div>
-                                            <span className="text-[11px] text-gray-400 uppercase tracking-wide">Produksi</span>
-                                            <p className="font-mono text-gray-700">{fmt(row.produksi)}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-[11px] text-gray-400 uppercase tracking-wide">Kumulatif</span>
-                                            <p className="font-mono text-gray-700 font-medium">{fmt(row.kumulatif)}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-[11px] text-gray-400 uppercase tracking-wide">Keluar</span>
-                                            <p className="font-mono text-gray-700">{fmt(row.keluar)}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-[11px] text-gray-400 uppercase tracking-wide">Stok Akhir</span>
-                                            <p className="font-mono font-semibold text-emerald-700">{fmt(row.stokAkhir)}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-[11px] text-gray-400 uppercase tracking-wide">COA</span>
-                                            <p className="font-mono text-gray-700">{fmt(row.coa)}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-[11px] text-gray-400 uppercase tracking-wide">CR%</span>
-                                            <p className="font-mono text-gray-700">{row.crPercent > 0 ? `${fmt(row.crPercent)}%` : '—'}</p>
-                                        </div>
-                                    </div>
-                                    {(row.jam || row.keterangan || row.analisa) && (
-                                        <div className="flex flex-wrap gap-3 pt-1 text-xs text-gray-500 border-t border-gray-100">
-                                            {row.jam && <span>Jam: <span className="font-medium text-gray-700">{row.jam}</span></span>}
-                                            {row.keterangan && <span>Ket: <span className="font-medium text-gray-700">{row.keterangan}</span></span>}
-                                            {row.analisa && <span>Analisa: <span className="font-medium text-gray-700">{row.analisa}</span></span>}
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })
-                    )}
-                </div>
+                                );
+                            })
+                        )}
+                    </div>
+                )}
 
                 {/* Pagination */}
-                <Pagination page={page} totalPages={totalPages} total={total} setPage={setPage} />
+                {!loading && <Pagination page={page} totalPages={totalPages} total={total} setPage={setPage} />}
             </div>
         </div>
     );
@@ -556,18 +737,16 @@ const COLOR_MAP: Record<string, { bg: string; iconBg: string; text: string; bord
 };
 
 function SummaryCard({ label, value, icon, color }: { label: string; value: string; icon: React.ReactNode; color: string }) {
-    const c = COLOR_MAP[color] || COLOR_MAP.emerald;
+    const c = COLOR_MAP[color] ?? COLOR_MAP.emerald;
     return (
-        <div className={`rounded-xl border ${c.border} ${c.bg} p-4 transition-shadow hover:shadow-md`}>
-            <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-lg ${c.iconBg} flex items-center justify-center ${c.text}`}>
+        <div className={`${c.bg} ${c.border} border rounded-xl p-4 sm:p-5`}>
+            <div className="flex items-center gap-3 mb-2">
+                <div className={`${c.iconBg} ${c.text} p-2 rounded-lg`}>
                     {icon}
                 </div>
-                <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wider truncate">{label}</p>
-                    <p className={`text-lg font-bold ${c.text} truncate`}>{value}</p>
-                </div>
+                <span className={`text-xs font-semibold uppercase tracking-wider ${c.text}`}>{label}</span>
             </div>
+            <p className="text-lg sm:text-xl font-bold text-gray-900 pl-1">{value}</p>
         </div>
     );
 }
@@ -579,10 +758,10 @@ function SummaryCard({ label, value, icon, color }: { label: string; value: stri
 function CalendarSmallIcon() {
     return (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-            <line x1="16" y1="2" x2="16" y2="6" />
-            <line x1="8" y1="2" x2="8" y2="6" />
-            <line x1="3" y1="10" x2="21" y2="10" />
+            <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
+            <line x1="16" x2="16" y1="2" y2="6" />
+            <line x1="8" x2="8" y1="2" y2="6" />
+            <line x1="3" x2="21" y1="10" y2="10" />
         </svg>
     );
 }
@@ -598,39 +777,53 @@ function Pagination({
     total: number;
     setPage: (p: number) => void;
 }) {
-    const from = total === 0 ? 0 : (page - 1) * 15 + 1;
-    const to = Math.min(page * 15, total);
+    if (total === 0) return null;
 
     return (
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-4 py-3 border-t border-gray-100">
-            <p className="text-xs text-gray-400 mb-2 sm:mb-0">
-                Showing {from} to {to} of {total} entries
-            </p>
+        <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between text-sm text-gray-500">
+            <span>
+                Menampilkan <span className="font-medium text-gray-700">{Math.min((page - 1) * 15 + 1, total)}</span>
+                {' – '}
+                <span className="font-medium text-gray-700">{Math.min(page * 15, total)}</span>
+                {' dari '}
+                <span className="font-medium text-gray-700">{total}</span> data
+            </span>
             <div className="flex items-center gap-1">
                 <button
-                    onClick={() => setPage(Math.max(1, page - 1))}
-                    disabled={page === 1}
-                    className="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    disabled={page <= 1}
+                    onClick={() => setPage(page - 1)}
+                    className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 >
                     <ChevronLeftIcon />
                 </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                    <button
-                        key={p}
-                        onClick={() => setPage(p)}
-                        className={`min-w-[32px] py-1 rounded-md text-sm font-medium transition-colors
-                            ${p === page
-                                ? 'bg-emerald-600 text-white shadow-sm'
-                                : 'text-gray-600 hover:bg-gray-100'
-                            }`}
-                    >
-                        {p}
-                    </button>
-                ))}
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+                    .reduce((acc: (number | 'ellipsis')[], p, idx, arr) => {
+                        if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('ellipsis');
+                        acc.push(p);
+                        return acc;
+                    }, [])
+                    .map((item, i) =>
+                        item === 'ellipsis' ? (
+                            <span key={`e${i}`} className="px-2 text-gray-300">…</span>
+                        ) : (
+                            <button
+                                key={item}
+                                onClick={() => setPage(item as number)}
+                                className={`min-w-[32px] h-8 rounded-lg text-sm font-medium transition-colors
+                                    ${page === item
+                                        ? 'bg-emerald-600 text-white shadow-sm'
+                                        : 'text-gray-600 hover:bg-gray-100'
+                                    }`}
+                            >
+                                {item}
+                            </button>
+                        )
+                    )}
                 <button
-                    onClick={() => setPage(Math.min(totalPages, page + 1))}
-                    disabled={page === totalPages}
-                    className="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    disabled={page >= totalPages}
+                    onClick={() => setPage(page + 1)}
+                    className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 >
                     <ChevronRightIcon />
                 </button>

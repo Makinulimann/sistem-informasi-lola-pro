@@ -23,6 +23,8 @@ public class SIPProDbContext : DbContext, ISipProDbContext
     public DbSet<BalanceStokDetail> BalanceStokDetails { get; set; }
     public DbSet<MasterItem> MasterItems { get; set; }
     public DbSet<ProductMaterial> ProductMaterials { get; set; }
+    public DbSet<ProduksiTab> ProduksiTabs { get; set; }
+    public DbSet<Produksi> Produksis { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -15,5 +15,7 @@ public interface ISipProDbContext
     DbSet<BalanceStokDetail> BalanceStokDetails { get; set; }
     DbSet<MasterItem> MasterItems { get; set; }
     DbSet<ProductMaterial> ProductMaterials { get; set; }
+    DbSet<ProduksiTab> ProduksiTabs { get; set; }
+    DbSet<Produksi> Produksis { get; set; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 }
