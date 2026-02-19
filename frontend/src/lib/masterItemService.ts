@@ -38,6 +38,15 @@ export const masterItemService = {
         return res;
     },
 
+    updateMasterItem: async (id: number, nama: string, satuanDefault?: string): Promise<MasterItem> => {
+        const payload = {
+            nama,
+            satuanDefault: satuanDefault || null
+        };
+        const res = await api.put<MasterItem>(`/ProductMaterial/master-items/${id}`, payload);
+        return res;
+    },
+
     // Product Configuration
     getProductMaterials: async (productSlug: string, jenis?: 'Baku' | 'Penolong'): Promise<ProductMaterial[]> => {
         const query = jenis ? `?jenis=${encodeURIComponent(jenis)}` : '';
@@ -52,6 +61,11 @@ export const masterItemService = {
 
     unassignMaterial: async (id: number): Promise<void> => {
         await api.delete(`/ProductMaterial/${id}`);
+    },
+
+    getMasterItemAssignments: async (id: number): Promise<{ id: number, productSlug: string, jenis: string }[]> => {
+        const res = await api.get<{ id: number, productSlug: string, jenis: string }[]>(`/ProductMaterial/master-items/${id}/assignments`);
+        return res;
     },
 
     deleteMasterItem: async (id: number): Promise<void> => {

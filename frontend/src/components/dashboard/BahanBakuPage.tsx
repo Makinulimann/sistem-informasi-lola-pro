@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback, Fragment } from 'react';
 import { format } from 'date-fns';
+import { id } from 'date-fns/locale';
 import { SuplaiModal } from './SuplaiModal';
 import { MutasiModal } from './MutasiModal';
 import { ConfigurationTab } from './ConfigurationTab';
@@ -13,11 +14,19 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { bahanBakuService, Perusahaan, BahanBaku, Material, BalanceStok } from '@/lib/bahanBakuService';
+import { cn } from "@/lib/utils";
+import { bahanBakuService, Perusahaan, BahanBaku, Material, BalanceStok, BalanceStokRow } from '@/lib/bahanBakuService';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { PencilIcon, Trash2Icon as TrashIcon } from 'lucide-react';
 
 /* ─── Types ─── */
 
 type TabKey = 'suplai' | 'mutasi' | 'balance-stok' | 'konfigurasi';
+
+/** Format number with locale-aware thousand separators */
+const fmtNumber = (n: number) => n.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 // ...
 
@@ -29,21 +38,25 @@ const tabs: { key: TabKey; label: string }[] = [
 ];
 
 interface SuplaiRow {
+    id: number;
     no: number;
     tanggal: string;
     jenis: string;
     namaBahan: string;
     kuantum: number;
+    satuan: string;
     dokumen: string;
     keterangan: string;
 }
 
 interface MutasiRow {
+    id: number;
     no: number;
     tanggal: string;
     jenis: string;
     namaBahan: string;
     kuantum: number;
+    satuan: string;
     dokumen: string;
     keterangan: string;
 }
@@ -120,23 +133,7 @@ function SortIcon({ direction }: { direction?: 'asc' | 'desc' }) {
     );
 }
 
-function EditIcon() {
-    return (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-        </svg>
-    );
-}
 
-function TrashIcon() {
-    return (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="3 6 5 6 21 6" />
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-        </svg>
-    );
-}
 
 function CheckIcon() {
     return (
@@ -211,12 +208,15 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
     const [suplaiData, setSuplaiData] = useState<SuplaiRow[]>([]);
     const [mutasiData, setMutasiData] = useState<MutasiRow[]>([]);
     const [balanceData, setBalanceData] = useState<BalanceStok[]>([]);
+    const [balanceStokRows, setBalanceStokRows] = useState<BalanceStokRow[]>([]);
     const [materials, setMaterials] = useState<Material[]>([]);
 
     // UI State
     const [isLoading, setIsLoading] = useState(false);
     const [isSuplaiModalOpen, setIsSuplaiModalOpen] = useState(false);
     const [isMutasiModalOpen, setIsMutasiModalOpen] = useState(false);
+    const [editingId, setEditingId] = useState<number | null>(null);
+    const [editData, setEditData] = useState<any>(null);
 
 
 
@@ -233,32 +233,36 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
             if (activeTab === 'suplai') {
                 const data = await bahanBakuService.getSuplai(params);
                 setSuplaiData(data.map((item, idx) => ({
+                    id: item.id,
                     no: idx + 1,
-                    tanggal: format(new Date(item.tanggal), 'dd/MM/yyyy'),
+                    tanggal: format(new Date(item.tanggal), 'yyyy-MM-dd'),
                     jenis: item.jenis,
                     namaBahan: item.namaBahan,
                     kuantum: item.kuantum,
+                    satuan: item.satuan || 'Kg',
                     dokumen: item.dokumen,
                     keterangan: item.keterangan || '-',
                 })));
             } else if (activeTab === 'mutasi') {
                 const data = await bahanBakuService.getMutasi(params);
                 setMutasiData(data.map((item, idx) => ({
+                    id: item.id,
                     no: idx + 1,
                     tanggal: format(new Date(item.tanggal), 'dd/MM/yyyy'),
                     jenis: item.jenis,
                     namaBahan: item.namaBahan,
                     kuantum: item.kuantum,
+                    satuan: item.satuan || 'Kg',
                     dokumen: item.dokumen,
                     keterangan: item.keterangan || '-',
                 })));
             } else if (activeTab === 'balance-stok') {
-                const [mats, bals] = await Promise.all([
-                    bahanBakuService.getMaterials(defaultProductSlug),
-                    bahanBakuService.getBalance(params)
-                ]);
-                setMaterials(mats);
-                setBalanceData(bals);
+                const rows = await bahanBakuService.getBalanceStok({
+                    productSlug: defaultProductSlug,
+                    bulan: bulan || undefined,
+                    tahun: tahun || undefined
+                });
+                setBalanceStokRows(rows);
             }
         } catch (error) {
             console.error('Failed to fetch data:', error);
@@ -272,21 +276,98 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
     }, [fetchData]);
 
     const handleAddSuplai = async (data: any) => {
-        const payload = {
-            productSlug: defaultProductSlug,
-            perusahaanId: 0, // Default to 0 as field is removed
-            tanggal: data.date,
-            jenis: 'Bahan Baku',
-            namaBahan: data.bahanBakuList?.[0]?.name || '',
-            kuantum: parseFloat(data.bahanBakuList?.[0]?.quantum || 0),
-            dokumen: data.file ? data.file.name : '',
-            keterangan: data.keterangan
-        };
         try {
-            await bahanBakuService.createSuplai(payload as any);
+            if (editingId) {
+                // Update mode (Single Item)
+                // We assume the modal returns lists, but we only update the single item we are editing.
+                // We need to extract the correct item from the lists.
+                let payload: any = null;
+
+                // Check if we are updating a Bahan Baku
+                if (data.bahanBakuList && data.bahanBakuList.length > 0 && data.bahanBakuList[0].name) {
+                    const item = data.bahanBakuList[0];
+                    payload = {
+                        productSlug: defaultProductSlug,
+                        perusahaanId: 0,
+                        tanggal: data.date,
+                        jenis: 'Bahan Baku',
+                        namaBahan: item.name,
+                        kuantum: parseFloat(item.quantum),
+                        satuan: item.satuan || 'Kg',
+                        dokumen: data.file ? data.file.name : (editData?.dokumen || ''),
+                        keterangan: data.keterangan
+                    };
+                }
+                // Check if we are updating a Bahan Penolong
+                else if (data.bahanPenolongList && data.bahanPenolongList.length > 0 && data.bahanPenolongList[0].name) {
+                    const item = data.bahanPenolongList[0];
+                    payload = {
+                        productSlug: defaultProductSlug,
+                        perusahaanId: 0,
+                        tanggal: data.date,
+                        jenis: 'Bahan Penolong',
+                        namaBahan: item.name,
+                        kuantum: parseFloat(item.quantum),
+                        satuan: item.satuan || 'Pcs',
+                        dokumen: data.file ? data.file.name : (editData?.dokumen || ''),
+                        keterangan: data.keterangan || ''
+                    };
+                }
+
+                if (payload) {
+                    await bahanBakuService.updateSuplai(editingId, payload);
+                }
+            } else {
+                // Create mode (Multiple Items)
+                const promises = [];
+
+                // Process Bahan Baku
+                if (data.bahanBakuList && Array.isArray(data.bahanBakuList)) {
+                    for (const item of data.bahanBakuList) {
+                        if (item.name && parseFloat(item.quantum) > 0) {
+                            const payload = {
+                                productSlug: defaultProductSlug,
+                                perusahaanId: 0,
+                                tanggal: data.date,
+                                jenis: 'Bahan Baku',
+                                namaBahan: item.name,
+                                kuantum: parseFloat(item.quantum),
+                                satuan: item.satuan || 'Kg',
+                                dokumen: data.file ? data.file.name : '',
+                                keterangan: data.keterangan
+                            };
+                            promises.push(bahanBakuService.createSuplai(payload as any));
+                        }
+                    }
+                }
+
+                // Process Bahan Penolong
+                if (data.bahanPenolongList && Array.isArray(data.bahanPenolongList)) {
+                    for (const item of data.bahanPenolongList) {
+                        if (item.name && parseFloat(item.quantum) > 0) {
+                            const payload = {
+                                productSlug: defaultProductSlug,
+                                perusahaanId: 0,
+                                tanggal: data.date,
+                                jenis: 'Bahan Penolong',
+                                namaBahan: item.name,
+                                kuantum: parseFloat(item.quantum),
+                                satuan: item.satuan || 'Pcs',
+                                dokumen: data.file ? data.file.name : '',
+                                keterangan: data.keterangan || ''
+                            };
+                            promises.push(bahanBakuService.createSuplai(payload as any));
+                        }
+                    }
+                }
+                await Promise.all(promises);
+            }
             fetchData();
+            setEditingId(null);
+            setEditData(null);
         } catch (error) {
-            console.error('Failed to create suplai:', error);
+            console.error('Failed to save suplai:', error);
+            alert('Gagal menyimpan data suplai. Silakan coba lagi.');
         }
     };
 
@@ -298,14 +379,46 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
             jenis: data.jenis,
             namaBahan: data.namaBahan,
             kuantum: parseFloat(data.quantum || 0),
-            dokumen: data.file ? data.file.name : '',
+            satuan: data.satuan,
+            dokumen: data.file ? data.file.name : (editData?.dokumen || ''),
             keterangan: data.keterangan
         };
         try {
-            await bahanBakuService.createMutasi(payload as any);
+            if (editingId) {
+                await bahanBakuService.updateMutasi(editingId, payload);
+            } else {
+                await bahanBakuService.createMutasi(payload as any);
+            }
             fetchData();
+            setEditingId(null);
+            setEditData(null);
         } catch (error) {
-            console.error('Failed to create mutasi:', error);
+            console.error('Failed to save mutasi:', error);
+            alert('Gagal menyimpan data mutasi.');
+        }
+    };
+
+    const handleDeleteSuplai = async (id: number) => {
+        if (confirm('Apakah Anda yakin ingin menghapus data ini?')) {
+            try {
+                await bahanBakuService.deleteSuplai(id);
+                fetchData();
+            } catch (error) {
+                console.error('Failed to delete suplai:', error);
+                alert('Gagal menghapus data.');
+            }
+        }
+    };
+
+    const handleDeleteMutasi = async (id: number) => {
+        if (confirm('Apakah Anda yakin ingin menghapus data ini?')) {
+            try {
+                await bahanBakuService.deleteMutasi(id);
+                fetchData();
+            } catch (error) {
+                console.error('Failed to delete mutasi:', error);
+                alert('Gagal menghapus data.');
+            }
         }
     };
 
@@ -313,19 +426,170 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
         bahanBakuService.getMaterials(defaultProductSlug).then(setMaterials);
     };
 
+    const handleEditSuplai = (item: SuplaiRow) => {
+        setEditingId(item.id);
+        setEditData(item);
+        setIsSuplaiModalOpen(true);
+    };
+
+    const handleEditMutasi = (item: MutasiRow) => {
+        setEditingId(item.id);
+        setEditData(item);
+        setIsMutasiModalOpen(true);
+    };
+
+    const handleExportExcel = () => {
+        let dataToExport: any[] = [];
+        let filename = '';
+        let sheetName = '';
+
+        if (activeTab === 'suplai') {
+            dataToExport = suplaiData.map(row => ({
+                No: row.no,
+                Tanggal: format(new Date(row.tanggal), 'dd/MM/yyyy'),
+                Jenis: row.jenis,
+                'Nama Bahan': row.namaBahan,
+                Kuantum: row.kuantum,
+                Satuan: row.satuan,
+                Dokumen: row.dokumen,
+                Keterangan: row.keterangan,
+            }));
+            filename = `Suplai_Data_${format(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`;
+            sheetName = 'Data Suplai';
+        } else if (activeTab === 'mutasi') {
+            dataToExport = mutasiData.map(row => ({
+                No: row.no,
+                Tanggal: format(new Date(row.tanggal), 'dd/MM/yyyy'),
+                Jenis: row.jenis,
+                'Nama Bahan': row.namaBahan,
+                Kuantum: row.kuantum,
+                Satuan: row.satuan,
+                Dokumen: row.dokumen,
+                Keterangan: row.keterangan,
+            }));
+            filename = `Mutasi_Data_${format(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`;
+            sheetName = 'Data Mutasi';
+        } else if (activeTab === 'balance-stok') {
+            dataToExport = balanceStokRows.map(row => ({
+                'Nama Bahan': row.nama,
+                'Jenis': row.jenis === 'Baku' ? 'Bahan Baku' : 'Bahan Penolong',
+                'Satuan': row.satuan,
+                'Pemasukan': row.totalIn,
+                'Pengeluaran': row.totalOut,
+                'Stok Akhir': row.stok,
+            }));
+            filename = `Balance_Stok_Data_${format(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`;
+            sheetName = 'Balance Stok';
+        }
+
+        if (dataToExport.length > 0) {
+            const ws = XLSX.utils.json_to_sheet(dataToExport);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, sheetName);
+            XLSX.writeFile(wb, filename);
+        } else {
+            alert('Tidak ada data untuk diekspor.');
+        }
+    };
+
+    const handleExportPDF = () => {
+        const doc = new jsPDF();
+        let headers: string[] = [];
+        let dataRows: any[][] = [];
+        let title = '';
+
+        if (activeTab === 'suplai') {
+            title = 'Data Suplai Bahan Baku';
+            headers = ['No.', 'Tanggal', 'Jenis', 'Nama Bahan', 'Kuantum', 'Satuan', 'Dokumen', 'Keterangan'];
+            dataRows = suplaiData.map(row => [
+                row.no,
+                format(new Date(row.tanggal), 'dd/MM/yyyy'),
+                row.jenis,
+                row.namaBahan,
+                row.kuantum.toLocaleString('id-ID'),
+                row.satuan,
+                row.dokumen || '-',
+                row.keterangan || '-',
+            ]);
+        } else if (activeTab === 'mutasi') {
+            title = 'Data Mutasi Bahan Baku';
+            headers = ['No.', 'Tanggal', 'Jenis', 'Nama Bahan', 'Kuantum', 'Satuan', 'Dokumen', 'Keterangan'];
+            dataRows = mutasiData.map(row => [
+                row.no,
+                format(new Date(row.tanggal), 'dd/MM/yyyy'),
+                row.jenis,
+                row.namaBahan,
+                row.kuantum.toLocaleString('id-ID'),
+                row.satuan,
+                row.dokumen || '-',
+                row.keterangan || '-',
+            ]);
+        } else if (activeTab === 'balance-stok') {
+            title = 'Balance Stok Bahan Baku';
+            headers = ['Nama Bahan', 'Jenis', 'Satuan', 'Pemasukan', 'Pengeluaran', 'Stok Akhir'];
+            dataRows = balanceStokRows.map(row => [
+                row.nama,
+                row.jenis === 'Baku' ? 'Bahan Baku' : 'Bahan Penolong',
+                row.satuan,
+                row.totalIn.toLocaleString('id-ID'),
+                row.totalOut.toLocaleString('id-ID'),
+                row.stok.toLocaleString('id-ID'),
+            ]);
+        }
+
+        if (dataRows.length > 0) {
+            doc.text(title, 14, 15);
+            autoTable(doc, {
+                startY: 20,
+                head: [headers],
+                body: dataRows,
+                theme: 'grid',
+                styles: {
+                    font: 'helvetica',
+                    fontSize: 8,
+                    cellPadding: 2,
+                    halign: 'left',
+                },
+                headStyles: {
+                    fillColor: [23, 162, 184], // A nice blue color
+                    textColor: [255, 255, 255],
+                    fontStyle: 'bold',
+                },
+                columnStyles: {
+                    3: { halign: 'right' }, // Pemasukan
+                    4: { halign: 'right' }, // Pengeluaran
+                    5: { halign: 'right' }, // Stok Akhir
+                }
+            });
+            doc.save(`${title.replace(/\s/g, '_')}_${format(new Date(), 'yyyyMMdd_HHmmss')}.pdf`);
+        } else {
+            alert('Tidak ada data untuk diekspor.');
+        }
+    };
+
     return (
         <div className="space-y-6">
             <SuplaiModal
                 isOpen={isSuplaiModalOpen}
-                onClose={() => setIsSuplaiModalOpen(false)}
+                onClose={() => {
+                    setIsSuplaiModalOpen(false);
+                    setEditingId(null);
+                    setEditData(null);
+                }}
                 onSubmit={handleAddSuplai}
                 productSlug={defaultProductSlug}
+                initialData={editData}
             />
             <MutasiModal
                 isOpen={isMutasiModalOpen}
-                onClose={() => setIsMutasiModalOpen(false)}
+                onClose={() => {
+                    setIsMutasiModalOpen(false);
+                    setEditingId(null);
+                    setEditData(null);
+                }}
                 onSubmit={handleAddMutasi}
                 productSlug={defaultProductSlug}
+                initialData={editData}
             />
 
             {/* Breadcrumb */}
@@ -372,19 +636,17 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
                         {activeTab !== 'konfigurasi' && (
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <button className="inline-flex items-center gap-2 px-4 py-2 bg-white text-gray-700 text-sm font-medium rounded-lg border border-gray-200 hover:bg-gray-50 hover:text-gray-900 transition-colors shadow-sm">
+                                    <button suppressHydrationWarning className="inline-flex items-center gap-2 px-4 py-2 bg-white text-gray-700 text-sm font-medium rounded-lg border border-gray-200 hover:bg-gray-50 hover:text-gray-900 transition-colors shadow-sm">
                                         <DownloadIcon />
                                         Export Data
                                     </button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48 bg-white">
-                                    <DropdownMenuLabel>Pilih Format</DropdownMenuLabel>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem className="cursor-pointer">
+                                <DropdownMenuContent align="end" className="w-48 bg-white border border-gray-200 shadow-lg rounded-lg p-1 z-50">
+                                    <DropdownMenuItem onClick={handleExportExcel} className="cursor-pointer hover:bg-gray-50 focus:bg-gray-50">
                                         <span className="mr-2">📄</span> Export to Excel
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem className="cursor-pointer">
-                                        <span className="mr-2">tj</span> Export to PDF
+                                    <DropdownMenuItem onClick={handleExportPDF} className="cursor-pointer hover:bg-gray-50 focus:bg-gray-50">
+                                        <span className="mr-2">📑</span> Export to PDF
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
@@ -402,12 +664,12 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
                     </div>
                 </div>
 
-                {/* Filters Row: Periode, Tahun, Search */}
-                {/* Filters Row: Periode, Tahun, Search */}
+                {/* Filters Row */}
                 {activeTab !== 'konfigurasi' && (
                     <div className="p-4 border-b border-gray-100 bg-gray-50/50">
                         <div className="flex flex-col md:flex-row md:items-end gap-4 justify-between">
-                            {/* Left Side: Period Filter */}
+                            {/* Left Side: Period Filter (only for Suplai/Mutasi) */}
+                            {/* Left Side: Period Filter (Available for all tabs) */}
                             <div className="flex flex-col sm:flex-row gap-4 items-end">
                                 <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
                                     <span className="text-sm font-medium text-gray-500 mr-2">Periode:</span>
@@ -431,12 +693,19 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
                                         ))}
                                     </select>
                                 </div>
-                                <button
-                                    onClick={fetchData}
-                                    className="px-4 py-2 bg-white text-emerald-600 text-sm font-medium rounded-lg border border-emerald-200 hover:bg-emerald-50 hover:border-emerald-300 transition-all shadow-sm"
-                                >
-                                    Terapkan Filter
-                                </button>
+                                {(bulan || tahun) && (
+                                    <button
+                                        onClick={() => { setBulan(''); setTahun(''); }}
+                                        className="px-4 py-2 bg-white text-gray-500 text-sm font-medium rounded-lg border border-gray-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all shadow-sm"
+                                    >
+                                        ✕ Hapus Filter
+                                    </button>
+                                )}
+                                {activeTab === 'balance-stok' && (bulan || tahun) && (
+                                    <span className="text-xs text-gray-400 italic ml-2">
+                                        {`Menampilkan data periode: ${bulan ? BULAN_OPTIONS.find(o => o.value === bulan)?.label : ''} ${tahun}`}
+                                    </span>
+                                )}
                             </div>
 
                             {/* Right Side: Search */}
@@ -464,14 +733,15 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
                         </div>
                     ) : (
                         <>
-                            {activeTab === 'suplai' && <SuplaiTable data={suplaiData} search={search} />}
-                            {activeTab === 'mutasi' && <MutasiTable data={mutasiData} search={search} />}
+                            {activeTab === 'suplai' && <SuplaiTable data={suplaiData} search={search} onDelete={handleDeleteSuplai} onEdit={handleEditSuplai} />}
+                            {activeTab === 'mutasi' && <MutasiTable data={mutasiData} search={search} onEdit={handleEditMutasi} onDelete={handleDeleteMutasi} />}
                             {activeTab === 'balance-stok' && (
                                 <BalanceStokTable
-                                    materials={materials}
-                                    data={balanceData}
+                                    data={balanceStokRows}
                                     productSlug={defaultProductSlug}
-                                    onMaterialsChange={refreshMaterials}
+                                    search={search}
+                                    bulan={bulan}
+                                    tahun={tahun}
                                 />
                             )}
                             {activeTab === 'konfigurasi' && (
@@ -489,7 +759,7 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
 /*  Suplai Table                               */
 /* ═══════════════════════════════════════════ */
 
-function SuplaiTable({ data, search }: { data: SuplaiRow[]; search: string }) {
+function SuplaiTable({ data, search, onDelete, onEdit }: { data: SuplaiRow[]; search: string; onDelete: (id: number) => void; onEdit: (item: SuplaiRow) => void }) {
     const filtered = useMemo(() =>
         data.filter((row) =>
             search === '' ||
@@ -500,66 +770,147 @@ function SuplaiTable({ data, search }: { data: SuplaiRow[]; search: string }) {
 
     const { page, setPage, totalPages, paginated, total } = usePagination(filtered);
 
+    // Sorting helper (simple implementation)
+    const [sortConfig, setSortConfig] = useState<{ key: keyof SuplaiRow | null; direction: 'asc' | 'desc' }>({ key: null, direction: 'asc' });
+
+    const sortedData = useMemo(() => {
+        if (!sortConfig.key) return paginated;
+        const sorted = [...paginated].sort((a, b) => {
+            const aVal = a[sortConfig.key!] as any;
+            const bVal = b[sortConfig.key!] as any;
+            if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+        return sorted;
+    }, [paginated, sortConfig]);
+
+    const requestSort = (key: keyof SuplaiRow) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+
     return (
         <>
             <div className="overflow-x-auto hidden sm:block">
                 <table className="w-full text-sm">
                     <thead>
-                        <tr className="bg-gray-50 text-left">
-                            <th className="px-4 py-3 font-semibold text-gray-600 w-14">No. <SortIcon /></th>
-                            <th className="px-4 py-3 font-semibold text-gray-600">Tanggal <SortIcon /></th>
-                            <th className="px-4 py-3 font-semibold text-gray-600">Jenis <SortIcon /></th>
-                            <th className="px-4 py-3 font-semibold text-gray-600">Nama Bahan <SortIcon /></th>
-                            <th className="px-4 py-3 font-semibold text-gray-600 text-right">Kuantum <SortIcon /></th>
-                            <th className="px-4 py-3 font-semibold text-gray-600 text-center">Dokumen <SortIcon /></th>
+                        <tr className="bg-gray-50 text-left border-b border-gray-200">
+                            <th className="px-4 py-3 font-semibold text-gray-600 w-16">No.</th>
+                            <th className="px-4 py-3 font-semibold text-gray-600 cursor-pointer hover:text-emerald-600" onClick={() => requestSort('tanggal')}>
+                                Tanggal <SortIcon direction={sortConfig.key === 'tanggal' ? sortConfig.direction : undefined} />
+                            </th>
+                            <th className="px-4 py-3 font-semibold text-gray-600 cursor-pointer hover:text-emerald-600" onClick={() => requestSort('jenis')}>
+                                Jenis <SortIcon direction={sortConfig.key === 'jenis' ? sortConfig.direction : undefined} />
+                            </th>
+                            <th className="px-4 py-3 font-semibold text-gray-600 cursor-pointer hover:text-emerald-600" onClick={() => requestSort('namaBahan')}>
+                                Nama Bahan <SortIcon direction={sortConfig.key === 'namaBahan' ? sortConfig.direction : undefined} />
+                            </th>
+                            <th className="px-4 py-3 font-semibold text-gray-600 text-right cursor-pointer hover:text-emerald-600" onClick={() => requestSort('kuantum')}>
+                                Kuantum <SortIcon direction={sortConfig.key === 'kuantum' ? sortConfig.direction : undefined} />
+                            </th>
+                            <th className="px-4 py-3 font-semibold text-gray-600 text-center">Dokumen</th>
                             <th className="px-4 py-3 font-semibold text-gray-600">Keterangan</th>
+                            <th className="px-4 py-3 font-semibold text-gray-600 text-center w-24">Aksi</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                        {paginated.length === 0 ? (
+                        {sortedData.length === 0 ? (
                             <tr>
-                                <td colSpan={7} className="px-4 py-12 text-center text-gray-400">
+                                <td colSpan={8} className="px-4 py-12 text-center text-gray-400">
                                     Tidak ada data ditemukan.
                                 </td>
                             </tr>
                         ) : (
-                            paginated.map((row) => (
-                                <tr key={row.no} className="hover:bg-emerald-50/30 transition-colors">
+                            sortedData.map((row) => (
+                                <tr key={row.id} className="hover:bg-emerald-50/30 transition-colors">
                                     <td className="px-4 py-3 text-emerald-600 font-medium">{row.no}</td>
-                                    <td className="px-4 py-3 text-gray-700">{row.tanggal}</td>
+                                    <td className="px-4 py-3 text-gray-700">{format(new Date(row.tanggal), 'dd/MM/yyyy')}</td>
                                     <td className="px-4 py-3">
-                                        <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                        <span className={cn(
+                                            "inline-flex px-2 py-0.5 text-xs font-medium rounded-full border",
+                                            row.jenis === 'Bahan Baku'
+                                                ? "bg-blue-50 text-blue-700 border-blue-100"
+                                                : "bg-emerald-50 text-emerald-700 border-emerald-100"
+                                        )}>
                                             {row.jenis}
                                         </span>
                                     </td>
-                                    <td className="px-4 py-3 text-gray-800 font-medium">{row.namaBahan}</td>
-                                    <td className="px-4 py-3 text-right font-mono text-gray-700">{row.kuantum.toFixed(2)}</td>
-                                    <td className="px-4 py-3 text-center">
-                                        {/* Eye Icon for viewing documents */}
-                                        <button className="text-emerald-600 hover:text-emerald-800 transition-colors p-1" title="Lihat Dokumen">
-                                            <EyeIcon />
-                                        </button>
+                                    <td className="px-4 py-3 text-gray-800 font-medium">{row.namaBahan || '-'}</td>
+                                    <td className="px-4 py-3 text-right font-mono text-gray-700">
+                                        {row.kuantum.toLocaleString('id-ID')} <span className="text-gray-400 text-xs ml-0.5">{row.satuan}</span>
                                     </td>
-                                    <td className="px-4 py-3 text-gray-500 text-xs max-w-[200px] truncate">{row.keterangan}</td>
+                                    <td className="px-4 py-3 text-center">
+                                        {row.dokumen ? (
+                                            <button className="text-emerald-600 hover:text-emerald-800 transition-colors p-1" title={row.dokumen}>
+                                                <EyeIcon />
+                                            </button>
+                                        ) : (
+                                            <span className="text-gray-300">-</span>
+                                        )}
+                                    </td>
+                                    <td className="px-4 py-3 text-gray-500 text-xs max-w-[150px] truncate" title={row.keterangan}>
+                                        {row.keterangan && row.keterangan !== '-' ? row.keterangan : <span className="text-gray-300">-</span>}
+                                    </td>
+                                    <td className="px-4 py-3 text-center">
+                                        <div className="flex items-center justify-center gap-1">
+                                            <button
+                                                onClick={() => onEdit(row)}
+                                                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                                                title="Edit Data"
+                                            >
+                                                <PencilIcon size={14} />
+                                            </button>
+                                            <button
+                                                onClick={() => onDelete(row.id)}
+                                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                                title="Hapus Data"
+                                            >
+                                                <TrashIcon size={14} />
+                                            </button>
+                                        </div>
+                                    </td>
                                 </tr>
                             ))
                         )}
                     </tbody>
                 </table>
             </div>
-            {/* Mobile View Omitted for Brevity - follows similar pattern */}
+            {/* Mobile View */}
             <div className="sm:hidden divide-y divide-gray-100">
-                {paginated.map((row) => (
-                    <div key={row.no} className="p-4 space-y-2">
+                {sortedData.map((row) => (
+                    <div key={row.id} className="p-4 space-y-3 bg-white">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs text-gray-400">#{row.no}</span>
-                            <span className="text-xs text-gray-400">{row.tanggal}</span>
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-mono text-gray-400">#{row.no}</span>
+                                <span className="text-xs text-gray-500">{format(new Date(row.tanggal), 'dd/MM/yyyy')}</span>
+                            </div>
+                            <div className="flex gap-1 justify-end">
+                                <button onClick={() => onEdit(row)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"><PencilIcon size={14} /></button>
+                                <button onClick={() => onDelete(row.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"><TrashIcon size={14} /></button>
+                            </div>
                         </div>
-                        <p className="text-sm font-semibold text-gray-800">{row.namaBahan}</p>
-                        <div className="flex gap-2">
-                            <span className="text-xs bg-emerald-50 text-emerald-700 px-2 rounded-full">{row.jenis}</span>
-                            <span className="text-xs text-gray-600 font-mono">{row.kuantum.toFixed(2)}</span>
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <p className="text-sm font-bold text-gray-800">{row.namaBahan}</p>
+                                <span className={cn("text-xs px-2 py-0.5 rounded-full mt-1 inline-block", row.jenis === 'Bahan Baku' ? "bg-blue-50 text-blue-700" : "bg-emerald-50 text-emerald-700")}>
+                                    {row.jenis}
+                                </span>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-sm font-mono font-medium text-gray-700">
+                                    {row.kuantum.toLocaleString('id-ID')} {row.satuan}
+                                </p>
+                            </div>
                         </div>
+                        {row.dokumen && (
+                            <div className="flex items-center gap-2 text-xs text-emerald-600">
+                                <EyeIcon /> <span>{row.dokumen}</span>
+                            </div>
+                        )}
                     </div>
                 ))}
             </div>
@@ -568,7 +919,7 @@ function SuplaiTable({ data, search }: { data: SuplaiRow[]; search: string }) {
     );
 }
 
-function MutasiTable({ data, search }: { data: MutasiRow[]; search: string }) {
+function MutasiTable({ data, search, onEdit, onDelete }: { data: MutasiRow[]; search: string; onEdit: (row: MutasiRow) => void; onDelete: (id: number) => void }) {
     const filtered = useMemo(() =>
         data.filter((row) =>
             search === '' ||
@@ -578,213 +929,540 @@ function MutasiTable({ data, search }: { data: MutasiRow[]; search: string }) {
 
     const { page, setPage, totalPages, paginated, total } = usePagination(filtered);
 
+    // Sorting helper
+    const [sortConfig, setSortConfig] = useState<{ key: keyof MutasiRow | null; direction: 'asc' | 'desc' }>({ key: null, direction: 'asc' });
+
+    const sortedData = useMemo(() => {
+        if (!sortConfig.key) return paginated;
+        const sorted = [...paginated].sort((a, b) => {
+            const aVal = a[sortConfig.key!] as any;
+            const bVal = b[sortConfig.key!] as any;
+            if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+        return sorted;
+    }, [paginated, sortConfig]);
+
+    const requestSort = (key: keyof MutasiRow) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+
     return (
         <>
             <div className="overflow-x-auto hidden sm:block">
                 <table className="w-full text-sm">
                     <thead>
-                        <tr className="bg-gray-50 text-left">
-                            <th className="px-4 py-3 font-semibold text-gray-600 w-14">No. <SortIcon /></th>
-                            <th className="px-4 py-3 font-semibold text-gray-600">Tanggal <SortIcon /></th>
-                            <th className="px-4 py-3 font-semibold text-gray-600">Jenis <SortIcon /></th>
-                            <th className="px-4 py-3 font-semibold text-gray-600">Nama Bahan <SortIcon /></th>
-                            <th className="px-4 py-3 font-semibold text-gray-600 text-right">Kuantum <SortIcon /></th>
-                            <th className="px-4 py-3 font-semibold text-gray-600 text-center">Dokumen <SortIcon /></th>
+                        <tr className="bg-gray-50 text-left border-b border-gray-200">
+                            <th className="px-4 py-3 font-semibold text-gray-600 w-16">No.</th>
+                            <th className="px-4 py-3 font-semibold text-gray-600 cursor-pointer hover:text-emerald-600" onClick={() => requestSort('tanggal')}>
+                                Tanggal <SortIcon direction={sortConfig.key === 'tanggal' ? sortConfig.direction : undefined} />
+                            </th>
+                            <th className="px-4 py-3 font-semibold text-gray-600 cursor-pointer hover:text-emerald-600" onClick={() => requestSort('jenis')}>
+                                Jenis <SortIcon direction={sortConfig.key === 'jenis' ? sortConfig.direction : undefined} />
+                            </th>
+                            <th className="px-4 py-3 font-semibold text-gray-600 cursor-pointer hover:text-emerald-600" onClick={() => requestSort('namaBahan')}>
+                                Nama Bahan <SortIcon direction={sortConfig.key === 'namaBahan' ? sortConfig.direction : undefined} />
+                            </th>
+                            <th className="px-4 py-3 font-semibold text-gray-600 text-right cursor-pointer hover:text-emerald-600" onClick={() => requestSort('kuantum')}>
+                                Kuantum <SortIcon direction={sortConfig.key === 'kuantum' ? sortConfig.direction : undefined} />
+                            </th>
+                            <th className="px-4 py-3 font-semibold text-gray-600 text-center">Dokumen</th>
                             <th className="px-4 py-3 font-semibold text-gray-600">Keterangan</th>
+                            <th className="px-4 py-3 font-semibold text-gray-600 text-center w-24">Aksi</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                        {paginated.length === 0 ? (
+                        {sortedData.length === 0 ? (
                             <tr>
-                                <td colSpan={7} className="px-4 py-12 text-center text-gray-400">Tidak ada data ditemukan.</td>
+                                <td colSpan={8} className="px-4 py-12 text-center text-gray-400">
+                                    Tidak ada data ditemukan.
+                                </td>
                             </tr>
                         ) : (
-                            paginated.map((row) => (
-                                <tr key={row.no} className="hover:bg-emerald-50/30 transition-colors">
+                            sortedData.map((row) => (
+                                <tr key={row.id} className="hover:bg-emerald-50/30 transition-colors">
                                     <td className="px-4 py-3 text-emerald-600 font-medium">{row.no}</td>
                                     <td className="px-4 py-3 text-gray-700">{row.tanggal}</td>
                                     <td className="px-4 py-3">
-                                        <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-amber-50 text-amber-700 border border-amber-100">
+                                        <span className={cn(
+                                            "inline-flex px-2 py-0.5 text-xs font-medium rounded-full border",
+                                            row.jenis === 'Bahan Baku'
+                                                ? "bg-blue-50 text-blue-700 border-blue-100"
+                                                : "bg-emerald-50 text-emerald-700 border-emerald-100"
+                                        )}>
                                             {row.jenis}
                                         </span>
                                     </td>
-                                    <td className="px-4 py-3 text-gray-800 font-medium">{row.namaBahan}</td>
-                                    <td className="px-4 py-3 text-right font-mono text-gray-700">{row.kuantum.toFixed(2)}</td>
-                                    <td className="px-4 py-3 text-center">
-                                        <button className="text-emerald-600 hover:text-emerald-800 transition-colors p-1" title="Lihat Dokumen">
-                                            <EyeIcon />
-                                        </button>
+                                    <td className="px-4 py-3 text-gray-800 font-medium">{row.namaBahan || '-'}</td>
+                                    <td className="px-4 py-3 text-right font-mono text-gray-700">
+                                        {row.kuantum.toLocaleString('id-ID')} <span className="text-gray-400 text-xs ml-0.5">{row.satuan}</span>
                                     </td>
-                                    <td className="px-4 py-3 text-gray-500 text-xs max-w-[250px] truncate">{row.keterangan}</td>
+                                    <td className="px-4 py-3 text-center">
+                                        {row.dokumen ? (
+                                            <button className="text-emerald-600 hover:text-emerald-800 transition-colors p-1" title={row.dokumen}>
+                                                <EyeIcon />
+                                            </button>
+                                        ) : (
+                                            <span className="text-gray-300">-</span>
+                                        )}
+                                    </td>
+                                    <td className="px-4 py-3 text-gray-500 text-xs max-w-[150px] truncate" title={row.keterangan}>
+                                        {row.keterangan && row.keterangan !== '-' ? row.keterangan : <span className="text-gray-300">-</span>}
+                                    </td>
+                                    <td className="px-4 py-3 text-center">
+                                        <div className="flex items-center justify-center gap-1">
+                                            <button
+                                                onClick={() => onEdit(row)}
+                                                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                                                title="Edit Data"
+                                            >
+                                                <PencilIcon size={14} />
+                                            </button>
+                                            <button
+                                                onClick={() => onDelete(row.id)}
+                                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                                title="Hapus Data"
+                                            >
+                                                <TrashIcon size={14} />
+                                            </button>
+                                        </div>
+                                    </td>
                                 </tr>
                             ))
                         )}
                     </tbody>
                 </table>
             </div>
+            {/* Mobile View */}
+            <div className="sm:hidden divide-y divide-gray-100">
+                {sortedData.map((row) => (
+                    <div key={row.id} className="p-4 space-y-3 bg-white">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-mono text-gray-400">#{row.no}</span>
+                                <span className="text-xs text-gray-500">{row.tanggal}</span>
+                            </div>
+                            <div className="flex gap-1 justify-end">
+                                <button onClick={() => onEdit(row)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"><PencilIcon size={14} /></button>
+                                <button onClick={() => onDelete(row.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"><TrashIcon size={14} /></button>
+                            </div>
+                        </div>
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <p className="text-sm font-bold text-gray-800">{row.namaBahan}</p>
+                                <span className={cn(
+                                    "text-xs px-2 py-0.5 rounded-full mt-1 inline-block",
+                                    row.jenis === 'Bahan Baku' ? "bg-blue-50 text-blue-700" : "bg-emerald-50 text-emerald-700"
+                                )}>
+                                    {row.jenis}
+                                </span>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-sm font-mono font-medium text-gray-700">
+                                    {row.kuantum.toLocaleString('id-ID')} {row.satuan}
+                                </p>
+                            </div>
+                        </div>
+                        {row.dokumen && (
+                            <div className="flex items-center gap-2 text-xs text-emerald-600">
+                                <EyeIcon /> <span>{row.dokumen}</span>
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
             <Pagination page={page} totalPages={totalPages} total={total} setPage={setPage} />
         </>
     );
 }
 
+/* ─── Frontend unit conversion helper ─── */
+
+const MASS_UNITS = ['Ton', 'Kwintal', 'Kg', 'Gram', 'mg'];
+const VOL_UNITS = ['KL', 'Liter', 'mL'];
+
+function getUnitFamily(unit: string): string[] {
+    const lo = unit.toLowerCase();
+    if (['ton', 'kwintal', 'kg', 'gram', 'mg', 'kilogram', 'kilo', 'gr', 'g'].includes(lo)) return MASS_UNITS;
+    if (['kl', 'liter', 'l', 'lt', 'litre', 'ml', 'milliliter', 'cc'].includes(lo)) return VOL_UNITS;
+    return [unit]; // unknown family, just keep original
+}
+
+function normalizeUnit(u: string): string {
+    const lo = u.trim().toLowerCase();
+    const map: Record<string, string> = {
+        'l': 'Liter', 'lt': 'Liter', 'litre': 'Liter', 'liter': 'Liter',
+        'ml': 'mL', 'milliliter': 'mL', 'cc': 'mL',
+        'kl': 'KL',
+        'kg': 'Kg', 'kilo': 'Kg', 'kilogram': 'Kg',
+        'gram': 'Gram', 'gr': 'Gram', 'g': 'Gram',
+        'mg': 'mg',
+        'ton': 'Ton',
+        'kwintal': 'Kwintal',
+    };
+    return map[lo] || u;
+}
+
+function convertUnitFE(value: number, fromUnit: string, toUnit: string): number {
+    const from = normalizeUnit(fromUnit);
+    const to = normalizeUnit(toUnit);
+    if (from === to) return value;
+
+    // Mass → Kg base
+    const toKg: Record<string, number> = { 'Ton': 1000, 'Kwintal': 100, 'Kg': 1, 'Gram': 0.001, 'mg': 0.000001 };
+    // Vol → Liter base
+    const toLiter: Record<string, number> = { 'KL': 1000, 'Liter': 1, 'mL': 0.001 };
+
+    if (from in toKg && to in toKg) {
+        return value * toKg[from] / toKg[to];
+    }
+    if (from in toLiter && to in toLiter) {
+        return value * toLiter[from] / toLiter[to];
+    }
+    return value;
+}
+
 /* ═══════════════════════════════════════════ */
-/*  Balance Stok Table (Dynamic)               */
+/*  Balance Stok Table (Computed)               */
+/* ═══════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════ */
+/*  Balance Stok Table (Computed)               */
 /* ═══════════════════════════════════════════ */
 
 interface BalanceStokTableProps {
-    materials: Material[];
-    data: BalanceStok[];
+    data: BalanceStokRow[];
     productSlug: string;
-    onMaterialsChange: () => void;
+    search: string;
+    bulan?: string;
+    tahun?: string;
 }
 
-function BalanceStokTable({ materials, data, productSlug, onMaterialsChange }: BalanceStokTableProps) {
-    const [isAddingMat, setIsAddingMat] = useState(false);
-    const [newMatName, setNewMatName] = useState('');
-    const [editingMat, setEditingMat] = useState<number | null>(null);
-    const [editName, setEditName] = useState('');
+function BalanceStokTable({ data, productSlug, search, bulan, tahun }: BalanceStokTableProps) {
+    const [historyModal, setHistoryModal] = useState<{ nama: string; tipe: string } | null>(null);
+    const [historyData, setHistoryData] = useState<BahanBaku[]>([]);
+    const [historyLoading, setHistoryLoading] = useState(false);
+    // Per-row display satuan overrides: { 'Molase': 'mL' }
+    const [satuanOverrides, setSatuanOverrides] = useState<Record<string, string>>({});
+    const [categoryFilter, setCategoryFilter] = useState<'All' | 'Baku' | 'Penolong'>('All');
 
-    const handleAddMaterial = async () => {
-        if (!newMatName.trim()) return;
-        await bahanBakuService.createMaterial(productSlug, newMatName);
-        setNewMatName('');
-        setIsAddingMat(false);
-        onMaterialsChange();
+    const getDisplaySatuan = (row: BalanceStokRow) => satuanOverrides[row.nama] || normalizeUnit(row.satuan);
+
+    const getConvertedRow = (row: BalanceStokRow) => {
+        const displaySatuan = getDisplaySatuan(row);
+        const fromSatuan = normalizeUnit(row.satuan);
+        return {
+            totalIn: convertUnitFE(row.totalIn, fromSatuan, displaySatuan),
+            totalOut: convertUnitFE(row.totalOut, fromSatuan, displaySatuan),
+            stok: convertUnitFE(row.stok, fromSatuan, displaySatuan),
+            satuan: displaySatuan,
+        };
     };
 
-    const handleUpdateMaterial = async (id: number) => {
-        if (!editName.trim()) return;
-        await bahanBakuService.updateMaterial(id, editName);
-        setEditingMat(null);
-        onMaterialsChange();
+    const handleSatuanChange = (materialName: string, newSatuan: string) => {
+        setSatuanOverrides(prev => ({ ...prev, [materialName]: newSatuan }));
     };
 
-    const handleDeleteMaterial = async (id: number) => {
-        if (!confirm('Hapus kolom material ini?')) return;
-        await bahanBakuService.deleteMaterial(id);
-        onMaterialsChange();
+    const openHistory = async (nama: string, tipe: 'Suplai' | 'Mutasi') => {
+        setHistoryModal({ nama, tipe });
+        setHistoryLoading(true);
+        try {
+            const data = await bahanBakuService.getHistory({
+                productSlug,
+                namaBahan: nama,
+                tipe,
+                bulan: bulan || undefined,
+                tahun: tahun || undefined,
+            });
+            setHistoryData(data);
+        } catch (e) {
+            console.error('Failed to load history:', e);
+            setHistoryData([]);
+        } finally {
+            setHistoryLoading(false);
+        }
     };
 
-    // Helper to get detail for a specific material in a row
-    const getDetail = (row: BalanceStok, matId: number) => {
-        const d = row.details.find(d => d.materialId === matId);
-        return d || { out: 0, in: 0, stokAkhir: 0 };
+    const closeHistory = () => {
+        setHistoryModal(null);
+        setHistoryData([]);
+    };
+
+
+
+    // Filter Logic
+    const filteredData = data.filter(row => {
+        const matchesSearch = row.nama.toLowerCase().includes(search.toLowerCase());
+        const matchesCategory = categoryFilter === 'All' || (categoryFilter === 'Baku' && row.jenis === 'Baku') || (categoryFilter === 'Penolong' && row.jenis === 'Penolong');
+        return matchesSearch && matchesCategory;
+    });
+
+    // Separate Baku and Penolong for visual grouping (from filtered data)
+    const bakuItems = filteredData.filter(r => r.jenis === 'Baku');
+    const penolongItems = filteredData.filter(r => r.jenis === 'Penolong');
+
+    if (data.length === 0) {
+        return (
+            <div className="flex flex-col items-center justify-center py-16 px-4">
+                <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                        <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                        <line x1="12" y1="22.08" x2="12" y2="12" />
+                    </svg>
+                </div>
+                <p className="text-sm font-medium text-gray-600 mb-1">Belum ada material dikonfigurasi</p>
+                <p className="text-xs text-gray-400">Tambahkan material di tab <span className="font-semibold text-emerald-600">Konfigurasi</span> terlebih dahulu.</p>
+            </div>
+        );
+    }
+
+    const renderRow = (row: BalanceStokRow, idx: number, isLast: boolean) => {
+        const converted = getConvertedRow(row);
+        const unitFamily = getUnitFamily(row.satuan);
+
+        return (
+            <tr key={`${row.jenis}-${row.nama}`} className={cn(
+                'group transition-colors hover:bg-emerald-50/40',
+                isLast && 'border-b-0'
+            )}>
+                <td className="px-5 py-3.5 text-gray-500 text-xs font-medium">{idx + 1}</td>
+                <td className="px-5 py-3.5">
+                    <div className="flex items-center gap-2.5">
+                        <div className={cn(
+                            'w-2 h-2 rounded-full shrink-0',
+                            row.jenis === 'Baku' ? 'bg-emerald-500' : 'bg-amber-500'
+                        )} />
+                        <span className="text-sm font-medium text-gray-800">{row.nama}</span>
+                    </div>
+                </td>
+                <td className="px-5 py-3.5">
+                    <span className={cn(
+                        'inline-flex px-2.5 py-0.5 text-[11px] font-semibold rounded-full border',
+                        row.jenis === 'Baku'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                            : 'bg-amber-50 text-amber-700 border-amber-100'
+                    )}>
+                        {row.jenis === 'Baku' ? 'Bahan Baku' : 'Bahan Penolong'}
+                    </span>
+                </td>
+                <td className="px-5 py-3.5 text-center">
+                    {unitFamily.length > 1 ? (
+                        <select
+                            value={converted.satuan}
+                            onChange={(e) => handleSatuanChange(row.nama, e.target.value)}
+                            className="bg-gray-50 border border-gray-200 text-xs font-semibold text-gray-700 rounded-md px-2 py-1 cursor-pointer hover:border-emerald-300 focus:outline-none focus:ring-1 focus:ring-emerald-400 transition-all appearance-none text-center"
+                            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 4px center', paddingRight: '18px' }}
+                        >
+                            {unitFamily.map(u => (
+                                <option key={u} value={u}>{u}</option>
+                            ))}
+                        </select>
+                    ) : (
+                        <span className="text-xs text-gray-500 font-medium">{converted.satuan}</span>
+                    )}
+                </td>
+                <td className="px-5 py-3.5 text-center">
+                    {converted.totalIn > 0 ? (
+                        <button
+                            onClick={() => openHistory(row.nama, 'Suplai')}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-100 hover:border-blue-200 transition-all cursor-pointer group/in"
+                        >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500"><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /></svg>
+                            {fmtNumber(converted.totalIn)} <span className="text-[10px] font-normal text-blue-600/70">{converted.satuan}</span>
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="opacity-0 group-hover/in:opacity-100 transition-opacity text-blue-400"><polyline points="9 18 15 12 9 6" /></svg>
+                        </button>
+                    ) : (
+                        <span className="text-xs text-gray-300 font-mono">—</span>
+                    )}
+                </td>
+                <td className="px-5 py-3.5 text-center">
+                    {converted.totalOut > 0 ? (
+                        <button
+                            onClick={() => openHistory(row.nama, 'Mutasi')}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-100 hover:border-orange-200 transition-all cursor-pointer group/out"
+                        >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-orange-500"><polyline points="7 1 3 5 7 9" /><path d="M21 11V9a4 4 0 0 0-4-4H3" /></svg>
+                            {fmtNumber(converted.totalOut)} <span className="text-[10px] font-normal text-orange-600/70">{converted.satuan}</span>
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="opacity-0 group-hover/out:opacity-100 transition-opacity text-orange-400"><polyline points="9 18 15 12 9 6" /></svg>
+                        </button>
+                    ) : (
+                        <span className="text-xs text-gray-300 font-mono">—</span>
+                    )}
+                </td>
+                <td className="px-5 py-3.5 text-center">
+                    <span className={cn(
+                        'inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-bold',
+                        converted.stok > 0 ? 'bg-emerald-50 text-emerald-700' :
+                            converted.stok < 0 ? 'bg-red-50 text-red-600' :
+                                'bg-gray-50 text-gray-400'
+                    )}>
+                        {fmtNumber(converted.stok)} <span className="text-[10px] font-normal opacity-70">{converted.satuan}</span>
+                    </span>
+                </td>
+            </tr>
+        );
     };
 
     return (
-        <div className="overflow-x-auto">
-            <div className="p-2 flex justify-end">
-                {isAddingMat ? (
-                    <div className="flex gap-2 items-center">
-                        <input
-                            value={newMatName}
-                            onChange={e => setNewMatName(e.target.value)}
-                            placeholder="Nama Material Baru"
-                            className="text-xs px-2 py-1 border rounded"
-                            autoFocus
-                        />
-                        <button onClick={handleAddMaterial} className="text-xs bg-emerald-600 text-white px-2 py-1 rounded">Simpan</button>
-                        <button onClick={() => setIsAddingMat(false)} className="text-xs text-gray-500 px-2">Batal</button>
-                    </div>
-                ) : (
-                    <button
-                        onClick={() => setIsAddingMat(true)}
-                        className="text-xs text-emerald-600 hover:text-emerald-800 font-medium flex items-center gap-1"
-                    >
-                        <PlusIcon /> Tambah Kolom Material
-                    </button>
-                )}
+        <>
+            <div className="p-4 bg-gray-50/50 border-b border-gray-100 flex items-center justify-between">
+                <div className="flex gap-2">
+                    {(['All', 'Baku', 'Penolong'] as const).map(cat => (
+                        <button
+                            key={cat}
+                            onClick={() => setCategoryFilter(cat)}
+                            className={cn(
+                                'px-3 py-1.5 rounded-full text-xs font-medium transition-colors border',
+                                categoryFilter === cat
+                                    ? 'bg-white text-emerald-700 border-emerald-200 shadow-sm'
+                                    : 'text-gray-500 border-transparent hover:bg-white hover:border-gray-200'
+                            )}
+                        >
+                            {cat === 'All' ? 'Semua' : cat === 'Baku' ? 'Bahan Baku' : 'Bahan Penolong'}
+                        </button>
+                    ))}
+                </div>
+            </div>
+            <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                    <thead>
+                        <tr className="bg-gradient-to-r from-gray-50 to-gray-50/80">
+                            <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-12">No.</th>
+                            <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Nama Bahan</th>
+                            <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Jenis</th>
+                            <th className="px-5 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider w-24">Satuan</th>
+                            <th className="px-5 py-3 text-center text-xs font-semibold text-blue-600 uppercase tracking-wider">
+                                <div className="flex items-center justify-center gap-1">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-blue-500"><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /></svg>
+                                    In (Masuk)
+                                </div>
+                            </th>
+                            <th className="px-5 py-3 text-center text-xs font-semibold text-orange-600 uppercase tracking-wider">
+                                <div className="flex items-center justify-center gap-1">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-orange-500"><polyline points="7 1 3 5 7 9" /><path d="M21 11V9a4 4 0 0 0-4-4H3" /></svg>
+                                    Out (Keluar)
+                                </div>
+                            </th>
+                            <th className="px-5 py-3 text-center text-xs font-semibold text-emerald-600 uppercase tracking-wider">Stok Akhir</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                        {filteredData.length === 0 ? (
+                            <tr>
+                                <td colSpan={7} className="px-5 py-8 text-center text-gray-500">
+                                    Tidak ada data yang cocok dengan filter atau pencarian.
+                                </td>
+                            </tr>
+                        ) : (
+                            <>
+                                {bakuItems.length > 0 && categoryFilter !== 'Penolong' && (
+                                    <>
+                                        <tr className="bg-emerald-50/30">
+                                            <td colSpan={7} className="px-5 py-2">
+                                                <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">Bahan Baku</span>
+                                            </td>
+                                        </tr>
+                                        {bakuItems.map((row, idx) => renderRow(row, idx, idx === bakuItems.length - 1))}
+                                    </>
+                                )}
+                                {penolongItems.length > 0 && categoryFilter !== 'Baku' && (
+                                    <>
+                                        <tr className="bg-amber-50/30">
+                                            <td colSpan={7} className="px-5 py-2">
+                                                <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wider">Bahan Penolong</span>
+                                            </td>
+                                        </tr>
+                                        {penolongItems.map((row, idx) => renderRow(row, bakuItems.length + idx, idx === penolongItems.length - 1))}
+                                    </>
+                                )}
+                            </>
+                        )}
+                    </tbody>
+                </table>
             </div>
 
-            <table className="w-full text-sm whitespace-nowrap">
-                <thead>
-                    <tr className="bg-gray-50">
-                        <th className="px-4 py-2 text-left font-semibold text-gray-600 border-b border-gray-200" rowSpan={2}>
-                            Tanggal
-                        </th>
-                        <th className="px-4 py-2 text-center font-semibold text-gray-600 border-b border-gray-200" rowSpan={2}>
-                            Produksi
-                        </th>
-                        {materials.map((mat) => (
-                            <th
-                                key={mat.id}
-                                colSpan={3}
-                                className="px-2 py-2 text-center font-bold text-gray-700 border-b border-gray-200 border-l border-gray-100 group relative min-w-[200px]"
-                            >
-                                {editingMat === mat.id ? (
-                                    <div className="flex gap-1 justify-center">
-                                        <input
-                                            value={editName}
-                                            onChange={e => setEditName(e.target.value)}
-                                            className="w-24 text-xs border rounded px-1"
-                                        />
-                                        <button onClick={() => handleUpdateMaterial(mat.id)} className="text-emerald-600"><CheckIcon /></button>
-                                        <button onClick={() => setEditingMat(null)} className="text-red-500"><XIcon /></button>
+            {/* ─── History Modal ─── */}
+            {
+                historyModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={closeHistory}>
+                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+                            {/* Modal Header */}
+                            <div className={cn(
+                                'flex items-center justify-between px-6 py-4 border-b',
+                                historyModal.tipe === 'Suplai' ? 'bg-gradient-to-r from-blue-50 to-white border-blue-100' : 'bg-gradient-to-r from-orange-50 to-white border-orange-100'
+                            )}>
+                                <div>
+                                    <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                                        {historyModal.tipe === 'Suplai' ? (
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-blue-500"><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /></svg>
+                                        ) : (
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-orange-500"><polyline points="7 1 3 5 7 9" /><path d="M21 11V9a4 4 0 0 0-4-4H3" /></svg>
+                                        )}
+                                        Riwayat {historyModal.tipe}
+                                    </h3>
+                                    <p className="text-sm text-gray-500 mt-0.5">Material: <span className="font-semibold text-gray-700">{historyModal.nama}</span></p>
+                                </div>
+                                <button onClick={closeHistory} className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                                </button>
+                            </div>
+
+                            {/* Modal Body */}
+                            <div className="flex-1 overflow-y-auto">
+                                {historyLoading ? (
+                                    <div className="flex items-center justify-center py-16">
+                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+                                    </div>
+                                ) : historyData.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mb-3"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+                                        <p className="text-sm">Tidak ada data riwayat.</p>
                                     </div>
                                 ) : (
-                                    <div className="flex items-center justify-center gap-2">
-                                        {mat.nama}
-                                        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 absolute right-2 top-1/2 -translate-y-1/2">
-                                            <button
-                                                onClick={() => { setEditingMat(mat.id); setEditName(mat.nama); }}
-                                                className="text-gray-400 hover:text-emerald-600 p-0.5"
-                                            >
-                                                <EditIcon />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDeleteMaterial(mat.id)}
-                                                className="text-gray-400 hover:text-red-600 p-0.5"
-                                            >
-                                                <TrashIcon />
-                                            </button>
-                                        </div>
-                                    </div>
+                                    <table className="w-full text-sm">
+                                        <thead className="sticky top-0 bg-white">
+                                            <tr className="border-b border-gray-100">
+                                                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 w-10">No.</th>
+                                                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500">Tanggal</th>
+                                                <th className="px-5 py-3 text-right text-xs font-semibold text-gray-500">Kuantum</th>
+                                                <th className="px-5 py-3 text-center text-xs font-semibold text-gray-500">Satuan</th>
+                                                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500">Dokumen</th>
+                                                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500">Keterangan</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50">
+                                            {historyData.map((item, idx) => (
+                                                <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
+                                                    <td className="px-5 py-3 text-xs text-gray-400">{idx + 1}</td>
+                                                    <td className="px-5 py-3 text-sm text-gray-700">{format(new Date(item.tanggal), 'dd/MM/yyyy')}</td>
+                                                    <td className="px-5 py-3 text-right font-mono text-sm font-medium text-gray-800">{fmtNumber(item.kuantum)}</td>
+                                                    <td className="px-5 py-3 text-center text-xs text-gray-500">{item.satuan || 'Kg'}</td>
+                                                    <td className="px-5 py-3 text-sm text-gray-600">{item.dokumen || '—'}</td>
+                                                    <td className="px-5 py-3 text-sm text-gray-500 max-w-[200px] truncate">{item.keterangan || '—'}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr className="bg-gray-50 border-t border-gray-200">
+                                                <td colSpan={2} className="px-5 py-3 text-right text-xs font-bold text-gray-600">Total</td>
+                                                <td className="px-5 py-3 text-right font-mono text-sm font-bold text-gray-800">{fmtNumber(historyData.reduce((s, i) => s + i.kuantum, 0))}</td>
+                                                <td colSpan={3}></td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
                                 )}
-                            </th>
-                        ))}
-                    </tr>
-                    <tr className="bg-gray-50/60">
-                        {materials.map((mat) => (
-                            <Fragment key={mat.id}>
-                                <th className="px-3 py-1.5 text-center text-xs font-medium text-gray-500 border-b border-gray-200 border-l border-gray-100">Out</th>
-                                <th className="px-3 py-1.5 text-center text-xs font-medium text-gray-500 border-b border-gray-200">In</th>
-                                <th className="px-3 py-1.5 text-center text-xs font-semibold text-gray-600 border-b border-gray-200">S Akhir</th>
-                            </Fragment>
-                        ))}
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                    {/* Empty state if no data */}
-                    {data.length === 0 && (
-                        <tr>
-                            <td colSpan={2 + materials.length * 3} className="px-4 py-8 text-center text-gray-400">
-                                Belum ada data balance stok.
-                            </td>
-                        </tr>
-                    )}
-                    {data.map((row) => (
-                        <tr key={row.id} className="hover:bg-emerald-50/20 transition-colors">
-                            <td className="px-4 py-2.5 text-gray-700 text-[13px]">
-                                {format(new Date(row.tanggal), 'dd MMMM yyyy')}
-                            </td>
-                            <td className="px-4 py-2.5 text-center font-mono text-gray-500 text-xs">{fmt(row.produksi)}</td>
-                            {materials.map((mat) => {
-                                const d = getDetail(row, mat.id);
-                                return (
-                                    <Fragment key={mat.id}>
-                                        <td className="px-3 py-2.5 text-center font-mono text-gray-500 text-xs border-l border-gray-100">{fmt(d.out)}</td>
-                                        <td className="px-3 py-2.5 text-center font-mono text-gray-500 text-xs">{fmt(d.in)}</td>
-                                        <td className={`px-3 py-2.5 text-center font-mono text-xs font-bold ${d.stokAkhir > 0 ? 'text-emerald-700' : 'text-gray-500'}`}>
-                                            {fmt(d.stokAkhir)}
-                                        </td>
-                                    </Fragment>
-                                );
-                            })}
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+        </>
     );
 }
 

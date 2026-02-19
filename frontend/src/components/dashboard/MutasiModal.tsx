@@ -46,8 +46,29 @@ function UploadIcon() {
 
 /* ─── Options ─── */
 
+/* ─── Unit Families ─── */
+
+const UNIT_FAMILIES: Record<string, string[]> = {
+    Massa: ['Ton', 'Kg', 'Gram'],
+    Volume: ['Liter', 'mL'],
+    Panjang: ['Meter', 'cm', 'mm'],
+    Lainnya: ['Pcs', 'Lusin', 'Karton', 'Drum', 'Sak', 'Zak', 'Box', 'Can']
+};
+
+const getUnitOptions = (baseUnit?: string) => {
+    if (!baseUnit) return Object.values(UNIT_FAMILIES).flat();
+
+    // Find which family the base unit belongs to (case-insensitive check)
+    const entry = Object.entries(UNIT_FAMILIES).find(([_, units]) =>
+        units.some(u => u.toLowerCase() === baseUnit.toLowerCase())
+    );
+
+    return entry ? entry[1] : Object.values(UNIT_FAMILIES).flat();
+};
+
+/* ─── Options ─── */
+
 const JENIS_OPTIONS = ['Bahan Baku', 'Bahan Penolong'];
-const SATUAN_OPTIONS = ['Kg', 'Ton', 'Liter', 'Pcs', 'Zak', 'Box', 'Can'];
 
 /* ─── Types ─── */
 
@@ -56,9 +77,10 @@ interface MutasiModalProps {
     onClose: () => void;
     onSubmit: (data: any) => void;
     productSlug: string;
+    initialData?: any;
 }
 
-export function MutasiModal({ isOpen, onClose, onSubmit, productSlug }: MutasiModalProps) {
+export function MutasiModal({ isOpen, onClose, onSubmit, productSlug, initialData }: MutasiModalProps) {
     const [date, setDate] = useState<Date | undefined>(undefined);
     const [jenis, setJenis] = useState('');
     const [namaBahan, setNamaBahan] = useState('');
@@ -72,16 +94,41 @@ export function MutasiModal({ isOpen, onClose, onSubmit, productSlug }: MutasiMo
     const [availablePenolong, setAvailablePenolong] = useState<ProductMaterial[]>([]);
 
     useEffect(() => {
-        if (isOpen && productSlug) {
-            masterItemService.getProductMaterials(productSlug, 'Baku').then(setAvailableBaku);
-            masterItemService.getProductMaterials(productSlug, 'Penolong').then(setAvailablePenolong);
+        if (isOpen) {
+            if (productSlug) {
+                masterItemService.getProductMaterials(productSlug, 'Baku').then(setAvailableBaku);
+                masterItemService.getProductMaterials(productSlug, 'Penolong').then(setAvailablePenolong);
+            }
+
+            if (initialData) {
+                setDate(initialData.tanggal ? new Date(initialData.tanggal) : undefined);
+                setJenis(initialData.jenis || '');
+                setNamaBahan(initialData.namaBahan || '');
+                setQuantum(initialData.kuantum?.toString() || '');
+                setSatuan(initialData.satuan || 'Kg');
+                setKeterangan(initialData.keterangan || '');
+                setFile(null); // Reset file input
+            } else {
+                // Reset form
+                setDate(undefined);
+                setJenis('');
+                setNamaBahan('');
+                setQuantum('');
+                setSatuan('Kg');
+                setFile(null);
+                setKeterangan('');
+            }
         }
-    }, [isOpen, productSlug]);
+    }, [isOpen, productSlug, initialData]);
 
     if (!isOpen) return null;
 
     const availableBahan = jenis === 'Bahan Baku' ? availableBaku :
         jenis === 'Bahan Penolong' ? availablePenolong : [];
+
+    // Derive unit options based on selected material
+    const selectedMaterial = availableBahan.find(m => m.nama === namaBahan);
+    const unitOptions = getUnitOptions(selectedMaterial?.satuan);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -94,17 +141,24 @@ export function MutasiModal({ isOpen, onClose, onSubmit, productSlug }: MutasiMo
         setNamaBahan(''); // Reset nama bahan when jenis changes
     };
 
+    const handleNamaBahanChange = (value: string) => {
+        setNamaBahan(value);
+        // Auto-update unit to default if available
+        const mat = availableBahan.find(m => m.nama === value);
+        if (mat && mat.satuan) {
+            setSatuan(mat.satuan);
+        }
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (!date) {
+            alert('Mohon pilih Tanggal Data Mutasi terlebih dahulu.');
+            return;
+        }
+
         onSubmit({ date, jenis, namaBahan, quantum, satuan, file, keterangan });
-        // Reset form
-        setDate(undefined);
-        setJenis('');
-        setNamaBahan('');
-        setQuantum('');
-        setSatuan('Kg');
-        setFile(null);
-        setKeterangan('');
         onClose();
     };
 
@@ -121,7 +175,9 @@ export function MutasiModal({ isOpen, onClose, onSubmit, productSlug }: MutasiMo
 
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
-                    <h2 className="text-lg font-bold text-gray-800">Tambah Data Mutasi</h2>
+                    <h2 className="text-lg font-bold text-gray-800">
+                        {initialData ? 'Edit Data Mutasi' : 'Tambah Data Mutasi'}
+                    </h2>
                     <button
                         onClick={onClose}
                         className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-full transition-colors"
@@ -188,7 +244,7 @@ export function MutasiModal({ isOpen, onClose, onSubmit, productSlug }: MutasiMo
                             {availableBahan.length > 0 ? (
                                 <select
                                     value={namaBahan}
-                                    onChange={(e) => setNamaBahan(e.target.value)}
+                                    onChange={(e) => handleNamaBahanChange(e.target.value)}
                                     required
                                     disabled={!jenis}
                                     className={cn(
@@ -234,7 +290,7 @@ export function MutasiModal({ isOpen, onClose, onSubmit, productSlug }: MutasiMo
                                         onChange={(e) => setSatuan(e.target.value)}
                                         className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all cursor-pointer"
                                     >
-                                        {SATUAN_OPTIONS.map((opt) => (
+                                        {unitOptions.map((opt) => (
                                             <option key={opt} value={opt}>{opt}</option>
                                         ))}
                                     </select>
@@ -245,13 +301,12 @@ export function MutasiModal({ isOpen, onClose, onSubmit, productSlug }: MutasiMo
                         {/* Dokumen */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                Dokumen <span className="text-red-500">*</span>
+                                Dokumen <span className="text-gray-400 font-normal italic ml-1">(Optional)</span>
                             </label>
                             <div className="relative group">
                                 <input
                                     type="file"
                                     onChange={handleFileChange}
-                                    required
                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                                 />
                                 <div className="flex items-center px-4 py-2.5 bg-white border border-gray-300 rounded-lg hover:border-emerald-500 hover:ring-1 hover:ring-emerald-500 transition-all h-11">
@@ -259,7 +314,7 @@ export function MutasiModal({ isOpen, onClose, onSubmit, productSlug }: MutasiMo
                                         Choose File
                                     </span>
                                     <span className="text-sm text-gray-500 truncate flex-1">
-                                        {file ? file.name : 'No file chosen'}
+                                        {file ? file.name : (initialData?.dokumen || 'No file chosen')}
                                     </span>
                                     <UploadIcon />
                                 </div>

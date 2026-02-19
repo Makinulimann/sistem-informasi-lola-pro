@@ -35,6 +35,9 @@ public class BahanBaku
 
     public double Kuantum { get; set; }
 
+    [MaxLength(20)]
+    public string Satuan { get; set; } = "Kg";
+
     [MaxLength(100)]
     public string Dokumen { get; set; } = string.Empty;
 

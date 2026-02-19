@@ -5,6 +5,7 @@ export default function PetroGladiatorBahanBakuPage() {
         <BahanBakuPage
             productCategory="Produk Pengembangan"
             productName="PetroGladiator"
+            productSlug="petro-gladiator"
         />
     );
 }

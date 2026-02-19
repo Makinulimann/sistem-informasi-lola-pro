@@ -95,12 +95,7 @@ type ProductVariant = string;
 
 /* ─── Mock Data ─── */
 
-const PERUSAHAAN_OPTIONS = [
-    'Semua Perusahaan',
-    'PT Petrokimia Gresik',
-    'PT Petrokopindo Cipta Selaras',
-    'PT Petronika',
-];
+
 
 const BULAN_OPTIONS = [
     { value: '', label: 'Pilih Bulan' },
@@ -199,7 +194,7 @@ interface ProduksiPageProps {
 }
 
 export function ProduksiPage({ productCategory, productName, productSlug }: ProduksiPageProps) {
-    const [perusahaan, setPerusahaan] = useState('Semua Perusahaan');
+
     const [bulan, setBulan] = useState('02');
     const [tahun, setTahun] = useState('2026');
     const [activeVariant, setActiveVariant] = useState<ProductVariant>(PRODUCT_VARIANTS[0]);
@@ -262,19 +257,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                 </div>
             </div>
 
-            {/* Perusahaan filter */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-                <label className="block text-sm font-medium text-emerald-700 mb-2">Perusahaan</label>
-                <select
-                    value={perusahaan}
-                    onChange={(e) => setPerusahaan(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow"
-                >
-                    {PERUSAHAAN_OPTIONS.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                </select>
-            </div>
+
 
             {/* Summary Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

@@ -64,7 +64,25 @@ function UploadIcon() {
 
 /* ─── Mock Options ─── */
 
-const SATUAN_OPTIONS = ['Kg', 'Ton', 'Liter', 'Pcs', 'Zak', 'Box', 'Can'];
+/* ─── Unit Families ─── */
+
+const UNIT_FAMILIES: Record<string, string[]> = {
+    Massa: ['Ton', 'Kg', 'Gram'],
+    Volume: ['Liter', 'mL'],
+    Panjang: ['Meter', 'cm', 'mm'],
+    Lainnya: ['Pcs', 'Lusin', 'Karton', 'Drum', 'Sak', 'Zak', 'Box', 'Can']
+};
+
+const getUnitOptions = (baseUnit?: string) => {
+    if (!baseUnit) return Object.values(UNIT_FAMILIES).flat();
+
+    // Find which family the base unit belongs to (case-insensitive check)
+    const entry = Object.entries(UNIT_FAMILIES).find(([_, units]) =>
+        units.some(u => u.toLowerCase() === baseUnit.toLowerCase())
+    );
+
+    return entry ? entry[1] : Object.values(UNIT_FAMILIES).flat();
+};
 
 /* ─── Types ─── */
 
@@ -80,9 +98,10 @@ interface SuplaiModalProps {
     onClose: () => void;
     onSubmit: (data: any) => void;
     productSlug: string;
+    initialData?: any;
 }
 
-export function SuplaiModal({ isOpen, onClose, onSubmit, productSlug }: SuplaiModalProps) {
+export function SuplaiModal({ isOpen, onClose, onSubmit, productSlug, initialData }: SuplaiModalProps) {
     const [date, setDate] = useState<Date | undefined>(undefined);
     const [bahanBakuList, setBahanBakuList] = useState<MaterialRow[]>([{ id: '1', name: '', quantum: '', satuan: 'Kg' }]);
     const [bahanPenolongList, setBahanPenolongList] = useState<MaterialRow[]>([{ id: '1', name: '', quantum: '', satuan: 'Pcs' }]);
@@ -94,11 +113,35 @@ export function SuplaiModal({ isOpen, onClose, onSubmit, productSlug }: SuplaiMo
     const [availablePenolong, setAvailablePenolong] = useState<ProductMaterial[]>([]);
 
     useEffect(() => {
-        if (isOpen && productSlug) {
-            masterItemService.getProductMaterials(productSlug, 'Baku').then(setAvailableBaku);
-            masterItemService.getProductMaterials(productSlug, 'Penolong').then(setAvailablePenolong);
+        if (isOpen) {
+            if (productSlug) {
+                masterItemService.getProductMaterials(productSlug, 'Baku').then(setAvailableBaku);
+                masterItemService.getProductMaterials(productSlug, 'Penolong').then(setAvailablePenolong);
+            }
+
+            if (initialData) {
+                setDate(initialData.tanggal ? new Date(initialData.tanggal) : undefined);
+                setKeterangan(initialData.keterangan || '');
+                // Populate lists based on kind. Since existing data is single row per record, we populate accordingly.
+                // However, the modal is designed for multiple items.
+                // For editing single item (from table row), we might want to just show that item.
+                if (initialData.jenis === 'Bahan Baku') {
+                    setBahanBakuList([{ id: '1', name: initialData.namaBahan, quantum: initialData.kuantum.toString(), satuan: initialData.satuan || 'Kg' }]);
+                    setBahanPenolongList([{ id: '1', name: '', quantum: '', satuan: 'Pcs' }]);
+                } else if (initialData.jenis === 'Bahan Penolong') {
+                    setBahanBakuList([{ id: '1', name: '', quantum: '', satuan: 'Kg' }]);
+                    setBahanPenolongList([{ id: '1', name: initialData.namaBahan, quantum: initialData.kuantum.toString(), satuan: initialData.satuan || 'Pcs' }]);
+                }
+            } else {
+                // Reset form
+                setDate(undefined);
+                setBahanBakuList([{ id: '1', name: '', quantum: '', satuan: 'Kg' }]);
+                setBahanPenolongList([{ id: '1', name: '', quantum: '', satuan: 'Pcs' }]);
+                setKeterangan('');
+                setFile(null);
+            }
         }
-    }, [isOpen, productSlug]);
+    }, [isOpen, productSlug, initialData]);
 
     if (!isOpen) return null;
 
@@ -115,7 +158,19 @@ export function SuplaiModal({ isOpen, onClose, onSubmit, productSlug }: SuplaiMo
     };
 
     const updateBahanBaku = (id: string, field: keyof MaterialRow, value: string) => {
-        setBahanBakuList(bahanBakuList.map((item) => (item.id === id ? { ...item, [field]: value } : item)));
+        setBahanBakuList(bahanBakuList.map((item) => {
+            if (item.id === id) {
+                const updated = { ...item, [field]: value };
+                // If name changed, reset unit to default if possible, or keep existing if compatible?
+                // For now just update. User will see updated options
+                if (field === 'name') {
+                    const mat = availableBaku.find(m => m.nama === value);
+                    if (mat && mat.satuan) updated.satuan = mat.satuan;
+                }
+                return updated;
+            }
+            return item;
+        }));
     };
 
     const addBahanPenolong = () => {
@@ -129,7 +184,17 @@ export function SuplaiModal({ isOpen, onClose, onSubmit, productSlug }: SuplaiMo
     };
 
     const updateBahanPenolong = (id: string, field: keyof MaterialRow, value: string) => {
-        setBahanPenolongList(bahanPenolongList.map((item) => (item.id === id ? { ...item, [field]: value } : item)));
+        setBahanPenolongList(bahanPenolongList.map((item) => {
+            if (item.id === id) {
+                const updated = { ...item, [field]: value };
+                if (field === 'name') {
+                    const mat = availablePenolong.find(m => m.nama === value);
+                    if (mat && mat.satuan) updated.satuan = mat.satuan;
+                }
+                return updated;
+            }
+            return item;
+        }));
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -140,6 +205,12 @@ export function SuplaiModal({ isOpen, onClose, onSubmit, productSlug }: SuplaiMo
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (!date) {
+            alert("Mohon pilih Tanggal Suplai terlebih dahulu.");
+            return;
+        }
+
         onSubmit({ date, bahanBakuList, bahanPenolongList, file, keterangan });
         onClose();
     };
@@ -205,59 +276,64 @@ export function SuplaiModal({ isOpen, onClose, onSubmit, productSlug }: SuplaiMo
                                 <h3 className="text-sm font-bold text-gray-800">Bahan Baku</h3>
                             </div>
                             <div className="space-y-3">
-                                {bahanBakuList.map((row) => (
-                                    <div key={row.id} className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-                                        <div className="flex-1 w-full">
-                                            {availableBaku.length > 0 ? (
-                                                <select
-                                                    value={row.name}
-                                                    onChange={(e) => updateBahanBaku(row.id, 'name', e.target.value)}
-                                                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
-                                                >
-                                                    <option value="" disabled>Pilih Bahan Baku</option>
-                                                    {availableBaku.map((item) => (
-                                                        <option key={item.id} value={item.nama}>{item.nama}</option>
-                                                    ))}
-                                                </select>
-                                            ) : (
-                                                <div className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 border-dashed rounded-lg text-sm text-gray-400 italic">
-                                                    Belum ada bahan baku dikonfigurasi.
+                                {bahanBakuList.map((row) => {
+                                    const selectedMaterial = availableBaku.find(m => m.nama === row.name);
+                                    const unitOptions = getUnitOptions(selectedMaterial?.satuan);
+
+                                    return (
+                                        <div key={row.id} className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+                                            <div className="flex-1 w-full">
+                                                {availableBaku.length > 0 ? (
+                                                    <select
+                                                        value={row.name}
+                                                        onChange={(e) => updateBahanBaku(row.id, 'name', e.target.value)}
+                                                        className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+                                                    >
+                                                        <option value="" disabled>Pilih Bahan Baku</option>
+                                                        {availableBaku.map((item) => (
+                                                            <option key={item.id} value={item.nama}>{item.nama}</option>
+                                                        ))}
+                                                    </select>
+                                                ) : (
+                                                    <div className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 border-dashed rounded-lg text-sm text-gray-400 italic">
+                                                        Belum ada bahan baku dikonfigurasi.
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="flex gap-3 w-full sm:w-auto">
+                                                <div className="w-full sm:w-32">
+                                                    <input
+                                                        type="number"
+                                                        placeholder="Kuantum"
+                                                        value={row.quantum}
+                                                        onChange={(e) => updateBahanBaku(row.id, 'quantum', e.target.value)}
+                                                        className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+                                                    />
                                                 </div>
+                                                <div className="w-full sm:w-28">
+                                                    <select
+                                                        value={row.satuan}
+                                                        onChange={(e) => updateBahanBaku(row.id, 'satuan', e.target.value)}
+                                                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all cursor-pointer"
+                                                    >
+                                                        {unitOptions.map((opt) => (
+                                                            <option key={opt} value={opt}>{opt}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            {bahanBakuList.length > 1 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeBahanBaku(row.id)}
+                                                    className="p-2.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                >
+                                                    <TrashIcon />
+                                                </button>
                                             )}
                                         </div>
-                                        <div className="flex gap-3 w-full sm:w-auto">
-                                            <div className="w-full sm:w-32">
-                                                <input
-                                                    type="number"
-                                                    placeholder="Kuantum"
-                                                    value={row.quantum}
-                                                    onChange={(e) => updateBahanBaku(row.id, 'quantum', e.target.value)}
-                                                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
-                                                />
-                                            </div>
-                                            <div className="w-full sm:w-28">
-                                                <select
-                                                    value={row.satuan}
-                                                    onChange={(e) => updateBahanBaku(row.id, 'satuan', e.target.value)}
-                                                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all cursor-pointer"
-                                                >
-                                                    {SATUAN_OPTIONS.map((opt) => (
-                                                        <option key={opt} value={opt}>{opt}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                        </div>
-                                        {bahanBakuList.length > 1 && (
-                                            <button
-                                                type="button"
-                                                onClick={() => removeBahanBaku(row.id)}
-                                                className="p-2.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                            >
-                                                <TrashIcon />
-                                            </button>
-                                        )}
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                             <button
                                 type="button"
@@ -276,59 +352,64 @@ export function SuplaiModal({ isOpen, onClose, onSubmit, productSlug }: SuplaiMo
                                 <h3 className="text-sm font-bold text-gray-800">Bahan Penolong</h3>
                             </div>
                             <div className="space-y-3">
-                                {bahanPenolongList.map((row) => (
-                                    <div key={row.id} className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-                                        <div className="flex-1 w-full">
-                                            {availablePenolong.length > 0 ? (
-                                                <select
-                                                    value={row.name}
-                                                    onChange={(e) => updateBahanPenolong(row.id, 'name', e.target.value)}
-                                                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
-                                                >
-                                                    <option value="" disabled>Pilih Bahan Penolong</option>
-                                                    {availablePenolong.map((item) => (
-                                                        <option key={item.id} value={item.nama}>{item.nama}</option>
-                                                    ))}
-                                                </select>
-                                            ) : (
-                                                <div className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 border-dashed rounded-lg text-sm text-gray-400 italic">
-                                                    Belum ada bahan penolong dikonfigurasi.
+                                {bahanPenolongList.map((row) => {
+                                    const selectedMaterial = availablePenolong.find(m => m.nama === row.name);
+                                    const unitOptions = getUnitOptions(selectedMaterial?.satuan);
+
+                                    return (
+                                        <div key={row.id} className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+                                            <div className="flex-1 w-full">
+                                                {availablePenolong.length > 0 ? (
+                                                    <select
+                                                        value={row.name}
+                                                        onChange={(e) => updateBahanPenolong(row.id, 'name', e.target.value)}
+                                                        className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+                                                    >
+                                                        <option value="" disabled>Pilih Bahan Penolong</option>
+                                                        {availablePenolong.map((item) => (
+                                                            <option key={item.id} value={item.nama}>{item.nama}</option>
+                                                        ))}
+                                                    </select>
+                                                ) : (
+                                                    <div className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 border-dashed rounded-lg text-sm text-gray-400 italic">
+                                                        Belum ada bahan penolong dikonfigurasi.
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="flex gap-3 w-full sm:w-auto">
+                                                <div className="w-full sm:w-32">
+                                                    <input
+                                                        type="number"
+                                                        placeholder="Kuantum"
+                                                        value={row.quantum}
+                                                        onChange={(e) => updateBahanPenolong(row.id, 'quantum', e.target.value)}
+                                                        className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+                                                    />
                                                 </div>
+                                                <div className="w-full sm:w-28">
+                                                    <select
+                                                        value={row.satuan}
+                                                        onChange={(e) => updateBahanPenolong(row.id, 'satuan', e.target.value)}
+                                                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all cursor-pointer"
+                                                    >
+                                                        {unitOptions.map((opt) => (
+                                                            <option key={opt} value={opt}>{opt}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            {bahanPenolongList.length > 1 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeBahanPenolong(row.id)}
+                                                    className="p-2.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                >
+                                                    <TrashIcon />
+                                                </button>
                                             )}
                                         </div>
-                                        <div className="flex gap-3 w-full sm:w-auto">
-                                            <div className="w-full sm:w-32">
-                                                <input
-                                                    type="number"
-                                                    placeholder="Kuantum"
-                                                    value={row.quantum}
-                                                    onChange={(e) => updateBahanPenolong(row.id, 'quantum', e.target.value)}
-                                                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
-                                                />
-                                            </div>
-                                            <div className="w-full sm:w-28">
-                                                <select
-                                                    value={row.satuan}
-                                                    onChange={(e) => updateBahanPenolong(row.id, 'satuan', e.target.value)}
-                                                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all cursor-pointer"
-                                                >
-                                                    {SATUAN_OPTIONS.map((opt) => (
-                                                        <option key={opt} value={opt}>{opt}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                        </div>
-                                        {bahanPenolongList.length > 1 && (
-                                            <button
-                                                type="button"
-                                                onClick={() => removeBahanPenolong(row.id)}
-                                                className="p-2.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                            >
-                                                <TrashIcon />
-                                            </button>
-                                        )}
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                             <button
                                 type="button"

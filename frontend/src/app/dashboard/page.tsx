@@ -11,25 +11,25 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
                 <StatCard
                     title="Total Produk KP"
-                    value="3"
+                    value="?"
                     subtitle="Aktif"
                     color="emerald"
                 />
                 <StatCard
                     title="Total Produk KNonP"
-                    value="3"
+                    value="?"
                     subtitle="Aktif"
                     color="amber"
                 />
                 <StatCard
                     title="Total KPP"
-                    value="4"
+                    value="?"
                     subtitle="Produk"
                     color="teal"
                 />
                 <StatCard
                     title="RKAP Target"
-                    value="100%"
+                    value="0"
                     subtitle="Pencapaian"
                     color="green"
                 />

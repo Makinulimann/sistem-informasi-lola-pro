@@ -50,8 +50,15 @@ public class BahanBakuController : ControllerBase
         [FromQuery] int? bulan,
         [FromQuery] int? tahun)
     {
+        // 1. Get configured material names
+        var configuredNames = await _context.ProductMaterials
+            .Include(pm => pm.MasterItem)
+            .Where(pm => pm.ProductSlug == productSlug)
+            .Select(pm => pm.MasterItem != null ? pm.MasterItem.Nama : "")
+            .ToListAsync();
+
         var query = _context.BahanBakus
-            .Where(b => b.Tipe == "Suplai" && b.ProductSlug == productSlug);
+            .Where(b => b.Tipe == "Suplai" && configuredNames.Contains(b.NamaBahan));
 
         if (perusahaanId.HasValue)
             query = query.Where(b => b.PerusahaanId == perusahaanId.Value);
@@ -76,10 +83,43 @@ public class BahanBakuController : ControllerBase
             Jenis = dto.Jenis,
             NamaBahan = dto.NamaBahan,
             Kuantum = dto.Kuantum,
+            Satuan = dto.Satuan ?? "Kg",
             Dokumen = dto.Dokumen,
             Keterangan = dto.Keterangan
         };
         _context.BahanBakus.Add(entity);
+        await _context.SaveChangesAsync(default);
+        return Ok(entity);
+    }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteSuplai(int id)
+    {
+        var entity = await _context.BahanBakus.FindAsync(id);
+        if (entity == null) return NotFound();
+
+        _context.BahanBakus.Remove(entity);
+        await _context.SaveChangesAsync(default);
+        return NoContent();
+    }
+
+    [HttpPut("{id}")]
+    public async Task<IActionResult> UpdateSuplai(int id, [FromBody] CreateBahanBakuDto dto)
+    {
+        var entity = await _context.BahanBakus.FindAsync(id);
+        if (entity == null) return NotFound();
+
+        // Update fields
+        entity.ProductSlug = dto.ProductSlug;
+        entity.PerusahaanId = dto.PerusahaanId == 0 ? null : dto.PerusahaanId;
+        entity.Tanggal = dto.Tanggal;
+        entity.Jenis = dto.Jenis;
+        entity.NamaBahan = dto.NamaBahan;
+        entity.Kuantum = dto.Kuantum;
+        entity.Satuan = dto.Satuan ?? "Kg";
+        entity.Dokumen = dto.Dokumen;
+        entity.Keterangan = dto.Keterangan;
+
         await _context.SaveChangesAsync(default);
         return Ok(entity);
     }
@@ -91,8 +131,15 @@ public class BahanBakuController : ControllerBase
         [FromQuery] int? bulan,
         [FromQuery] int? tahun)
     {
+        // 1. Get configured material names
+        var configuredNames = await _context.ProductMaterials
+            .Include(pm => pm.MasterItem)
+            .Where(pm => pm.ProductSlug == productSlug)
+            .Select(pm => pm.MasterItem != null ? pm.MasterItem.Nama : "")
+            .ToListAsync();
+
         var query = _context.BahanBakus
-            .Where(b => b.Tipe == "Mutasi" && b.ProductSlug == productSlug);
+            .Where(b => b.Tipe == "Mutasi" && configuredNames.Contains(b.NamaBahan));
 
         if (perusahaanId.HasValue)
             query = query.Where(b => b.PerusahaanId == perusahaanId.Value);
@@ -117,6 +164,7 @@ public class BahanBakuController : ControllerBase
             Jenis = dto.Jenis,
             NamaBahan = dto.NamaBahan,
             Kuantum = dto.Kuantum,
+            Satuan = dto.Satuan ?? "Kg",
             Dokumen = dto.Dokumen,
             Keterangan = dto.Keterangan
         };
@@ -222,6 +270,232 @@ public class BahanBakuController : ControllerBase
 
         return Ok(list);
     }
+
+    // ═══════════════════════════════════════
+    //  Balance Stok (computed from Suplai/Mutasi per configured materials)
+    // ═══════════════════════════════════════
+
+    [HttpGet("balance-stok")]
+    public async Task<IActionResult> GetBalanceStok(
+        [FromQuery] string productSlug,
+        [FromQuery] int? bulan,
+        [FromQuery] int? tahun)
+    {
+        // 1. Get all configured materials for this product
+        var configuredMaterials = await _context.ProductMaterials
+            .Include(pm => pm.MasterItem)
+            .Where(pm => pm.ProductSlug == productSlug)
+            .OrderBy(pm => pm.Jenis)
+            .ThenBy(pm => pm.MasterItem != null ? pm.MasterItem.Nama : "")
+            .ToListAsync();
+
+        var configuredNames = configuredMaterials
+            .Select(pm => pm.MasterItem != null ? pm.MasterItem.Nama : "")
+            .Where(n => !string.IsNullOrEmpty(n))
+            .ToList();
+
+        // 2. Determine Period Range (in local time UTC+7, stored as UTC in DB)
+        //    Dates in DB are stored as UTC but represent local time (UTC+7).
+        //    e.g., "1 Feb 2026 00:00 WIB" is stored as "2026-01-31T17:00:00Z"
+        //    We use UTC boundaries shifted by -7 hours for correct comparison.
+        var utcOffset = TimeSpan.FromHours(7);
+        bool hasPeriodFilter = bulan.HasValue || tahun.HasValue;
+        
+        DateTime periodStartUtc = DateTime.MinValue;
+        DateTime periodEndUtc = DateTime.MaxValue;   // exclusive upper bound
+
+        if (bulan.HasValue && tahun.HasValue)
+        {
+            // Local start of month → UTC
+            var localStart = new DateTime(tahun.Value, bulan.Value, 1);
+            var localEnd = localStart.AddMonths(1); // exclusive: start of next month
+            periodStartUtc = localStart.Add(-utcOffset); // convert to UTC
+            periodEndUtc = localEnd.Add(-utcOffset);     // convert to UTC
+        }
+        else if (tahun.HasValue)
+        {
+            var localStart = new DateTime(tahun.Value, 1, 1);
+            var localEnd = new DateTime(tahun.Value + 1, 1, 1); // exclusive: start of next year
+            periodStartUtc = localStart.Add(-utcOffset);
+            periodEndUtc = localEnd.Add(-utcOffset);
+        }
+
+        // 3. Fetch ALL BahanBaku records for configured materials
+        var allRecords = await _context.BahanBakus
+            .Where(b => configuredNames.Contains(b.NamaBahan))
+            .ToListAsync();
+
+        // 4. Aggregate per material
+        var result = configuredMaterials.Select(pm =>
+        {
+            var materialName = pm.MasterItem?.Nama ?? "";
+            var satuan = pm.MasterItem?.SatuanDefault ?? "Kg";
+
+            // All records for this material
+            var materialRecords = allRecords
+                .Where(r => r.NamaBahan.Equals(materialName, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            // In/Out for the SELECTED PERIOD only
+            var periodRecords = hasPeriodFilter
+                ? materialRecords.Where(r => r.Tanggal >= periodStartUtc && r.Tanggal < periodEndUtc).ToList()
+                : materialRecords;
+
+            var totalInPeriod = periodRecords
+                .Where(r => r.Tipe == "Suplai")
+                .Sum(r => ConvertUnit(r.Kuantum, r.Satuan, satuan));
+
+            var totalOutPeriod = periodRecords
+                .Where(r => r.Tipe == "Mutasi")
+                .Sum(r => ConvertUnit(r.Kuantum, r.Satuan, satuan));
+
+            // Cumulative Stock = ALL records up to the END of the selected period
+            var cumulativeRecords = hasPeriodFilter
+                ? materialRecords.Where(r => r.Tanggal < periodEndUtc).ToList()
+                : materialRecords;
+
+            var totalInCumulative = cumulativeRecords
+                .Where(r => r.Tipe == "Suplai")
+                .Sum(r => ConvertUnit(r.Kuantum, r.Satuan, satuan));
+
+            var totalOutCumulative = cumulativeRecords
+                .Where(r => r.Tipe == "Mutasi")
+                .Sum(r => ConvertUnit(r.Kuantum, r.Satuan, satuan));
+
+            return new
+            {
+                Nama = materialName,
+                Jenis = pm.Jenis,
+                Satuan = satuan,
+                TotalIn = totalInPeriod,
+                TotalOut = totalOutPeriod,
+                Stok = totalInCumulative - totalOutCumulative
+            };
+        }).ToList();
+
+        return Ok(result);
+    }
+
+    private double ConvertUnit(double value, string fromUnit, string toUnit)
+    {
+        if (string.Equals(fromUnit, toUnit, StringComparison.OrdinalIgnoreCase)) return value;
+
+        // Simplify units (lowercase + trim)
+        var from = fromUnit?.Trim().ToLower() ?? "";
+        var to = toUnit?.Trim().ToLower() ?? "";
+
+        // Normalize aliases
+        string Normalize(string u) => u switch
+        {
+            "l" => "liter",
+            "lt" => "liter",
+            "litre" => "liter",
+            "milliliter" => "ml",
+            "millilitre" => "ml",
+            "cc" => "ml",
+            "kilo" => "kg",
+            "kilogram" => "kg",
+            "gr" => "gram",
+            "g" => "gram",
+            _ => u
+        };
+
+        from = Normalize(from);
+        to = Normalize(to);
+
+        // Mass conversions (Base: Kg)
+        double ToKg(double val, string u) => u switch
+        {
+            "ton" => val * 1000,
+            "kwintal" => val * 100,
+            "kg" => val,
+            "gram" => val / 1000,
+            "mg" => val / 1000000,
+            _ => val 
+        };
+
+        double FromKg(double val, string u) => u switch
+        {
+            "ton" => val / 1000,
+            "kwintal" => val / 100,
+            "kg" => val,
+            "gram" => val * 1000,
+            "mg" => val * 1000000,
+            _ => val
+        };
+
+        // Volume conversions (Base: Liter)
+        double ToLiter(double val, string u) => u switch
+        {
+            "kl" => val * 1000,
+            "liter" => val,
+            "ml" => val / 1000,
+            _ => val
+        };
+
+        double FromLiter(double val, string u) => u switch
+        {
+            "kl" => val / 1000,
+            "liter" => val,
+            "ml" => val * 1000,
+            _ => val
+        };
+
+        // Check family
+        var massUnits = new[] { "ton", "kwintal", "kg", "gram", "mg" };
+        var volUnits = new[] { "kl", "liter", "ml" };
+
+        if (massUnits.Contains(from) && massUnits.Contains(to))
+        {
+            var kg = ToKg(value, from);
+            return FromKg(kg, to);
+        }
+
+        if (volUnits.Contains(from) && volUnits.Contains(to))
+        {
+            var liter = ToLiter(value, from);
+            return FromLiter(liter, to);
+        }
+
+        // Cross-family or unknown: return original
+        return value;
+    }
+
+    [HttpGet("history")]
+    public async Task<IActionResult> GetHistory(
+        [FromQuery] string productSlug,
+        [FromQuery] string namaBahan,
+        [FromQuery] string tipe,
+        [FromQuery] int? bulan,
+        [FromQuery] int? tahun)
+    {
+        var query = _context.BahanBakus
+            .Where(b => b.Tipe == tipe
+                     && b.NamaBahan == namaBahan);
+
+        // UTC+7 offset for correct local date filtering
+        var utcOffset = TimeSpan.FromHours(7);
+
+        if (bulan.HasValue && tahun.HasValue)
+        {
+            var localStart = new DateTime(tahun.Value, bulan.Value, 1);
+            var localEnd = localStart.AddMonths(1);
+            var startUtc = localStart.Add(-utcOffset);
+            var endUtc = localEnd.Add(-utcOffset);
+            query = query.Where(b => b.Tanggal >= startUtc && b.Tanggal < endUtc);
+        }
+        else if (tahun.HasValue)
+        {
+            var localStart = new DateTime(tahun.Value, 1, 1);
+            var localEnd = new DateTime(tahun.Value + 1, 1, 1);
+            var startUtc = localStart.Add(-utcOffset);
+            var endUtc = localEnd.Add(-utcOffset);
+            query = query.Where(b => b.Tanggal >= startUtc && b.Tanggal < endUtc);
+        }
+
+        var list = await query.OrderByDescending(b => b.Tanggal).ToListAsync();
+        return Ok(list);
+    }
 }
 
 // ═══════════════════════════════════════
@@ -237,6 +511,7 @@ public record CreateBahanBakuDto(
     string Jenis,
     string NamaBahan,
     double Kuantum,
+    string? Satuan,
     string Dokumen,
     string Keterangan
 );

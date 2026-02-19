@@ -42,6 +42,22 @@ public class ProductMaterialController : ControllerBase
         return Ok(items);
     }
 
+    [HttpGet("master-items/{id}/assignments")]
+    public async Task<IActionResult> GetMasterItemAssignments(int id)
+    {
+        var assignments = await _context.ProductMaterials
+            .Where(pm => pm.MasterItemId == id)
+            .Select(pm => new
+            {
+                pm.Id,
+                pm.ProductSlug,
+                pm.Jenis
+            })
+            .ToListAsync();
+
+        return Ok(assignments);
+    }
+
     [HttpPost("master-items")]
     public async Task<IActionResult> CreateMasterItem([FromBody] CreateMasterItemDto dto)
     {
@@ -121,6 +137,26 @@ public class ProductMaterialController : ControllerBase
         return Ok(pm);
     }
 
+    [HttpPut("master-items/{id}")]
+    public async Task<IActionResult> UpdateMasterItem(int id, [FromBody] UpdateMasterItemDto dto)
+    {
+        var item = await _context.MasterItems.FindAsync(id);
+        if (item == null) return NotFound();
+
+        // Optional: Check for duplicates if name is changing
+        if (dto.Nama != item.Nama && await _context.MasterItems.AnyAsync(m => m.Nama == dto.Nama && (m.ScopeProductSlug == null || m.ScopeProductSlug == item.ScopeProductSlug)))
+        {
+             return BadRequest("Item with this name already exists.");
+        }
+
+        item.Nama = dto.Nama;
+        item.SatuanDefault = dto.SatuanDefault;
+        
+        await _context.SaveChangesAsync(new CancellationToken());
+
+        return Ok(item);
+    }
+
     [HttpDelete("master-items/{id}")]
     public async Task<IActionResult> DeleteMasterItem(int id)
     {
@@ -159,4 +195,5 @@ public class ProductMaterialController : ControllerBase
 }
 
 public record CreateMasterItemDto(string Nama, string? Kode, string? SatuanDefault, string? ScopeProductSlug);
+public record UpdateMasterItemDto(string Nama, string? SatuanDefault);
 public record AssignMaterialDto(string ProductSlug, int MasterItemId, string Jenis);

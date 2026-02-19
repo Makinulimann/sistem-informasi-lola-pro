@@ -16,6 +16,7 @@ export interface BahanBaku {
     jenis: string;
     namaBahan: string;
     kuantum: number;
+    satuan?: string;
     dokumen: string;
     keterangan: string;
 }
@@ -43,6 +44,15 @@ export interface BalanceStok {
     details: BalanceStokDetail[];
 }
 
+export interface BalanceStokRow {
+    nama: string;
+    jenis: string;
+    satuan: string;
+    totalIn: number;
+    totalOut: number;
+    stok: number;
+}
+
 // Helper to clean params
 const cleanParams = (params: any) => {
     const cleaned: any = {};
@@ -66,6 +76,9 @@ export const bahanBakuService = {
     },
     createSuplai: (data: Omit<BahanBaku, 'id' | 'tipe' | 'perusahaan'>) =>
         api.post<BahanBaku>('/bahanbaku/suplai', data),
+    updateSuplai: (id: number, data: Omit<BahanBaku, 'id' | 'tipe' | 'perusahaan'>) =>
+        api.put<BahanBaku>(`/bahanbaku/suplai/${id}`, data),
+    deleteSuplai: (id: number) => api.delete(`/bahanbaku/${id}`),
 
     // Mutasi
     getMutasi: (params: { productSlug: string; perusahaanId?: number; bulan?: string; tahun?: string }) => {
@@ -74,6 +87,9 @@ export const bahanBakuService = {
     },
     createMutasi: (data: Omit<BahanBaku, 'id' | 'tipe' | 'perusahaan'>) =>
         api.post<BahanBaku>('/bahanbaku/mutasi', data),
+    updateMutasi: (id: number, data: Omit<BahanBaku, 'id' | 'tipe' | 'perusahaan'>) =>
+        api.put<BahanBaku>(`/bahanbaku/mutasi/${id}`, data),
+    deleteMutasi: (id: number) => api.delete(`/bahanbaku/${id}`),
 
     // Materials
     getMaterials: (productSlug: string) =>
@@ -85,7 +101,19 @@ export const bahanBakuService = {
     deleteMaterial: (id: number) =>
         api.delete(`/bahanbaku/materials/${id}`),
 
-    // Balance Stok
+    // Balance Stok (computed from Suplai/Mutasi)
+    getBalanceStok: (params: { productSlug: string; bulan?: string; tahun?: string }) => {
+        const query = new URLSearchParams(cleanParams(params)).toString();
+        return api.get<BalanceStokRow[]>(`/bahanbaku/balance-stok?${query}`);
+    },
+
+    // History (drill-down for specific material)
+    getHistory: (params: { productSlug: string; namaBahan: string; tipe: string; bulan?: string; tahun?: string }) => {
+        const query = new URLSearchParams(cleanParams(params)).toString();
+        return api.get<BahanBaku[]>(`/bahanbaku/history?${query}`);
+    },
+
+    // Balance Stok (legacy)
     getBalance: (params: { productSlug: string; perusahaanId?: number; bulan?: string; tahun?: string }) => {
         const query = new URLSearchParams(cleanParams(params)).toString();
         return api.get<BalanceStok[]>(`/bahanbaku/balance?${query}`);

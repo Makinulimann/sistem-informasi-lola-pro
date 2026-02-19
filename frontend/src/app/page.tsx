@@ -156,9 +156,17 @@ export default function LoginPage() {
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);
+      } else if (err instanceof Error) {
+        // Handle common network errors from fetch
+        if (err.message.includes('fetch') || err.message.includes('Network')) {
+          setError(`Gagal terhubung ke server (${err.message}). Cek koneksi & IP Backend.`);
+        } else {
+          setError(err.message);
+        }
       } else {
-        setError('Terjadi kesalahan saat login.');
+        setError('Terjadi kesalahan yang tidak diketahui saat login.');
       }
+      console.error('Login Error:', err);
 
       // Shake animation for error
       if (formRef.current) {

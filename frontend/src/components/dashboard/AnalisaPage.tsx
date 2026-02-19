@@ -117,12 +117,7 @@ interface KegiatanProduksiRow {
 
 /* ─── Constants ─── */
 
-const PERUSAHAAN_OPTIONS = [
-    'Semua Perusahaan',
-    'PT Petrokimia Gresik',
-    'PT Petrokopindo Cipta Selaras',
-    'PT Petronika',
-];
+
 
 const BULAN_OPTIONS = [
     { value: '', label: 'Semua Bulan' },
@@ -287,7 +282,7 @@ interface AnalisaPageProps {
 
 export function AnalisaPage({ productCategory, productName, productSlug }: AnalisaPageProps) {
     const [activeTab, setActiveTab] = useState<TabKey>('kegiatan-sampling');
-    const [perusahaan, setPerusahaan] = useState('Semua Perusahaan');
+
     const [bulan, setBulan] = useState('');
     const [tahun, setTahun] = useState('');
     const [search, setSearch] = useState('');
@@ -300,7 +295,6 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
         setSearch('');
     };
 
-    /* ─── Filtered data per tab ─── */
 
     const samplingData = useMemo(() =>
         MOCK_SAMPLING.filter((r) =>
@@ -385,19 +379,7 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
                 </p>
             </div>
 
-            {/* Perusahaan Filter */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-                <label className="block text-sm font-medium text-emerald-700 mb-2">Perusahaan</label>
-                <select
-                    value={perusahaan}
-                    onChange={(e) => setPerusahaan(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow"
-                >
-                    {PERUSAHAAN_OPTIONS.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                </select>
-            </div>
+
 
             {/* Main Content Card */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
