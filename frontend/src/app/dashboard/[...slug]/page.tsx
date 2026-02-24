@@ -4,6 +4,7 @@ import { use } from 'react';
 import { BahanBakuPage } from '@/components/dashboard/BahanBakuPage';
 import { ProduksiPage } from '@/components/dashboard/ProduksiPage';
 import { AnalisaPage } from '@/components/dashboard/AnalisaPage';
+import { CategoryDashboardPage } from '@/components/dashboard/CategoryDashboardPage';
 
 interface PageProps {
     params: Promise<{ slug: string[] }>;
@@ -16,6 +17,13 @@ const PAGE_COMPONENT_MAP: Record<string, React.ComponentType<{ productCategory: 
     'analisa': AnalisaPage,
 };
 
+// Known category slugs
+const CATEGORY_SLUGS = [
+    'produk-pengembangan',
+    'produk-petroganik',
+    'produk-non-petroganik',
+];
+
 function titleCase(s: string) {
     return s.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -23,6 +31,16 @@ function titleCase(s: string) {
 export default function CatchAllPage({ params }: PageProps) {
     const { slug } = use(params);
     const lastSegment = slug[slug.length - 1];
+
+    // ── Category Dashboard (single segment like "produk-pengembangan") ──
+    if (slug.length === 1 && CATEGORY_SLUGS.includes(slug[0])) {
+        return (
+            <CategoryDashboardPage
+                categorySlug={slug[0]}
+                categoryName={titleCase(slug[0])}
+            />
+        );
+    }
 
     // Check if the last segment matches a known page type
     const PageComponent = PAGE_COMPONENT_MAP[lastSegment];

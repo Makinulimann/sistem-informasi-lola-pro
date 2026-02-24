@@ -1,12 +1,15 @@
-'use client';
+﻿'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { format } from 'date-fns';
+import { id } from 'date-fns/locale';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -15,161 +18,54 @@ import {
     renameTab as renameTabApi,
     deleteTab as deleteTabApi,
     getProduksi,
+    saveProduksi,
+    cancelProduksiWithMaterials,
     type ProduksiTab,
     type ProduksiRow,
     type ProduksiSummary,
 } from '@/lib/produksiService';
+import { BelumSamplingModal } from './BelumSamplingModal';
 
 /* ─── Icons ─── */
-
-function SearchIcon() {
-    return (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-        </svg>
-    );
-}
-
-function DownloadIcon() {
-    return (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-        </svg>
-    );
-}
-
-function ChevronLeftIcon() {
-    return (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6" />
-        </svg>
-    );
-}
-
-function ChevronRightIcon() {
-    return (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="9 18 15 12 9 6" />
-        </svg>
-    );
-}
-
-function FactoryIcon() {
-    return (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5V8l-7 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" />
-            <path d="M17 18h1" /><path d="M12 18h1" /><path d="M7 18h1" />
-        </svg>
-    );
-}
-
-function TrendUpIcon() {
-    return (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
-            <polyline points="16 7 22 7 22 13" />
-        </svg>
-    );
-}
-
-function PackageIcon() {
-    return (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="m7.5 4.27 9 5.15" />
-            <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
-            <path d="m3.3 7 8.7 5 8.7-5" />
-            <path d="M12 22V12" />
-        </svg>
-    );
-}
-
-function PlusIcon() {
-    return (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-        </svg>
-    );
-}
-
-function PencilIcon() {
-    return (
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-        </svg>
-    );
-}
-
-function TrashIcon() {
-    return (
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-        </svg>
-    );
-}
-
-function XIcon() {
-    return (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-        </svg>
-    );
-}
+function SearchIcon() { return (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>); }
+function DownloadIcon() { return (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>); }
+function FactoryIcon() { return (<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5V8l-7 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" /><path d="M17 18h1" /><path d="M12 18h1" /><path d="M7 18h1" /></svg>); }
+function TrendUpIcon() { return (<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" /></svg>); }
+function PackageIcon() { return (<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m7.5 4.27 9 5.15" /><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>); }
+function PlusIcon() { return (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>); }
+function PencilIcon() { return (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></svg>); }
+function TrashIcon() { return (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /></svg>); }
+function XIcon() { return (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>); }
+function CheckIcon() { return (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>); }
+function SettingsIcon() { return (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></svg>); }
+function CalendarSmallIcon() { return (<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="4" rx="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" /></svg>); }
 
 /* ─── Constants ─── */
-
 const BULAN_OPTIONS = [
-    { value: 1, label: 'Januari' },
-    { value: 2, label: 'Februari' },
-    { value: 3, label: 'Maret' },
-    { value: 4, label: 'April' },
-    { value: 5, label: 'Mei' },
-    { value: 6, label: 'Juni' },
-    { value: 7, label: 'Juli' },
-    { value: 8, label: 'Agustus' },
-    { value: 9, label: 'September' },
-    { value: 10, label: 'Oktober' },
-    { value: 11, label: 'November' },
-    { value: 12, label: 'Desember' },
+    { value: 1, label: 'Januari' }, { value: 2, label: 'Februari' }, { value: 3, label: 'Maret' },
+    { value: 4, label: 'April' }, { value: 5, label: 'Mei' }, { value: 6, label: 'Juni' },
+    { value: 7, label: 'Juli' }, { value: 8, label: 'Agustus' }, { value: 9, label: 'September' },
+    { value: 10, label: 'Oktober' }, { value: 11, label: 'November' }, { value: 12, label: 'Desember' },
 ];
-
 const BULAN_NAMES: Record<number, string> = Object.fromEntries(BULAN_OPTIONS.map(o => [o.value, o.label]));
-
 const currentDate = new Date();
 const currentMonth = currentDate.getMonth() + 1;
 const currentYear = currentDate.getFullYear();
+function generateYearOptions() { const years = []; for (let y = currentYear; y >= currentYear - 3; y--) years.push(y); return years; }
+function fmt(n: number): string { return n.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
-function generateYearOptions() {
-    const years = [];
-    for (let y = currentYear; y >= currentYear - 3; y--) {
-        years.push(y);
-    }
-    return years;
-}
-
-/* ─── Number formatting ─── */
-
-function fmt(n: number): string {
-    return n.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-/* ─── Pagination ─── */
-
-function usePagination<T>(data: T[], pageSize = 15) {
-    const [page, setPage] = useState(1);
-    const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
-    const paginated = data.slice((page - 1) * pageSize, page * pageSize);
-    return { page, setPage, totalPages, paginated, total: data.length };
+/* ─── Date Format: dd-MM-yyyy ─── */
+function formatDateShort(dateStr: string): string {
+    const d = new Date(dateStr);
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return `${dd}-${mm}-${yyyy}`;
 }
 
 /* ═══════════════════════════════════════════ */
 /*  Main Component                             */
 /* ═══════════════════════════════════════════ */
-
 interface ProduksiPageProps {
     productCategory: string;
     productName: string;
@@ -180,64 +76,77 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
     const slug = productSlug || 'petro-gladiator';
 
     // ─── State ───
-    const [bulan, setBulan] = useState<number | null>(currentMonth);
-    const [tahun, setTahun] = useState<number | null>(currentYear);
+    const [bulan, setBulan] = useState<number>(currentMonth);
+    const [tahun, setTahun] = useState<number>(currentYear);
     const [search, setSearch] = useState('');
 
     // Tabs
     const [tabs, setTabs] = useState<ProduksiTab[]>([]);
     const [activeTabId, setActiveTabId] = useState<number | null>(null);
     const [tabsLoading, setTabsLoading] = useState(true);
+    const [showTabConfig, setShowTabConfig] = useState(false);
 
-    // Tab management modal
-    const [showAddTab, setShowAddTab] = useState(false);
+    // Tab Config
     const [newTabName, setNewTabName] = useState('');
-    const [renamingTabId, setRenamingTabId] = useState<number | null>(null);
-    const [renameValue, setRenameValue] = useState('');
+    const [editingTabId, setEditingTabId] = useState<number | null>(null);
+    const [editTabValue, setEditTabValue] = useState('');
 
     // Data
     const [data, setData] = useState<ProduksiRow[]>([]);
     const [summary, setSummary] = useState<ProduksiSummary>({ totalProduksi: 0, totalKeluar: 0, kumulatif: 0, stokAkhir: 0 });
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    // Editing Logic
+    const [dirtyRows, setDirtyRows] = useState<Record<string, Partial<ProduksiRow>>>({});
+
+    // Belum Sampling Modal
+    const [bsModal, setBsModal] = useState<{ isOpen: boolean; tanggal: string; currentBs: number }>(
+        { isOpen: false, tanggal: '', currentBs: 0 }
+    );
+    const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; rowDate: string | null }>({ isOpen: false, rowDate: null });
+
+    // Cancel produksi
+    const [cancelConfirm, setCancelConfirm] = useState<{ isOpen: boolean; tanggal: string }>({ isOpen: false, tanggal: '' });
+    const [cancelLoading, setCancelLoading] = useState(false);
 
     // ─── Fetch Tabs ───
     const fetchTabs = useCallback(async () => {
         setTabsLoading(true);
+        setError(null);
         try {
-            const result = await getTabs(slug);
-            setTabs(result);
-            // If no tabs, auto-create "Padat" as default
+            let result = await getTabs(slug);
             if (result.length === 0) {
                 const defaultTab = await createTab(slug, 'Padat');
-                setTabs([defaultTab]);
-                setActiveTabId(defaultTab.id);
-            } else if (!activeTabId || !result.find(t => t.id === activeTabId)) {
+                result = [defaultTab];
+            }
+            setTabs(result);
+            if (!activeTabId || !result.find(t => t.id === activeTabId)) {
                 setActiveTabId(result[0].id);
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error('Failed to load tabs:', err);
+            setError(`Gagal memuat tab: ${err.message || 'Periksa koneksi backend.'}`);
         } finally {
             setTabsLoading(false);
         }
-    }, [slug, activeTabId]);
+    }, [slug]);
 
-    useEffect(() => { fetchTabs(); }, [slug]); // eslint-disable-line react-hooks/exhaustive-deps
+    useEffect(() => { fetchTabs(); }, [fetchTabs]);
 
     // ─── Fetch Data ───
     const fetchData = useCallback(async () => {
         if (!activeTabId) return;
         setLoading(true);
+        setError(null);
+        setDirtyRows({});
         try {
-            const result = await getProduksi(
-                slug,
-                activeTabId,
-                bulan ?? undefined,
-                tahun ?? undefined
-            );
+            const result = await getProduksi(slug, activeTabId, bulan, tahun);
             setData(result.data);
             setSummary(result.summary);
-        } catch (err) {
+        } catch (err: any) {
             console.error('Failed to load produksi data:', err);
+            setError(`Gagal memuat data: ${err.message || 'Error tidak diketahui'}`);
             setData([]);
             setSummary({ totalProduksi: 0, totalKeluar: 0, kumulatif: 0, stokAkhir: 0 });
         } finally {
@@ -247,411 +156,523 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
-    // ─── Tab actions ───
+    // ─── Row Editing ───
+    const handleInputChange = (date: string, field: keyof ProduksiRow, value: string | number) => {
+        const original = data.find(r => r.tanggal === date);
+        if (!original) return;
+
+        setDirtyRows(prev => {
+            const currentDirty = prev[date] || {};
+            const updatedDirty = { ...currentDirty, [field]: value };
+
+            if (updatedDirty[field] === original[field]) {
+                delete updatedDirty[field];
+            }
+
+            if (Object.keys(updatedDirty).length === 0) {
+                const { [date]: _, ...rest } = prev;
+                return rest;
+            }
+            return { ...prev, [date]: updatedDirty };
+        });
+    };
+
+    /** Get the RAW stored value (or dirty override) for a field */
+    const getRawValue = (row: ProduksiRow, field: keyof ProduksiRow): number => {
+        const dirty = dirtyRows[row.tanggal];
+        if (dirty && dirty[field] !== undefined) return Number(dirty[field]);
+        return Number(row[field]);
+    };
+
+    /** Get value for keterangan field */
+    const getTextValue = (row: ProduksiRow, field: keyof ProduksiRow): string => {
+        const dirty = dirtyRows[row.tanggal];
+        if (dirty && dirty[field] !== undefined) return String(dirty[field]);
+        return String(row[field]);
+    };
+
+    const isRowDirty = (date: string) => {
+        return !!dirtyRows[date] && Object.keys(dirtyRows[date]).length > 0;
+    };
+
+    const handleCancelRow = (date: string) => {
+        setDirtyRows(prev => {
+            const { [date]: _, ...rest } = prev;
+            return rest;
+        });
+    };
+
+    const handleSaveRow = async () => {
+        const date = confirmModal.rowDate;
+        if (!date || !activeTabId) return;
+
+        const original = data.find(r => r.tanggal === date);
+        const dirty = dirtyRows[date];
+        if (!original || !dirty) {
+            setConfirmModal({ isOpen: false, rowDate: null });
+            return;
+        }
+
+        try {
+            await saveProduksi({
+                productSlug: slug,
+                tabId: activeTabId,
+                tanggal: original.tanggal,
+                bs: dirty.bs !== undefined ? Number(dirty.bs) : original.bs,
+                ps: dirty.ps !== undefined ? Number(dirty.ps) : original.ps,
+                coa: dirty.coa !== undefined ? Number(dirty.coa) : original.coa,
+                pg: dirty.pg !== undefined ? Number(dirty.pg) : original.pg,
+                keterangan: dirty.keterangan !== undefined ? String(dirty.keterangan) : original.keterangan,
+            });
+
+            setConfirmModal({ isOpen: false, rowDate: null });
+            setDirtyRows(prev => { const { [date]: _, ...rest } = prev; return rest; });
+            await fetchData();
+        } catch (err) {
+            console.error('Failed to save:', err);
+            alert('Gagal menyimpan data.');
+            setConfirmModal({ isOpen: false, rowDate: null });
+        }
+    };
+
+    // ─── Tab Management ───
     const handleAddTab = async () => {
         if (!newTabName.trim()) return;
         try {
-            const tab = await createTab(slug, newTabName.trim());
-            setTabs(prev => [...prev, tab]);
-            setActiveTabId(tab.id);
+            await createTab(slug, newTabName);
             setNewTabName('');
-            setShowAddTab(false);
+            fetchTabs();
         } catch (err) {
-            console.error('Failed to create tab:', err);
+            console.error(err);
+            alert('Gagal menambah tab');
         }
     };
 
-    const handleRenameTab = async (id: number) => {
-        if (!renameValue.trim()) return;
+    const handleRenameTab = async (tabId: number) => {
+        if (!editTabValue.trim()) return;
         try {
-            const updated = await renameTabApi(id, renameValue.trim());
-            setTabs(prev => prev.map(t => t.id === id ? { ...t, nama: updated.nama } : t));
-            setRenamingTabId(null);
-            setRenameValue('');
+            await renameTabApi(tabId, editTabValue);
+            setEditingTabId(null);
+            fetchTabs();
         } catch (err) {
-            console.error('Failed to rename tab:', err);
+            console.error(err);
+            alert('Gagal mengubah nama tab');
         }
     };
 
-    const handleDeleteTab = async (id: number) => {
-        if (!confirm('Hapus tab ini beserta semua data produksinya?')) return;
+    const handleDeleteTab = async (tabId: number) => {
+        if (!confirm('Hapus tab ini beserta seluruh datanya?')) return;
         try {
-            await deleteTabApi(id);
-            setTabs(prev => prev.filter(t => t.id !== id));
-            if (activeTabId === id) {
-                const remaining = tabs.filter(t => t.id !== id);
-                setActiveTabId(remaining.length > 0 ? remaining[0].id : null);
+            await deleteTabApi(tabId);
+            if (activeTabId === tabId) setActiveTabId(null);
+            fetchTabs();
+        } catch (err) {
+            console.error(err);
+            alert('Gagal menghapus tab');
+        }
+    };
+
+    // ─── Export ───
+    const handleExportExcel = () => {
+        const activeTabName = tabs.find(t => t.id === activeTabId)?.nama || '';
+        const fullProductName = `${productName} ${activeTabName}`.trim();
+        const exportDate = format(new Date(), 'EEEE, dd MMMM yyyy', { locale: id });
+        const period = `${BULAN_NAMES[bulan]} ${tahun}`;
+
+        const headerRows = [
+            [`Nama Produk: ${fullProductName}`],
+            [`Tanggal Export: ${exportDate}`],
+            [`Periode Data: ${period}`],
+            [''],
+        ];
+
+        const th1 = ['Tanggal', 'Produksi', '', '', 'Kumulatif Produksi', 'Pengiriman Gudang', 'Stok Akhir', 'Keterangan'];
+        const th2 = ['', 'Belum Sampling', 'Proses Sampling', 'COA', '', '', '', ''];
+
+        const dataRows = filtered.map(row => {
+            const bs = getRawValue(row, 'bs');
+            const ps = getRawValue(row, 'ps');
+            const coa = getRawValue(row, 'coa');
+            const pg = getRawValue(row, 'pg');
+            return [
+                formatDateShort(row.tanggal),
+                bs - ps,    // Belum Sampling display
+                ps - coa,   // Proses Sampling display
+                coa,        // COA display
+                row.kumulatif,
+                pg,
+                row.stokAkhir,
+                row.keterangan || ''
+            ];
+        });
+
+        const wsData = [...headerRows, th1, th2, ...dataRows];
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+        const startRow = headerRows.length;
+        if (!ws['!merges']) ws['!merges'] = [];
+        ws['!merges'].push(
+            { s: { r: startRow, c: 0 }, e: { r: startRow + 1, c: 0 } },
+            { s: { r: startRow, c: 1 }, e: { r: startRow, c: 3 } },
+            { s: { r: startRow, c: 4 }, e: { r: startRow + 1, c: 4 } },
+            { s: { r: startRow, c: 5 }, e: { r: startRow + 1, c: 5 } },
+            { s: { r: startRow, c: 6 }, e: { r: startRow + 1, c: 6 } },
+            { s: { r: startRow, c: 7 }, e: { r: startRow + 1, c: 7 } }
+        );
+
+        ws['!cols'] = [
+            { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 12 },
+            { wch: 18 }, { wch: 18 }, { wch: 14 }, { wch: 30 },
+        ];
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Data Produksi");
+        XLSX.writeFile(wb, `Produksi_${fullProductName.replace(/\s+/g, '_')}_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+    };
+
+    const handleExportPDF = () => {
+        const doc = new jsPDF({ orientation: 'landscape' });
+        const activeTabName = tabs.find(t => t.id === activeTabId)?.nama || '';
+        const fullProductName = `${productName} ${activeTabName}`.trim();
+        const exportDate = format(new Date(), 'EEEE, dd MMMM yyyy', { locale: id });
+        const period = `${BULAN_NAMES[bulan]} ${tahun}`;
+
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text(fullProductName, 14, 15);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Tanggal Export: ${exportDate}`, 14, 22);
+        doc.text(`Periode Data: ${period}`, 14, 27);
+
+        const tableRows = filtered.map(row => {
+            const bs = getRawValue(row, 'bs');
+            const ps = getRawValue(row, 'ps');
+            const coa = getRawValue(row, 'coa');
+            const pg = getRawValue(row, 'pg');
+            return [
+                formatDateShort(row.tanggal),
+                fmt(bs - ps),
+                fmt(ps - coa),
+                fmt(coa),
+                fmt(row.kumulatif),
+                fmt(pg),
+                fmt(row.stokAkhir),
+                row.keterangan || '-'
+            ];
+        });
+
+        autoTable(doc, {
+            head: [
+                [
+                    { content: 'Tanggal', rowSpan: 2, styles: { valign: 'middle', halign: 'center' } },
+                    { content: 'Produksi', colSpan: 3, styles: { halign: 'center', fillColor: [16, 185, 129] } },
+                    { content: 'Kumulatif Produksi', rowSpan: 2, styles: { valign: 'middle', halign: 'right' } },
+                    { content: 'Peng. Gudang', rowSpan: 2, styles: { valign: 'middle', halign: 'right' } },
+                    { content: 'Stok Akhir', rowSpan: 2, styles: { valign: 'middle', halign: 'right' } },
+                    { content: 'Keterangan', rowSpan: 2, styles: { valign: 'middle', halign: 'left' } }
+                ],
+                [
+                    { content: 'Belum Sampling', styles: { halign: 'right', fontSize: 8 } },
+                    { content: 'Proses Sampling', styles: { halign: 'right', fontSize: 8 } },
+                    { content: 'COA', styles: { halign: 'right', fontSize: 8 } }
+                ]
+            ],
+            body: tableRows,
+            startY: 35,
+            theme: 'grid',
+            headStyles: { fillColor: [16, 185, 129], textColor: 255, lineColor: 200, lineWidth: 0.1 },
+            styles: { fontSize: 9, cellPadding: 2 },
+            columnStyles: {
+                1: { halign: 'right' },
+                2: { halign: 'right' },
+                3: { halign: 'right' },
+                4: { halign: 'right' },
+                5: { halign: 'right' },
+                6: { halign: 'right' },
             }
-        } catch (err) {
-            console.error('Failed to delete tab:', err);
-        }
+        });
+
+        doc.save(`Produksi_${fullProductName.replace(/\s+/g, '_')}_${format(new Date(), 'yyyyMMdd')}.pdf`);
     };
 
-    // ─── Filter helpers ───
-    const hasFilter = bulan !== null || tahun !== null;
-    const clearFilter = () => {
-        setBulan(null);
-        setTahun(null);
+    // ─── Helpers ───
+    const isToday = (dateStr: string) => {
+        const d = new Date(dateStr);
+        const today = new Date();
+        return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
     };
 
-    const periodLabel = bulan && tahun
-        ? `${BULAN_NAMES[bulan]} ${tahun}`
-        : tahun
-            ? `Tahun ${tahun}`
-            : 'Semua Periode';
-
-    // ─── Search ───
+    const periodLabel = `${BULAN_NAMES[bulan]} ${tahun}`;
     const filtered = useMemo(() => {
         if (!search) return data;
         const q = search.toLowerCase();
         return data.filter(row =>
-            new Date(row.tanggal).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }).toLowerCase().includes(q) ||
+            formatDateShort(row.tanggal).toLowerCase().includes(q) ||
             row.keterangan.toLowerCase().includes(q)
         );
     }, [data, search]);
 
-    const { page, setPage, totalPages, paginated, total } = usePagination(filtered);
-
-    // Reset page when filter/tab changes
-    useEffect(() => { setPage(1); }, [activeTabId, bulan, tahun, search]); // eslint-disable-line react-hooks/exhaustive-deps
-
-    // ─── Date formatting ───
-    const formatDate = (dateStr: string) => {
-        const d = new Date(dateStr);
-        return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
-    };
-
-    const isToday = (dateStr: string) => {
-        const d = new Date(dateStr);
-        const today = new Date();
-        return d.getDate() === today.getDate() &&
-            d.getMonth() === today.getMonth() &&
-            d.getFullYear() === today.getFullYear();
-    };
-
+    /* ═══════════════════════════════════════════ */
+    /*  RENDER                                     */
+    /* ═══════════════════════════════════════════ */
     return (
-        <div className="space-y-6">
-            {/* Breadcrumb */}
-            <div className="flex items-center gap-2 text-sm text-gray-400">
-                <span className="text-gray-500">Dashboard</span>
-                <span>/</span>
-                <span className="text-gray-500">{productCategory}</span>
-                <span>/</span>
-                <span className="text-gray-500">{productName}</span>
-                <span>/</span>
-                <span className="text-gray-800 font-medium">Produksi</span>
-            </div>
-
-            {/* Page Header */}
+        <div className="space-y-8 p-2">
+            {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
+                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
                         Produksi — {productName}
                     </h1>
-                    <p className="text-sm text-gray-500 mt-1">
-                        Data produksi harian dan stok untuk semua varian produk
+                    <p className="text-base text-gray-500 mt-2">
+                        Input dan monitoring data produksi harian
                     </p>
                 </div>
             </div>
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <SummaryCard
-                    label="Periode"
-                    value={periodLabel}
-                    icon={<CalendarSmallIcon />}
-                    color="emerald"
-                />
-                <SummaryCard
-                    label="Total Produksi"
-                    value={fmt(summary.totalProduksi)}
-                    icon={<FactoryIcon />}
-                    color="blue"
-                />
-                <SummaryCard
-                    label="Kumulatif"
-                    value={fmt(summary.kumulatif)}
-                    icon={<TrendUpIcon />}
-                    color="amber"
-                />
-                <SummaryCard
-                    label="Stok Akhir"
-                    value={fmt(summary.stokAkhir)}
-                    icon={<PackageIcon />}
-                    color="violet"
-                />
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                <SummaryCard label="Periode" value={periodLabel} icon={<CalendarSmallIcon />} color="emerald" />
+                <SummaryCard label="Total Produksi" value={fmt(summary.totalProduksi)} icon={<FactoryIcon />} color="blue" />
+                <SummaryCard label="Kumulatif" value={fmt(summary.kumulatif)} icon={<TrendUpIcon />} color="amber" />
+                <SummaryCard label="Stok Akhir" value={fmt(summary.stokAkhir)} icon={<PackageIcon />} color="violet" />
             </div>
 
-            {/* Data Table Card */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            {/* Error Alert */}
+            {error && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center justify-between shadow-sm">
+                    <span className="text-sm font-medium text-red-800">{error}</span>
+                    <button onClick={() => { setError(null); fetchTabs(); }} className="px-4 py-2 text-sm font-semibold text-red-700 bg-red-100 hover:bg-red-200 rounded-lg">Coba Lagi</button>
+                </div>
+            )}
 
-                {/* Tabs + Actions */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-gray-100">
-                    {/* Tabs */}
+            {/* Main Card */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-md overflow-hidden">
+                {/* Tabs Row */}
+                <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50/30">
                     <div className="flex overflow-x-auto scrollbar-hide items-center">
                         {tabsLoading ? (
-                            <div className="px-4 py-3 text-sm text-gray-400">Memuat tab...</div>
+                            <div className="px-6 py-4 text-gray-400">Memuat tab...</div>
                         ) : (
-                            <>
-                                {tabs.map(tab => (
-                                    <div key={tab.id} className="relative group flex items-center">
-                                        {renamingTabId === tab.id ? (
-                                            <div className="flex items-center gap-1 px-2 py-2">
-                                                <input
-                                                    autoFocus
-                                                    value={renameValue}
-                                                    onChange={e => setRenameValue(e.target.value)}
-                                                    onKeyDown={e => {
-                                                        if (e.key === 'Enter') handleRenameTab(tab.id);
-                                                        if (e.key === 'Escape') { setRenamingTabId(null); setRenameValue(''); }
-                                                    }}
-                                                    className="text-sm px-2 py-1 border border-emerald-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-500 w-24"
-                                                />
-                                                <button onClick={() => handleRenameTab(tab.id)} className="text-emerald-600 hover:text-emerald-800 p-1">
-                                                    ✓
-                                                </button>
-                                                <button onClick={() => { setRenamingTabId(null); setRenameValue(''); }} className="text-gray-400 hover:text-gray-600 p-1">
-                                                    <XIcon />
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <button
-                                                onClick={() => setActiveTabId(tab.id)}
-                                                className={`px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap
-                                                    ${activeTabId === tab.id
-                                                        ? 'text-emerald-700'
-                                                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                                                    }`}
-                                            >
-                                                {tab.nama}
-                                                {activeTabId === tab.id && (
-                                                    <span className="absolute bottom-0 left-0 w-full h-0.5 bg-emerald-600 rounded-t" />
-                                                )}
-                                            </button>
-                                        )}
-
-                                        {/* Tab context menu */}
-                                        {activeTabId === tab.id && renamingTabId !== tab.id && (
-                                            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity mr-1">
-                                                <button
-                                                    onClick={() => { setRenamingTabId(tab.id); setRenameValue(tab.nama); }}
-                                                    className="p-1 rounded text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
-                                                    title="Rename"
-                                                >
-                                                    <PencilIcon />
-                                                </button>
-                                                {tabs.length > 1 && (
-                                                    <button
-                                                        onClick={() => handleDeleteTab(tab.id)}
-                                                        className="p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                                                        title="Hapus"
-                                                    >
-                                                        <TrashIcon />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-
-                                {/* Add tab button */}
-                                {showAddTab ? (
-                                    <div className="flex items-center gap-1 px-2 py-2">
-                                        <input
-                                            autoFocus
-                                            value={newTabName}
-                                            onChange={e => setNewTabName(e.target.value)}
-                                            onKeyDown={e => {
-                                                if (e.key === 'Enter') handleAddTab();
-                                                if (e.key === 'Escape') { setShowAddTab(false); setNewTabName(''); }
-                                            }}
-                                            placeholder="Nama tab..."
-                                            className="text-sm px-2 py-1 border border-emerald-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-500 w-28"
-                                        />
-                                        <button onClick={handleAddTab} className="text-emerald-600 hover:text-emerald-800 p-1 text-sm font-medium">
-                                            ✓
-                                        </button>
-                                        <button onClick={() => { setShowAddTab(false); setNewTabName(''); }} className="text-gray-400 hover:text-gray-600 p-1">
-                                            <XIcon />
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <button
-                                        onClick={() => setShowAddTab(true)}
-                                        className="flex items-center gap-1 px-3 py-3 text-sm text-gray-400 hover:text-emerald-600 hover:bg-emerald-50/50 transition-colors whitespace-nowrap"
-                                        title="Tambah Tab"
-                                    >
-                                        <PlusIcon />
-                                    </button>
-                                )}
-                            </>
+                            tabs.map(tab => (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTabId(tab.id)}
+                                    className={`px-6 py-4 text-base font-medium transition-colors relative whitespace-nowrap
+                                    ${activeTabId === tab.id ? 'text-emerald-700 bg-white border-b-2 border-emerald-600' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}
+                                >
+                                    {tab.nama}
+                                </button>
+                            ))
                         )}
                     </div>
-
-                    {/* Export */}
-                    <div className="px-4 py-2 sm:py-0 flex items-center gap-2 shrink-0">
+                    <div className="px-6 py-3 flex items-center gap-3 shrink-0">
+                        <button
+                            onClick={() => setShowTabConfig(!showTabConfig)}
+                            className={`p-2.5 rounded-lg transition-colors ${showTabConfig ? 'bg-emerald-100 text-emerald-700' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
+                            title="Konfigurasi Tab"
+                        >
+                            <SettingsIcon />
+                        </button>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <button className="inline-flex items-center gap-2 px-4 py-2 bg-white text-gray-700 text-sm font-medium rounded-lg border border-gray-200 hover:bg-gray-50 hover:text-gray-900 transition-colors shadow-sm">
-                                    <DownloadIcon />
-                                    Export
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-1 opacity-50">
-                                        <polyline points="6 9 12 15 18 9" />
-                                    </svg>
+                                <button className="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 text-base font-medium rounded-lg border border-gray-200 hover:bg-gray-50 shadow-sm transition-colors">
+                                    <DownloadIcon /> Export
                                 </button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48 bg-white">
-                                <DropdownMenuLabel>Pilih Format</DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem className="cursor-pointer">
-                                    <span className="mr-2">📊</span> Export to Excel
-                                </DropdownMenuItem>
-                                <DropdownMenuItem className="cursor-pointer">
-                                    <span className="mr-2">📄</span> Export to PDF
-                                </DropdownMenuItem>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={handleExportExcel} className="py-2 px-4 text-base cursor-pointer">Excel</DropdownMenuItem>
+                                <DropdownMenuItem onClick={handleExportPDF} className="py-2 px-4 text-base cursor-pointer">PDF</DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
                 </div>
 
-                {/* Filter Row */}
-                <div className="p-4 border-b border-gray-100 bg-gray-50/50">
-                    <div className="flex flex-col md:flex-row md:items-end gap-4 justify-between">
-                        {/* Left: Period filter (auto-apply) */}
-                        <div className="flex flex-col sm:flex-row gap-3 items-end">
-                            <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
-                                <span className="text-sm font-medium text-gray-500 mr-1">Periode:</span>
-                                <select
-                                    value={bulan ?? ''}
-                                    onChange={e => setBulan(e.target.value ? Number(e.target.value) : null)}
-                                    className="bg-transparent text-sm font-medium text-gray-700 focus:outline-none cursor-pointer hover:text-emerald-600 transition-colors"
-                                >
-                                    <option value="">Semua Bulan</option>
-                                    {BULAN_OPTIONS.map(opt => (
-                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                    ))}
-                                </select>
-                                <span className="text-gray-300">/</span>
-                                <select
-                                    value={tahun ?? ''}
-                                    onChange={e => setTahun(e.target.value ? Number(e.target.value) : null)}
-                                    className="bg-transparent text-sm font-medium text-gray-700 focus:outline-none cursor-pointer hover:text-emerald-600 transition-colors"
-                                >
-                                    <option value="">Semua Tahun</option>
-                                    {generateYearOptions().map(y => (
-                                        <option key={y} value={y}>{y}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            {hasFilter && (
-                                <button
-                                    onClick={clearFilter}
-                                    className="px-3 py-2 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg border border-red-200 transition-colors flex items-center gap-1.5"
-                                >
-                                    <XIcon /> Hapus Filter
-                                </button>
-                            )}
+                {/* Tab Config Panel */}
+                {showTabConfig && (
+                    <div className="border-b border-gray-100 bg-gray-50/70 p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-base font-semibold text-gray-700">Konfigurasi Tab</h3>
+                            <button onClick={() => setShowTabConfig(false)} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-white"><XIcon /></button>
                         </div>
+                        <div className="space-y-3 mb-4">
+                            {tabs.map(tab => (
+                                <div key={tab.id} className="flex items-center gap-3 bg-white rounded-lg border border-gray-200 px-4 py-3 shadow-sm">
+                                    {editingTabId === tab.id ? (
+                                        <>
+                                            <input autoFocus value={editTabValue} onChange={e => setEditTabValue(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleRenameTab(tab.id); if (e.key === 'Escape') setEditingTabId(null); }} className="flex-1 text-base px-3 py-1.5 border border-emerald-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-500" />
+                                            <button onClick={() => handleRenameTab(tab.id)} className="text-emerald-600 hover:text-emerald-700 p-2 text-sm font-medium">Simpan</button>
+                                            <button onClick={() => setEditingTabId(null)} className="text-gray-400 hover:text-gray-600 p-2"><XIcon /></button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span className="flex-1 text-base text-gray-700 font-medium">{tab.nama}</span>
+                                            <button onClick={() => { setEditingTabId(tab.id); setEditTabValue(tab.nama); }} className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded" title="Rename"><PencilIcon /></button>
+                                            <button onClick={() => handleDeleteTab(tab.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded" title="Hapus"><TrashIcon /></button>
+                                        </>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <input value={newTabName} onChange={e => setNewTabName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleAddTab(); }} className="flex-1 text-base px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 shadow-sm" placeholder="Nama tab baru..." />
+                            <button onClick={handleAddTab} disabled={!newTabName.trim()} className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-base font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm">
+                                <PlusIcon /> Tambah
+                            </button>
+                        </div>
+                    </div>
+                )}
 
-                        {/* Right: Search */}
-                        <div className="relative w-full md:w-64">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                                <SearchIcon />
-                            </span>
-                            <input
-                                type="text"
-                                value={search}
-                                onChange={e => setSearch(e.target.value)}
-                                placeholder="Cari data..."
-                                className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow shadow-sm"
-                            />
+                {/* Filter Row */}
+                <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex flex-col md:flex-row gap-6 justify-between items-end">
+                    <div className="flex items-center gap-3">
+                        <span className="text-base font-medium text-gray-500">Periode:</span>
+                        <div className="flex items-center gap-2 bg-white px-4 py-2.5 rounded-xl border border-gray-200 shadow-sm">
+                            <select value={bulan} onChange={e => setBulan(Number(e.target.value))} className="bg-transparent text-base font-medium text-gray-700 focus:outline-none cursor-pointer">
+                                {BULAN_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                            </select>
+                            <span className="text-gray-300 mx-1">/</span>
+                            <select value={tahun} onChange={e => setTahun(Number(e.target.value))} className="bg-transparent text-base font-medium text-gray-700 focus:outline-none cursor-pointer">
+                                {generateYearOptions().map(y => <option key={y} value={y}>{y}</option>)}
+                            </select>
                         </div>
+                    </div>
+                    <div className="relative w-full md:w-80">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"><SearchIcon /></span>
+                        <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari data..." className="w-full pl-11 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm" />
                     </div>
                 </div>
 
-                {/* Summary Strip */}
-                {bulan && tahun && (
-                    <div className="px-4 py-3 bg-emerald-50/60 border-b border-emerald-100">
-                        <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Bulan</span>
-                                <span className="text-sm font-bold text-gray-800">{periodLabel}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Kumulatif</span>
-                                <span className="text-sm font-bold text-gray-800">{fmt(summary.kumulatif)}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Stok Akhir</span>
-                                <span className="text-sm font-bold text-gray-800">{fmt(summary.stokAkhir)}</span>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Loading Indicator */}
-                {loading && (
-                    <div className="px-4 py-8 text-center text-gray-400 text-sm">
-                        <div className="inline-flex items-center gap-2">
-                            <div className="w-4 h-4 border-2 border-emerald-300 border-t-transparent rounded-full animate-spin" />
-                            Memuat data...
-                        </div>
-                    </div>
-                )}
-
-                {/* Desktop Table */}
-                {!loading && (
-                    <div className="overflow-x-auto hidden sm:block">
-                        <table className="w-full text-sm">
+                {/* ═══════════════════ TABLE ═══════════════════ */}
+                {loading ? (
+                    <div className="p-12 text-center text-gray-400 text-lg">Memuat data...</div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-base">
                             <thead>
-                                <tr className="bg-gray-50 text-left">
-                                    <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap sticky left-0 bg-gray-50 z-10">Tanggal</th>
-                                    <th className="px-4 py-3 font-semibold text-gray-600 text-right whitespace-nowrap">Prod.</th>
-                                    <th className="px-4 py-3 font-semibold text-gray-600 text-right whitespace-nowrap">Kumulatif</th>
-                                    <th className="px-4 py-3 font-semibold text-gray-600 text-right whitespace-nowrap">Keluar</th>
-                                    <th className="px-4 py-3 font-semibold text-gray-600 text-right whitespace-nowrap">Stok Akhir</th>
-                                    <th className="px-4 py-3 font-semibold text-gray-600 text-right whitespace-nowrap">COA</th>
-                                    <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">Ket.</th>
+                                {/* Row 1: Group headers */}
+                                <tr className="bg-gray-50 border-b border-gray-200">
+                                    <th rowSpan={2} className="px-4 py-4 font-semibold text-gray-600 sticky left-0 bg-gray-50 z-10 text-left w-32">Tanggal</th>
+                                    <th colSpan={3} className="px-4 py-3 font-semibold text-gray-700 text-center border-b border-gray-200 bg-emerald-50/50">Produksi</th>
+                                    <th rowSpan={2} className="px-4 py-4 font-semibold text-gray-600 text-right w-32 bg-blue-50/30">Kumulatif Produksi</th>
+                                    <th rowSpan={2} className="px-4 py-4 font-semibold text-gray-600 text-center w-32 bg-amber-50/30">Pengiriman Gudang</th>
+                                    <th rowSpan={2} className="px-4 py-4 font-semibold text-gray-600 text-right w-28">Stok Akhir</th>
+                                    <th rowSpan={2} className="px-4 py-4 font-semibold text-gray-600 w-44">Keterangan</th>
+                                    <th rowSpan={2} className="px-4 py-4 font-semibold text-gray-600 w-20 text-center">Aksi</th>
+                                </tr>
+                                {/* Row 2: Sub-headers under Produksi */}
+                                <tr className="bg-gray-50 border-b border-gray-200">
+                                    <th className="px-3 py-2.5 font-medium text-gray-500 text-center text-xs uppercase tracking-wider bg-emerald-50/50 w-28">Belum Sampling</th>
+                                    <th className="px-3 py-2.5 font-medium text-gray-500 text-center text-xs uppercase tracking-wider bg-emerald-50/50 w-28">Proses Sampling</th>
+                                    <th className="px-3 py-2.5 font-medium text-gray-500 text-center text-xs uppercase tracking-wider bg-emerald-50/50 w-20">COA</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {paginated.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={7} className="px-4 py-12 text-center text-gray-400">
-                                            {data.length === 0 ? 'Belum ada data produksi.' : 'Tidak ada data ditemukan.'}
-                                        </td>
-                                    </tr>
+                                {filtered.length === 0 ? (
+                                    <tr><td colSpan={9} className="p-12 text-center text-gray-400 text-lg">Tidak ada data.</td></tr>
                                 ) : (
-                                    paginated.map((row) => {
+                                    filtered.map(row => {
                                         const highlight = isToday(row.tanggal);
+                                        const dirty = isRowDirty(row.tanggal);
+
+                                        // Raw values (from original or dirty)
+                                        const bs = getRawValue(row, 'bs');
+                                        const ps = getRawValue(row, 'ps');
+                                        const coa = getRawValue(row, 'coa');
+                                        const pg = getRawValue(row, 'pg');
+
+                                        // Cascading display values
+                                        const bsDisplay = bs - ps;   // Remaining unsampled
+                                        const psDisplay = ps - coa;  // In sampling process
+                                        const coaDisplay = coa;      // Certified
+
                                         return (
-                                            <tr
-                                                key={row.id}
-                                                className={`transition-colors ${highlight
-                                                    ? 'bg-amber-50/80 hover:bg-amber-50'
-                                                    : 'hover:bg-emerald-50/30'
-                                                    }`}
-                                            >
-                                                <td className={`px-4 py-3 font-medium whitespace-nowrap sticky left-0 z-10 ${highlight ? 'text-amber-700 bg-amber-50/80' : 'text-gray-700 bg-white'}`}>
-                                                    {formatDate(row.tanggal)}
+                                            <tr key={row.tanggal} className={`${highlight ? 'bg-amber-50/50' : 'hover:bg-gray-50/50'} transition-colors`}>
+                                                {/* Tanggal */}
+                                                <td className={`px-4 py-3 font-medium sticky left-0 z-10 ${highlight ? 'text-amber-700 bg-amber-50/90' : 'text-gray-700 bg-white'}`}>
+                                                    {formatDateShort(row.tanggal)}
                                                 </td>
-                                                <td className="px-4 py-3 text-right font-mono text-gray-600 tabular-nums">
-                                                    {fmt(row.produksi)}
+
+                                                {/* ── Produksi Group ── */}
+                                                {/* Belum Sampling: clickable cell → opens modal */}
+                                                <td className="p-1">
+                                                    <div className="flex items-center gap-0.5">
+                                                        <button
+                                                            onClick={() => setBsModal({ isOpen: true, tanggal: row.tanggal, currentBs: bs })}
+                                                            className={`flex-1 h-10 px-3 text-right font-mono text-base rounded-lg transition-all outline-none cursor-pointer
+                                                                ${bsDisplay > 0
+                                                                    ? 'text-emerald-700 font-semibold bg-emerald-50/50 hover:bg-emerald-100 border border-emerald-200 hover:border-emerald-300'
+                                                                    : 'text-gray-400 bg-transparent hover:bg-gray-50 border border-transparent hover:border-gray-200'}`}
+                                                            title="Klik untuk input produksi & bahan"
+                                                        >
+                                                            {bsDisplay > 0 ? fmt(bsDisplay) : '0'}
+                                                        </button>
+                                                        {bs > 0 && (
+                                                            <button
+                                                                onClick={() => setCancelConfirm({ isOpen: true, tanggal: row.tanggal })}
+                                                                className="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-md text-red-400 hover:text-red-600 hover:bg-red-50 transition-all"
+                                                                title="Batalkan pengisian produksi"
+                                                            >
+                                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                    <path d="M3 6h18" /><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" /><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+                                                                </svg>
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </td>
-                                                <td className="px-4 py-3 text-right font-mono text-gray-700 font-medium tabular-nums">
+
+                                                {/* Proses Sampling: display = ps - coa (net value) */}
+                                                <td className="p-1">
+                                                    <InputCell
+                                                        value={psDisplay}
+                                                        onChange={(val) => {
+                                                            const valNum = val === '' ? 0 : Number(val);
+                                                            handleInputChange(row.tanggal, 'ps', valNum + coa);
+                                                        }}
+                                                    />
+                                                </td>
+
+                                                {/* COA */}
+                                                <td className="p-1">
+                                                    <InputCell value={coa} onChange={v => handleInputChange(row.tanggal, 'coa', v)} />
+                                                </td>
+
+                                                {/* Kumulatif Produksi (computed - read only) */}
+                                                <td className="px-4 py-3 text-right font-mono text-gray-700 tabular-nums bg-blue-50/10">
                                                     {fmt(row.kumulatif)}
+                                                    {dirty && <span className="text-xs text-amber-500 block">*</span>}
                                                 </td>
-                                                <td className="px-4 py-3 text-right font-mono text-gray-600 tabular-nums">
-                                                    {fmt(row.keluar)}
+
+                                                {/* Pengiriman Gudang (editable) */}
+                                                <td className="p-1">
+                                                    <InputCell value={pg} onChange={v => handleInputChange(row.tanggal, 'pg', v)} />
                                                 </td>
-                                                <td className="px-4 py-3 text-right font-mono font-semibold tabular-nums text-emerald-700">
+
+                                                {/* Stok Akhir (computed - read only) */}
+                                                <td className="px-4 py-3 text-right font-mono font-semibold text-emerald-700 tabular-nums bg-emerald-50/10">
                                                     {fmt(row.stokAkhir)}
+                                                    {dirty && <span className="text-xs text-amber-500 block">*</span>}
                                                 </td>
-                                                <td className="px-4 py-3 text-right font-mono text-gray-600 tabular-nums">
-                                                    {fmt(row.coa)}
+
+                                                {/* Keterangan */}
+                                                <td className="p-1">
+                                                    <input
+                                                        type="text"
+                                                        value={getTextValue(row, 'keterangan')}
+                                                        onChange={e => handleInputChange(row.tanggal, 'keterangan', e.target.value)}
+                                                        className="w-full px-3 py-2 text-sm border border-transparent bg-transparent hover:bg-white hover:border-gray-200 focus:bg-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 rounded-lg transition-all outline-none text-gray-600 truncate focus:text-clip"
+                                                        placeholder="-"
+                                                    />
                                                 </td>
-                                                <td className="px-4 py-3 text-gray-500 text-xs max-w-[200px] truncate">
-                                                    {row.keterangan || '—'}
+
+                                                {/* Actions */}
+                                                <td className="px-4 py-3 text-center">
+                                                    {dirty && (
+                                                        <div className="flex items-center justify-center gap-2">
+                                                            <button onClick={() => setConfirmModal({ isOpen: true, rowDate: row.tanggal })} className="p-1.5 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 transition-colors shadow-sm" title="Simpan"><CheckIcon /></button>
+                                                            <button onClick={() => handleCancelRow(row.tanggal)} className="p-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors shadow-sm" title="Batal"><XIcon /></button>
+                                                        </div>
+                                                    )}
                                                 </td>
                                             </tr>
                                         );
@@ -661,173 +682,122 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                         </table>
                     </div>
                 )}
-
-                {/* Mobile Cards */}
-                {!loading && (
-                    <div className="sm:hidden divide-y divide-gray-100">
-                        {paginated.length === 0 ? (
-                            <div className="px-4 py-12 text-center text-gray-400">
-                                {data.length === 0 ? 'Belum ada data produksi.' : 'Tidak ada data ditemukan.'}
-                            </div>
-                        ) : (
-                            paginated.map((row) => {
-                                const highlight = isToday(row.tanggal);
-                                return (
-                                    <div key={row.id} className={`p-4 space-y-3 ${highlight ? 'bg-amber-50/60' : ''}`}>
-                                        <div className="flex items-center justify-between">
-                                            <span className={`text-sm font-semibold ${highlight ? 'text-amber-700' : 'text-gray-800'}`}>
-                                                {formatDate(row.tanggal)}
-                                            </span>
-                                            {highlight && (
-                                                <span className="inline-flex px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-100 text-amber-700 border border-amber-200">
-                                                    Hari ini
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
-                                            <div>
-                                                <span className="text-[11px] text-gray-400 uppercase tracking-wide">Produksi</span>
-                                                <p className="font-mono text-gray-700">{fmt(row.produksi)}</p>
-                                            </div>
-                                            <div>
-                                                <span className="text-[11px] text-gray-400 uppercase tracking-wide">Kumulatif</span>
-                                                <p className="font-mono text-gray-700 font-medium">{fmt(row.kumulatif)}</p>
-                                            </div>
-                                            <div>
-                                                <span className="text-[11px] text-gray-400 uppercase tracking-wide">Keluar</span>
-                                                <p className="font-mono text-gray-700">{fmt(row.keluar)}</p>
-                                            </div>
-                                            <div>
-                                                <span className="text-[11px] text-gray-400 uppercase tracking-wide">Stok Akhir</span>
-                                                <p className="font-mono font-semibold text-emerald-700">{fmt(row.stokAkhir)}</p>
-                                            </div>
-                                            <div>
-                                                <span className="text-[11px] text-gray-400 uppercase tracking-wide">COA</span>
-                                                <p className="font-mono text-gray-700">{fmt(row.coa)}</p>
-                                            </div>
-                                        </div>
-                                        {row.keterangan && (
-                                            <div className="pt-1 text-xs text-gray-500 border-t border-gray-100">
-                                                Ket: <span className="font-medium text-gray-700">{row.keterangan}</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })
-                        )}
-                    </div>
-                )}
-
-                {/* Pagination */}
-                {!loading && <Pagination page={page} totalPages={totalPages} total={total} setPage={setPage} />}
             </div>
+
+            {/* Belum Sampling Modal */}
+            <BelumSamplingModal
+                isOpen={bsModal.isOpen}
+                onClose={() => setBsModal({ isOpen: false, tanggal: '', currentBs: 0 })}
+                onSaved={() => fetchData()}
+                productSlug={slug}
+                productFullName={`${productName} ${tabs.find(t => t.id === activeTabId)?.nama || ''}`.trim()}
+                tabId={activeTabId || 0}
+                tanggal={bsModal.tanggal}
+                currentBs={bsModal.currentBs}
+                bulan={bulan}
+                tahun={tahun}
+            />
+
+            {/* Confirmation Modal */}
+            {confirmModal.isOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-xl shadow-xl border border-gray-100 max-w-sm w-full p-6 animate-in fade-in zoom-in-95 duration-200">
+                        <h3 className="text-lg font-bold text-gray-900 mb-2">Simpan Perubahan?</h3>
+                        <p className="text-gray-600 mb-6">Apakah anda yakin ingin menyimpan perubahan data ini? Data produksi akan diperbarui.</p>
+                        <div className="flex justify-end gap-3">
+                            <button onClick={() => setConfirmModal({ isOpen: false, rowDate: null })} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition-colors">Batal</button>
+                            <button onClick={handleSaveRow} className="px-4 py-2 bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg font-medium shadow-sm transition-colors">Ya, Simpan</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Cancel Produksi Confirmation Modal */}
+            {cancelConfirm.isOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-xl shadow-xl border border-gray-100 max-w-sm w-full p-6 animate-in fade-in zoom-in-95 duration-200">
+                        <div className="flex items-center gap-3 mb-3">
+                            <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center text-red-600">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M3 6h18" /><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" /><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+                                </svg>
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-900">Batalkan Pengisian?</h3>
+                        </div>
+                        <p className="text-sm text-gray-600 mb-5">
+                            Data produksi akan di-reset ke 0 dan semua mutasi bahan yang terkait akan dihapus. Stok bahan akan dikembalikan.
+                        </p>
+                        <div className="flex justify-end gap-3">
+                            <button
+                                onClick={() => setCancelConfirm({ isOpen: false, tanggal: '' })}
+                                disabled={cancelLoading}
+                                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition-colors"
+                            >
+                                Tidak
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    setCancelLoading(true);
+                                    try {
+                                        await cancelProduksiWithMaterials(slug, activeTabId || 0, cancelConfirm.tanggal);
+                                        setCancelConfirm({ isOpen: false, tanggal: '' });
+                                        fetchData();
+                                    } catch (err) {
+                                        console.error('Cancel failed:', err);
+                                    } finally {
+                                        setCancelLoading(false);
+                                    }
+                                }}
+                                disabled={cancelLoading}
+                                className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg font-medium shadow-sm transition-colors disabled:opacity-50"
+                            >
+                                {cancelLoading ? (
+                                    <>
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                                        Menghapus...
+                                    </>
+                                ) : (
+                                    'Ya, Batalkan'
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
 
-/* ═══════════════════════════════════════════ */
-/*  Summary Card                               */
-/* ═══════════════════════════════════════════ */
+/* ─── Input Cell ─── */
+function InputCell({ value, onChange }: { value: string | number, onChange: (val: string) => void }) {
+    return (
+        <input
+            type="number"
+            step="any"
+            value={value === 0 ? '' : value}
+            onChange={e => onChange(e.target.value)}
+            className="w-full h-10 px-3 text-right font-mono text-base border border-transparent bg-transparent hover:bg-white hover:border-gray-200 focus:bg-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 rounded-lg transition-all outline-none placeholder-gray-300 text-gray-700"
+            placeholder="0"
+        />
+    );
+}
 
-const COLOR_MAP: Record<string, { bg: string; iconBg: string; text: string; border: string }> = {
-    emerald: { bg: 'bg-emerald-50', iconBg: 'bg-emerald-100', text: 'text-emerald-700', border: 'border-emerald-100' },
-    blue: { bg: 'bg-blue-50', iconBg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-100' },
-    amber: { bg: 'bg-amber-50', iconBg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-100' },
-    violet: { bg: 'bg-violet-50', iconBg: 'bg-violet-100', text: 'text-violet-700', border: 'border-violet-100' },
-};
-
+/* ─── Summary Card ─── */
 function SummaryCard({ label, value, icon, color }: { label: string; value: string; icon: React.ReactNode; color: string }) {
+    const COLOR_MAP: Record<string, any> = {
+        emerald: { bg: 'bg-emerald-50', iconBg: 'bg-emerald-100', text: 'text-emerald-700', border: 'border-emerald-100' },
+        blue: { bg: 'bg-blue-50', iconBg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-100' },
+        amber: { bg: 'bg-amber-50', iconBg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-100' },
+        violet: { bg: 'bg-violet-50', iconBg: 'bg-violet-100', text: 'text-violet-700', border: 'border-violet-100' },
+    };
     const c = COLOR_MAP[color] ?? COLOR_MAP.emerald;
     return (
-        <div className={`${c.bg} ${c.border} border rounded-xl p-4 sm:p-5`}>
-            <div className="flex items-center gap-3 mb-2">
-                <div className={`${c.iconBg} ${c.text} p-2 rounded-lg`}>
-                    {icon}
-                </div>
-                <span className={`text-xs font-semibold uppercase tracking-wider ${c.text}`}>{label}</span>
+        <div className={`${c.bg} ${c.border} border rounded-xl p-5 sm:p-6`}>
+            <div className="flex items-center gap-3 mb-3">
+                <div className={`${c.iconBg} ${c.text} p-2.5 rounded-lg`}>{icon}</div>
+                <span className={`text-sm font-semibold uppercase tracking-wider ${c.text}`}>{label}</span>
             </div>
-            <p className="text-lg sm:text-xl font-bold text-gray-900 pl-1">{value}</p>
-        </div>
-    );
-}
-
-/* ═══════════════════════════════════════════ */
-/*  Shared Components                          */
-/* ═══════════════════════════════════════════ */
-
-function CalendarSmallIcon() {
-    return (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
-            <line x1="16" x2="16" y1="2" y2="6" />
-            <line x1="8" x2="8" y1="2" y2="6" />
-            <line x1="3" x2="21" y1="10" y2="10" />
-        </svg>
-    );
-}
-
-function Pagination({
-    page,
-    totalPages,
-    total,
-    setPage,
-}: {
-    page: number;
-    totalPages: number;
-    total: number;
-    setPage: (p: number) => void;
-}) {
-    if (total === 0) return null;
-
-    return (
-        <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between text-sm text-gray-500">
-            <span>
-                Menampilkan <span className="font-medium text-gray-700">{Math.min((page - 1) * 15 + 1, total)}</span>
-                {' – '}
-                <span className="font-medium text-gray-700">{Math.min(page * 15, total)}</span>
-                {' dari '}
-                <span className="font-medium text-gray-700">{total}</span> data
-            </span>
-            <div className="flex items-center gap-1">
-                <button
-                    disabled={page <= 1}
-                    onClick={() => setPage(page - 1)}
-                    className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                >
-                    <ChevronLeftIcon />
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                    .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
-                    .reduce((acc: (number | 'ellipsis')[], p, idx, arr) => {
-                        if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('ellipsis');
-                        acc.push(p);
-                        return acc;
-                    }, [])
-                    .map((item, i) =>
-                        item === 'ellipsis' ? (
-                            <span key={`e${i}`} className="px-2 text-gray-300">…</span>
-                        ) : (
-                            <button
-                                key={item}
-                                onClick={() => setPage(item as number)}
-                                className={`min-w-[32px] h-8 rounded-lg text-sm font-medium transition-colors
-                                    ${page === item
-                                        ? 'bg-emerald-600 text-white shadow-sm'
-                                        : 'text-gray-600 hover:bg-gray-100'
-                                    }`}
-                            >
-                                {item}
-                            </button>
-                        )
-                    )}
-                <button
-                    disabled={page >= totalPages}
-                    onClick={() => setPage(page + 1)}
-                    className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                >
-                    <ChevronRightIcon />
-                </button>
-            </div>
+            <p className="text-2xl sm:text-3xl font-bold text-gray-900 pl-1">{value}</p>
         </div>
     );
 }

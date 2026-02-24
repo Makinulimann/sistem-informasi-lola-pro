@@ -21,15 +21,17 @@ public class Produksi
 
     public DateTime Tanggal { get; set; }
 
-    public double JumlahProduksi { get; set; }
+    public double BS { get; set; } // Belum Sampling
 
-    public double Keluar { get; set; }
+    public double PS { get; set; } // Proses Sampling
+
+    public double COA { get; set; }
+
+    public double PG { get; set; } // Pengiriman Gudang
 
     public double Kumulatif { get; set; }
 
     public double StokAkhir { get; set; }
-
-    public double COA { get; set; }
 
     [MaxLength(500)]
     public string Keterangan { get; set; } = string.Empty;

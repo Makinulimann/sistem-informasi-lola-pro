@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, usePathname } from 'next/navigation';
 import { navigation, type NavSection, type NavChild } from '@/lib/navigation';
-import { api, auth } from '@/lib/api';
+import { api, auth, ApiError } from '@/lib/api';
 import { jwtDecode } from 'jwt-decode';
 import { LogOut, Settings, User, ChevronDown as ChevronDownIcon } from 'lucide-react';
 import {
@@ -376,6 +376,12 @@ export function Sidebar({
 
 /* ─── Dashboard Header ─── */
 
+
+
+// ... (existing imports)
+
+// ...
+
 export function DashboardHeader({ onMenuToggle }: { onMenuToggle: () => void }) {
     const router = useRouter();
     const [user, setUser] = useState<{ fullName: string; role: string } | null>(null);
@@ -388,6 +394,10 @@ export function DashboardHeader({ onMenuToggle }: { onMenuToggle: () => void }) 
                 const data = await api.get<{ fullName: string; role: string }>('/auth/me');
                 setUser(data);
             } catch (err) {
+                // Ignore 401/403 (Unauthorized/Forbidden) - just means user is not logged in
+                if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+                    return;
+                }
                 console.error('Failed to fetch user', err);
             }
         };
