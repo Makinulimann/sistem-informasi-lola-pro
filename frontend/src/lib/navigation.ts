@@ -64,6 +64,8 @@ export const navigation: NavSection[] = [
             { label: 'BioFertil', children: subItems('/dashboard/produk-pengembangan/bio-fertil') },
             { label: 'PetroFish', children: subItems('/dashboard/produk-pengembangan/petro-fish') },
             { label: 'Phonska Oca', children: subItems('/dashboard/produk-pengembangan/phonska-oca') },
+            { label: 'Aktivitas Harian', href: '/dashboard/produk-pengembangan/aktivitas-harian' },
+            { label: 'Maintenance', href: '/dashboard/produk-pengembangan/maintenance' },
         ],
     },
 ];

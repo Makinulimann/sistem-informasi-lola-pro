@@ -17,5 +17,8 @@ public interface ISipProDbContext
     DbSet<ProductMaterial> ProductMaterials { get; set; }
     DbSet<ProduksiTab> ProduksiTabs { get; set; }
     DbSet<Produksi> Produksis { get; set; }
+    DbSet<AktivitasHarian> AktivitasHarians { get; set; }
+    DbSet<LogbookPic> LogbookPics { get; set; }
+    DbSet<LogbookLokasi> LogbookLokasis { get; set; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 }

@@ -209,7 +209,9 @@ public class SidebarController : ControllerBase
         var bioFertil = new SidebarMenu { Label = "BioFertil", Href = "#", ParentId = pengembangan.Id, Order = 2, RoleAccess = "Admin,VP,KPP" };
         var petroFish = new SidebarMenu { Label = "PetroFish", Href = "#", ParentId = pengembangan.Id, Order = 3, RoleAccess = "Admin,VP,KPP" };
         var phonskaOca = new SidebarMenu { Label = "Phonska Oca", Href = "#", ParentId = pengembangan.Id, Order = 4, RoleAccess = "Admin,VP,KPP" };
-        _context.SidebarMenus.AddRange(gladiator, bioFertil, petroFish, phonskaOca);
+        var aktivitasHarian = new SidebarMenu { Label = "Aktivitas Harian", Href = "/dashboard/produk-pengembangan/aktivitas-harian", ParentId = pengembangan.Id, Order = 5, RoleAccess = "KPP,VP,Admin" };
+        var maintenance = new SidebarMenu { Label = "Maintenance", Href = "/dashboard/produk-pengembangan/maintenance", ParentId = pengembangan.Id, Order = 6, RoleAccess = "KPP,VP,Admin" };
+        _context.SidebarMenus.AddRange(gladiator, bioFertil, petroFish, phonskaOca, aktivitasHarian, maintenance);
 
         await _context.SaveChangesAsync(CancellationToken.None);
 

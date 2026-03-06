@@ -25,6 +25,9 @@ public class SIPProDbContext : DbContext, ISipProDbContext
     public DbSet<ProductMaterial> ProductMaterials { get; set; }
     public DbSet<ProduksiTab> ProduksiTabs { get; set; }
     public DbSet<Produksi> Produksis { get; set; }
+    public DbSet<AktivitasHarian> AktivitasHarians { get; set; }
+    public DbSet<LogbookPic> LogbookPics { get; set; }
+    public DbSet<LogbookLokasi> LogbookLokasis { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

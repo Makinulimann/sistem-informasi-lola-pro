@@ -796,40 +796,48 @@ function SuplaiTable({ data, search, onDelete, onEdit }: { data: SuplaiRow[]; se
     return (
         <>
             <div className="overflow-x-auto hidden sm:block">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm border-collapse border border-gray-200">
                     <thead>
-                        <tr className="bg-gray-50 text-left border-b border-gray-200">
-                            <th className="px-4 py-3 font-semibold text-gray-600 w-16">No.</th>
-                            <th className="px-4 py-3 font-semibold text-gray-600 cursor-pointer hover:text-emerald-600" onClick={() => requestSort('tanggal')}>
-                                Tanggal <SortIcon direction={sortConfig.key === 'tanggal' ? sortConfig.direction : undefined} />
+                        <tr className="bg-gray-50/80">
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700 w-16 border border-gray-200">No.</th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors border border-gray-200" onClick={() => requestSort('tanggal')}>
+                                <div className="flex items-center gap-1.5">
+                                    Tanggal <SortIcon direction={sortConfig.key === 'tanggal' ? sortConfig.direction : undefined} />
+                                </div>
                             </th>
-                            <th className="px-4 py-3 font-semibold text-gray-600 cursor-pointer hover:text-emerald-600" onClick={() => requestSort('jenis')}>
-                                Jenis <SortIcon direction={sortConfig.key === 'jenis' ? sortConfig.direction : undefined} />
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors border border-gray-200" onClick={() => requestSort('jenis')}>
+                                <div className="flex items-center gap-1.5">
+                                    Jenis <SortIcon direction={sortConfig.key === 'jenis' ? sortConfig.direction : undefined} />
+                                </div>
                             </th>
-                            <th className="px-4 py-3 font-semibold text-gray-600 cursor-pointer hover:text-emerald-600" onClick={() => requestSort('namaBahan')}>
-                                Nama Bahan <SortIcon direction={sortConfig.key === 'namaBahan' ? sortConfig.direction : undefined} />
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors border border-gray-200" onClick={() => requestSort('namaBahan')}>
+                                <div className="flex items-center gap-1.5">
+                                    Nama Bahan <SortIcon direction={sortConfig.key === 'namaBahan' ? sortConfig.direction : undefined} />
+                                </div>
                             </th>
-                            <th className="px-4 py-3 font-semibold text-gray-600 text-right cursor-pointer hover:text-emerald-600" onClick={() => requestSort('kuantum')}>
-                                Kuantum <SortIcon direction={sortConfig.key === 'kuantum' ? sortConfig.direction : undefined} />
+                            <th className="px-4 py-3 text-right font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors border border-gray-200" onClick={() => requestSort('kuantum')}>
+                                <div className="flex items-center justify-end gap-1.5">
+                                    Kuantum <SortIcon direction={sortConfig.key === 'kuantum' ? sortConfig.direction : undefined} />
+                                </div>
                             </th>
-                            <th className="px-4 py-3 font-semibold text-gray-600 text-center">Dokumen</th>
-                            <th className="px-4 py-3 font-semibold text-gray-600">Keterangan</th>
-                            <th className="px-4 py-3 font-semibold text-gray-600 text-center w-24">Aksi</th>
+                            <th className="px-4 py-3 text-center font-semibold text-gray-700 border border-gray-200">Dokumen</th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700 border border-gray-200">Keterangan</th>
+                            <th className="px-4 py-3 text-center font-semibold text-gray-700 w-24 border border-gray-200">Aksi</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="bg-white">
                         {sortedData.length === 0 ? (
                             <tr>
-                                <td colSpan={8} className="px-4 py-12 text-center text-gray-400">
+                                <td colSpan={8} className="px-4 py-12 text-center text-gray-400 border border-gray-200">
                                     Tidak ada data ditemukan.
                                 </td>
                             </tr>
                         ) : (
                             sortedData.map((row) => (
-                                <tr key={row.id} className="hover:bg-emerald-50/30 transition-colors">
-                                    <td className="px-4 py-3 text-emerald-600 font-medium">{row.no}</td>
-                                    <td className="px-4 py-3 text-gray-700">{format(new Date(row.tanggal), 'dd/MM/yyyy')}</td>
-                                    <td className="px-4 py-3">
+                                <tr key={row.id} className="hover:bg-emerald-50/10 transition-colors">
+                                    <td className="px-4 py-3 text-emerald-600 font-medium border border-gray-200">{row.no}</td>
+                                    <td className="px-4 py-3 text-gray-700 border border-gray-200">{format(new Date(row.tanggal), 'dd/MM/yyyy')}</td>
+                                    <td className="px-4 py-3 border border-gray-200">
                                         <span className={cn(
                                             "inline-flex px-2 py-0.5 text-xs font-medium rounded-full border",
                                             row.jenis === 'Bahan Baku'
@@ -839,11 +847,11 @@ function SuplaiTable({ data, search, onDelete, onEdit }: { data: SuplaiRow[]; se
                                             {row.jenis}
                                         </span>
                                     </td>
-                                    <td className="px-4 py-3 text-gray-800 font-medium">{row.namaBahan || '-'}</td>
-                                    <td className="px-4 py-3 text-right font-mono text-gray-700">
+                                    <td className="px-4 py-3 text-gray-800 font-medium border border-gray-200">{row.namaBahan || '-'}</td>
+                                    <td className="px-4 py-3 text-right font-mono text-gray-700 border border-gray-200">
                                         {row.kuantum.toLocaleString('id-ID')} <span className="text-gray-400 text-xs ml-0.5">{row.satuan}</span>
                                     </td>
-                                    <td className="px-4 py-3 text-center">
+                                    <td className="px-4 py-3 text-center border border-gray-200">
                                         {row.dokumen ? (
                                             <button className="text-emerald-600 hover:text-emerald-800 transition-colors p-1" title={row.dokumen}>
                                                 <EyeIcon />
@@ -852,10 +860,8 @@ function SuplaiTable({ data, search, onDelete, onEdit }: { data: SuplaiRow[]; se
                                             <span className="text-gray-300">-</span>
                                         )}
                                     </td>
-                                    <td className="px-4 py-3 text-gray-500 text-xs max-w-[150px] truncate" title={row.keterangan}>
-                                        {row.keterangan && row.keterangan !== '-' ? row.keterangan : <span className="text-gray-300">-</span>}
-                                    </td>
-                                    <td className="px-4 py-3 text-center">
+                                    <td className="px-4 py-3 text-gray-600 max-w-xs truncate border border-gray-200">{row.keterangan || '-'}</td>
+                                    <td className="px-4 py-3 text-center border border-gray-200">
                                         <div className="flex items-center justify-center gap-1">
                                             <button
                                                 onClick={() => onEdit(row)}
@@ -955,40 +961,48 @@ function MutasiTable({ data, search, onEdit, onDelete }: { data: MutasiRow[]; se
     return (
         <>
             <div className="overflow-x-auto hidden sm:block">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm border-collapse border border-gray-200">
                     <thead>
-                        <tr className="bg-gray-50 text-left border-b border-gray-200">
-                            <th className="px-4 py-3 font-semibold text-gray-600 w-16">No.</th>
-                            <th className="px-4 py-3 font-semibold text-gray-600 cursor-pointer hover:text-emerald-600" onClick={() => requestSort('tanggal')}>
-                                Tanggal <SortIcon direction={sortConfig.key === 'tanggal' ? sortConfig.direction : undefined} />
+                        <tr className="bg-gray-50/80">
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700 w-16 border border-gray-200">No.</th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors border border-gray-200" onClick={() => requestSort('tanggal')}>
+                                <div className="flex items-center gap-1.5">
+                                    Tanggal <SortIcon direction={sortConfig.key === 'tanggal' ? sortConfig.direction : undefined} />
+                                </div>
                             </th>
-                            <th className="px-4 py-3 font-semibold text-gray-600 cursor-pointer hover:text-emerald-600" onClick={() => requestSort('jenis')}>
-                                Jenis <SortIcon direction={sortConfig.key === 'jenis' ? sortConfig.direction : undefined} />
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors border border-gray-200" onClick={() => requestSort('jenis')}>
+                                <div className="flex items-center gap-1.5">
+                                    Jenis <SortIcon direction={sortConfig.key === 'jenis' ? sortConfig.direction : undefined} />
+                                </div>
                             </th>
-                            <th className="px-4 py-3 font-semibold text-gray-600 cursor-pointer hover:text-emerald-600" onClick={() => requestSort('namaBahan')}>
-                                Nama Bahan <SortIcon direction={sortConfig.key === 'namaBahan' ? sortConfig.direction : undefined} />
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors border border-gray-200" onClick={() => requestSort('namaBahan')}>
+                                <div className="flex items-center gap-1.5">
+                                    Nama Bahan <SortIcon direction={sortConfig.key === 'namaBahan' ? sortConfig.direction : undefined} />
+                                </div>
                             </th>
-                            <th className="px-4 py-3 font-semibold text-gray-600 text-right cursor-pointer hover:text-emerald-600" onClick={() => requestSort('kuantum')}>
-                                Kuantum <SortIcon direction={sortConfig.key === 'kuantum' ? sortConfig.direction : undefined} />
+                            <th className="px-4 py-3 text-right font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors border border-gray-200" onClick={() => requestSort('kuantum')}>
+                                <div className="flex items-center justify-end gap-1.5">
+                                    Kuantum <SortIcon direction={sortConfig.key === 'kuantum' ? sortConfig.direction : undefined} />
+                                </div>
                             </th>
-                            <th className="px-4 py-3 font-semibold text-gray-600 text-center">Dokumen</th>
-                            <th className="px-4 py-3 font-semibold text-gray-600">Keterangan</th>
-                            <th className="px-4 py-3 font-semibold text-gray-600 text-center w-24">Aksi</th>
+                            <th className="px-4 py-3 text-center font-semibold text-gray-700 border border-gray-200">Dokumen</th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700 border border-gray-200">Keterangan</th>
+                            <th className="px-4 py-3 text-center font-semibold text-gray-700 w-24 border border-gray-200">Aksi</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="bg-white">
                         {sortedData.length === 0 ? (
                             <tr>
-                                <td colSpan={8} className="px-4 py-12 text-center text-gray-400">
+                                <td colSpan={8} className="px-4 py-12 text-center text-gray-400 border border-gray-200">
                                     Tidak ada data ditemukan.
                                 </td>
                             </tr>
                         ) : (
                             sortedData.map((row) => (
-                                <tr key={row.id} className="hover:bg-emerald-50/30 transition-colors">
-                                    <td className="px-4 py-3 text-emerald-600 font-medium">{row.no}</td>
-                                    <td className="px-4 py-3 text-gray-700">{row.tanggal}</td>
-                                    <td className="px-4 py-3">
+                                <tr key={row.id} className="hover:bg-emerald-50/10 transition-colors">
+                                    <td className="px-4 py-3 text-emerald-600 font-medium border border-gray-200">{row.no}</td>
+                                    <td className="px-4 py-3 text-gray-700 border border-gray-200">{row.tanggal}</td>
+                                    <td className="px-4 py-3 border border-gray-200">
                                         <span className={cn(
                                             "inline-flex px-2 py-0.5 text-xs font-medium rounded-full border",
                                             row.jenis === 'Bahan Baku'
@@ -998,11 +1012,11 @@ function MutasiTable({ data, search, onEdit, onDelete }: { data: MutasiRow[]; se
                                             {row.jenis}
                                         </span>
                                     </td>
-                                    <td className="px-4 py-3 text-gray-800 font-medium">{row.namaBahan || '-'}</td>
-                                    <td className="px-4 py-3 text-right font-mono text-gray-700">
+                                    <td className="px-4 py-3 text-gray-800 font-medium border border-gray-200">{row.namaBahan || '-'}</td>
+                                    <td className="px-4 py-3 text-right font-mono text-gray-700 border border-gray-200">
                                         {row.kuantum.toLocaleString('id-ID')} <span className="text-gray-400 text-xs ml-0.5">{row.satuan}</span>
                                     </td>
-                                    <td className="px-4 py-3 text-center">
+                                    <td className="px-4 py-3 text-center border border-gray-200">
                                         {row.dokumen ? (
                                             <button className="text-emerald-600 hover:text-emerald-800 transition-colors p-1" title={row.dokumen}>
                                                 <EyeIcon />
@@ -1011,10 +1025,8 @@ function MutasiTable({ data, search, onEdit, onDelete }: { data: MutasiRow[]; se
                                             <span className="text-gray-300">-</span>
                                         )}
                                     </td>
-                                    <td className="px-4 py-3 text-gray-500 text-xs max-w-[150px] truncate" title={row.keterangan}>
-                                        {row.keterangan && row.keterangan !== '-' ? row.keterangan : <span className="text-gray-300">-</span>}
-                                    </td>
-                                    <td className="px-4 py-3 text-center">
+                                    <td className="px-4 py-3 text-gray-600 max-w-xs truncate border border-gray-200">{row.keterangan || '-'}</td>
+                                    <td className="px-4 py-3 text-center border border-gray-200">
                                         <div className="flex items-center justify-center gap-1">
                                             <button
                                                 onClick={() => onEdit(row)}
@@ -1228,11 +1240,11 @@ function BalanceStokTable({ data, productSlug, search, bulan, tahun }: BalanceSt
 
         return (
             <tr key={`${row.jenis}-${row.nama}`} className={cn(
-                'group transition-colors hover:bg-emerald-50/40',
+                'group transition-colors hover:bg-emerald-50/10',
                 isLast && 'border-b-0'
             )}>
-                <td className="px-5 py-3.5 text-gray-500 text-xs font-medium">{idx + 1}</td>
-                <td className="px-5 py-3.5">
+                <td className="px-5 py-3.5 text-gray-700 text-xs font-medium border border-gray-200">{idx + 1}</td>
+                <td className="px-5 py-3.5 border border-gray-200">
                     <div className="flex items-center gap-2.5">
                         <div className={cn(
                             'w-2 h-2 rounded-full shrink-0',
@@ -1241,7 +1253,7 @@ function BalanceStokTable({ data, productSlug, search, bulan, tahun }: BalanceSt
                         <span className="text-sm font-medium text-gray-800">{row.nama}</span>
                     </div>
                 </td>
-                <td className="px-5 py-3.5">
+                <td className="px-5 py-3.5 border border-gray-200">
                     <span className={cn(
                         'inline-flex px-2.5 py-0.5 text-[11px] font-semibold rounded-full border',
                         row.jenis === 'Baku'
@@ -1251,7 +1263,7 @@ function BalanceStokTable({ data, productSlug, search, bulan, tahun }: BalanceSt
                         {row.jenis === 'Baku' ? 'Bahan Baku' : 'Bahan Penolong'}
                     </span>
                 </td>
-                <td className="px-5 py-3.5 text-center">
+                <td className="px-5 py-3.5 text-center border border-gray-200">
                     {unitFamily.length > 1 ? (
                         <select
                             value={converted.satuan}
@@ -1267,7 +1279,7 @@ function BalanceStokTable({ data, productSlug, search, bulan, tahun }: BalanceSt
                         <span className="text-xs text-gray-500 font-medium">{converted.satuan}</span>
                     )}
                 </td>
-                <td className="px-5 py-3.5 text-center">
+                <td className="px-5 py-3.5 text-center border border-gray-200">
                     {converted.totalIn > 0 ? (
                         <button
                             onClick={() => openHistory(row.nama, 'Suplai')}
@@ -1281,7 +1293,7 @@ function BalanceStokTable({ data, productSlug, search, bulan, tahun }: BalanceSt
                         <span className="text-xs text-gray-300 font-mono">—</span>
                     )}
                 </td>
-                <td className="px-5 py-3.5 text-center">
+                <td className="px-5 py-3.5 text-center border border-gray-200">
                     {converted.totalOut > 0 ? (
                         <button
                             onClick={() => openHistory(row.nama, 'Mutasi')}
@@ -1295,7 +1307,7 @@ function BalanceStokTable({ data, productSlug, search, bulan, tahun }: BalanceSt
                         <span className="text-xs text-gray-300 font-mono">—</span>
                     )}
                 </td>
-                <td className="px-5 py-3.5 text-center">
+                <td className="px-5 py-3.5 text-center border border-gray-200">
                     <span className={cn(
                         'inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-bold',
                         converted.stok > 0 ? 'bg-emerald-50 text-emerald-700' :
@@ -1330,32 +1342,32 @@ function BalanceStokTable({ data, productSlug, search, bulan, tahun }: BalanceSt
                 </div>
             </div>
             <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm border-collapse border border-gray-200">
                     <thead>
-                        <tr className="bg-gradient-to-r from-gray-50 to-gray-50/80">
-                            <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-12">No.</th>
-                            <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Nama Bahan</th>
-                            <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Jenis</th>
-                            <th className="px-5 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider w-24">Satuan</th>
-                            <th className="px-5 py-3 text-center text-xs font-semibold text-blue-600 uppercase tracking-wider">
+                        <tr className="bg-gray-50/80">
+                            <th className="px-5 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-12 border border-gray-200">No.</th>
+                            <th className="px-5 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200">Nama Bahan</th>
+                            <th className="px-5 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200">Jenis</th>
+                            <th className="px-5 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider w-24 border border-gray-200">Satuan</th>
+                            <th className="px-5 py-3 text-center text-xs font-semibold text-blue-600 uppercase tracking-wider border border-gray-200">
                                 <div className="flex items-center justify-center gap-1">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-blue-500"><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /></svg>
                                     In (Masuk)
                                 </div>
                             </th>
-                            <th className="px-5 py-3 text-center text-xs font-semibold text-orange-600 uppercase tracking-wider">
+                            <th className="px-5 py-3 text-center text-xs font-semibold text-orange-600 uppercase tracking-wider border border-gray-200">
                                 <div className="flex items-center justify-center gap-1">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-orange-500"><polyline points="7 1 3 5 7 9" /><path d="M21 11V9a4 4 0 0 0-4-4H3" /></svg>
                                     Out (Keluar)
                                 </div>
                             </th>
-                            <th className="px-5 py-3 text-center text-xs font-semibold text-emerald-600 uppercase tracking-wider">Stok Akhir</th>
+                            <th className="px-5 py-3 text-center text-xs font-semibold text-emerald-600 uppercase tracking-wider border border-gray-200">Stok Akhir</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="bg-white">
                         {filteredData.length === 0 ? (
                             <tr>
-                                <td colSpan={7} className="px-5 py-8 text-center text-gray-500">
+                                <td colSpan={7} className="px-5 py-8 text-center text-gray-500 border border-gray-200">
                                     Tidak ada data yang cocok dengan filter atau pencarian.
                                 </td>
                             </tr>
@@ -1438,13 +1450,13 @@ function BalanceStokTable({ data, productSlug, search, bulan, tahun }: BalanceSt
                                         </thead>
                                         <tbody className="divide-y divide-gray-50">
                                             {historyData.map((item, idx) => (
-                                                <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
-                                                    <td className="px-5 py-3 text-xs text-gray-400">{idx + 1}</td>
-                                                    <td className="px-5 py-3 text-sm text-gray-700">{format(new Date(item.tanggal), 'dd/MM/yyyy')}</td>
-                                                    <td className="px-5 py-3 text-right font-mono text-sm font-medium text-gray-800">{fmtNumber(item.kuantum)}</td>
-                                                    <td className="px-5 py-3 text-center text-xs text-gray-500">{item.satuan || 'Kg'}</td>
-                                                    <td className="px-5 py-3 text-sm text-gray-600">{item.dokumen || '—'}</td>
-                                                    <td className="px-5 py-3 text-sm text-gray-500 max-w-[200px] truncate">{item.keterangan || '—'}</td>
+                                                <tr key={item.id} className="hover:bg-gray-50/50 transition-colors border-t border-gray-100">
+                                                    <td className="px-5 py-3 text-xs text-gray-400 border border-gray-200">{idx + 1}</td>
+                                                    <td className="px-5 py-3 text-sm text-gray-700 border border-gray-200">{format(new Date(item.tanggal), 'dd/MM/yyyy')}</td>
+                                                    <td className="px-5 py-3 text-right font-mono text-sm font-medium text-gray-800 border border-gray-200">{fmtNumber(item.kuantum)}</td>
+                                                    <td className="px-5 py-3 text-center text-xs text-gray-500 border border-gray-200">{item.satuan || 'Kg'}</td>
+                                                    <td className="px-5 py-3 text-sm text-gray-600 border border-gray-200">{item.dokumen || '—'}</td>
+                                                    <td className="px-5 py-3 text-sm text-gray-500 max-w-[200px] truncate border border-gray-200">{item.keterangan || '—'}</td>
                                                 </tr>
                                             ))}
                                         </tbody>

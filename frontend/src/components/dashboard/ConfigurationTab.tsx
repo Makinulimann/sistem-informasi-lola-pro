@@ -178,19 +178,19 @@ function MaterialTableSection({ title, description, items, jenis, productSlug, o
 
             {/* Table Section */}
             <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                    <thead className="bg-gray-50/50 border-b border-gray-100 text-gray-500 font-medium uppercase text-xs tracking-wider">
+                <table className="w-full text-sm text-left border-collapse border border-gray-200">
+                    <thead className="bg-gray-50/80 font-semibold uppercase text-xs tracking-wider text-gray-700">
                         <tr>
-                            <th className="px-6 py-3 w-16 text-center">No</th>
-                            <th className="px-6 py-3">Nama Material</th>
-                            <th className="px-6 py-3">Satuan Default</th>
-                            <th className="px-6 py-3 text-right">Aksi</th>
+                            <th className="px-6 py-3 w-16 text-center border border-gray-200">No</th>
+                            <th className="px-6 py-3 border border-gray-200">Nama Material</th>
+                            <th className="px-6 py-3 border border-gray-200">Satuan Default</th>
+                            <th className="px-6 py-3 text-right border border-gray-200">Aksi</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="bg-white">
                         {filteredItems.length === 0 ? (
                             <tr>
-                                <td colSpan={4} className="px-6 py-12 text-center text-gray-500">
+                                <td colSpan={4} className="px-6 py-12 text-center text-gray-500 border border-gray-200">
                                     <div className="flex flex-col items-center justify-center">
                                         <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-3 text-gray-400">
                                             <InfoIcon size={20} />
@@ -203,11 +203,11 @@ function MaterialTableSection({ title, description, items, jenis, productSlug, o
                         ) : (
                             filteredItems.map((item, index) => (
                                 <tr key={item.id} className="group hover:bg-gray-50/50 transition-colors">
-                                    <td className="px-6 py-3 text-center text-gray-500">{index + 1}</td>
-                                    <td className="px-6 py-3">
+                                    <td className="px-6 py-3 text-center text-gray-500 border border-gray-200">{index + 1}</td>
+                                    <td className="px-6 py-3 border border-gray-200">
                                         <span className="font-medium text-gray-900">{item.nama}</span>
                                     </td>
-                                    <td className="px-6 py-3 text-gray-600">
+                                    <td className="px-6 py-3 text-gray-600 border border-gray-200">
                                         {item.satuan ? (
                                             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 border border-gray-200">
                                                 {item.satuan}
@@ -216,7 +216,7 @@ function MaterialTableSection({ title, description, items, jenis, productSlug, o
                                             <span className="text-gray-400 text-xs italic">Not set</span>
                                         )}
                                     </td>
-                                    <td className="px-6 py-3 text-right">
+                                    <td className="px-6 py-3 text-right border border-gray-200">
                                         <div className="flex items-center justify-end gap-1 transition-opacity">
                                             <button
                                                 onClick={() => openEditModal(item)}

@@ -77,7 +77,7 @@ export const bahanBakuService = {
     createSuplai: (data: Omit<BahanBaku, 'id' | 'tipe' | 'perusahaan'>) =>
         api.post<BahanBaku>('/bahanbaku/suplai', data),
     updateSuplai: (id: number, data: Omit<BahanBaku, 'id' | 'tipe' | 'perusahaan'>) =>
-        api.put<BahanBaku>(`/bahanbaku/suplai/${id}`, data),
+        api.put<BahanBaku>(`/bahanbaku/${id}`, data),
     deleteSuplai: (id: number) => api.delete(`/bahanbaku/${id}`),
 
     // Mutasi
@@ -88,7 +88,7 @@ export const bahanBakuService = {
     createMutasi: (data: Omit<BahanBaku, 'id' | 'tipe' | 'perusahaan'>) =>
         api.post<BahanBaku>('/bahanbaku/mutasi', data),
     updateMutasi: (id: number, data: Omit<BahanBaku, 'id' | 'tipe' | 'perusahaan'>) =>
-        api.put<BahanBaku>(`/bahanbaku/mutasi/${id}`, data),
+        api.put<BahanBaku>(`/bahanbaku/${id}`, data),
     deleteMutasi: (id: number) => api.delete(`/bahanbaku/${id}`),
 
     // Materials
