@@ -149,28 +149,44 @@ public class DashboardController : ControllerBase
                          && p.Tanggal < endUtc)
                 .ToListAsync();
 
-            double totalBS = 0, totalPG = 0;
+            double totalBS = 0, totalPS = 0, totalCOA = 0, totalPG = 0;
             var tabSummaries = tabs.Select(tab =>
             {
+                // Deduplicate: group by LOCAL date and take first record per day
+                // (matches ProduksiController's r.Tanggal.Add(utcOffset).Date logic)
                 var tabRecords = produksiRecords
                     .Where(r => r.ProduksiTabId == tab.Id)
+                    .OrderBy(r => r.Id)
+                    .GroupBy(r => r.Tanggal.Add(utcOffset).Date)
+                    .Select(g => g.First())
                     .ToList();
                 var bs = tabRecords.Sum(r => r.BS);
                 var ps = tabRecords.Sum(r => r.PS);
                 var pg = tabRecords.Sum(r => r.PG);
                 var coa = tabRecords.Sum(r => r.COA);
                 totalBS += bs;
+                totalPS += ps;
+                totalCOA += coa;
                 totalPG += pg;
+
+                // Cascading display: COA draws from PS first, overflow from BS
+                var belumSampling = bs - ps - Math.Max(0, coa - ps);
+                var prosesSampling = Math.Max(0, ps - coa);
+
                 return new
                 {
                     tabName = tab.Nama,
-                    totalProduksi = bs, // keeping it for backward compatibility or alias
-                    belumSampling = bs,
-                    prosesSampling = ps,
+                    totalProduksi = bs,
+                    belumSampling,
+                    prosesSampling,
                     pengirimanGudang = pg,
                     coa
                 };
             }).ToList();
+
+            // Cascading display for totals
+            var totalBelumSampling = totalBS - totalPS - Math.Max(0, totalCOA - totalPS);
+            var totalProsesSampling = Math.Max(0, totalPS - totalCOA);
 
             results.Add(new
             {
@@ -180,9 +196,10 @@ public class DashboardController : ControllerBase
                 production = new
                 {
                     tabs = tabSummaries,
-                    totalProduksi = totalBS, // legacy alias
-                    totalBelumSampling = totalBS,
-                    totalProsesSampling = tabSummaries.Sum(t => t.prosesSampling),
+                    totalProduksi = totalBS,
+                    totalBelumSampling,
+                    totalProsesSampling,
+                    totalCOA = totalCOA,
                     totalPengiriman = totalPG,
                     stokAkhir = totalBS - totalPG
                 }

@@ -85,7 +85,7 @@ export default function DashboardPage() {
                                 onClick={() => setActiveCategory(cat.slug)}
                                 className={`group flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 border
                                     ${isActive
-                                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-200'
+                                        ? 'bg-emerald-600 text-white border-emerald-600'
                                         : 'bg-white text-gray-700 border-gray-200 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700'
                                     }`}
                             >

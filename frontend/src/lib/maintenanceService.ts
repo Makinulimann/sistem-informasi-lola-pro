@@ -1,0 +1,65 @@
+import { api } from './api';
+
+export interface Maintenance {
+    id: number;
+    tanggal: string;
+    equipment: string;
+    area: string;
+    kegiatan: string;
+    keterangan?: string | null;
+    dokumentasi?: string | null;
+    createdAt: string;
+}
+
+const cleanParams = (params: any) => {
+    const cleaned: any = {};
+    Object.keys(params).forEach((key) => {
+        if (params[key] !== undefined && params[key] !== null && params[key] !== '') {
+            cleaned[key] = params[key];
+        }
+    });
+    return cleaned;
+};
+
+export interface MaintenanceResponse {
+    data: Maintenance[];
+    total: number;
+}
+
+export const maintenanceService = {
+    getAll: (params: { bulan?: string; tahun?: string; search?: string; page?: number; limit?: number; sortBy?: string; sortDesc?: boolean }) => {
+        const query = new URLSearchParams(cleanParams(params)).toString();
+        return api.get<MaintenanceResponse>(`/maintenance?${query}`);
+    },
+    getById: (id: number) => api.get<Maintenance>(`/maintenance/${id}`),
+    create: (data: Omit<Maintenance, 'id' | 'createdAt'>) =>
+        api.post<Maintenance>('/maintenance', data),
+    update: (id: number, data: Omit<Maintenance, 'id' | 'createdAt'>) =>
+        api.put<Maintenance>(`/maintenance/${id}`, data),
+    delete: (id: number) => api.delete(`/maintenance/${id}`),
+};
+
+export interface MaintenanceSummary {
+    bulan: number;
+    tahun: number;
+    totalKegiatan: number;
+    areas: string[];
+    equipments: string[];
+    byArea: { area: string; count: number }[];
+    byEquipment: { equipment: string; count: number }[];
+    byDay: { date: string; count: number }[];
+}
+
+export function getMaintenanceSummary(
+    bulan?: number,
+    tahun?: number,
+    area?: string,
+    equipment?: string
+): Promise<MaintenanceSummary> {
+    const params = new URLSearchParams();
+    if (bulan) params.set('bulan', String(bulan));
+    if (tahun) params.set('tahun', String(tahun));
+    if (area) params.set('area', area);
+    if (equipment) params.set('equipment', equipment);
+    return api.get<MaintenanceSummary>(`/maintenance/summary?${params.toString()}`);
+}

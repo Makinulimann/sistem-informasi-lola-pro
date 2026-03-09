@@ -105,16 +105,14 @@ var app = builder.Build();
 // ---------------------------------------------------------------------------
 // Middleware pipeline
 // ---------------------------------------------------------------------------
-if (app.Environment.IsDevelopment())
+
+await DbInitializer.Initialize(app.Services); // Seed data on startup
+
+app.UseSwagger();
+app.UseSwaggerUI(options =>
 {
-    await DbInitializer.Initialize(app.Services); // Seed data on startup
-    
-    app.UseSwagger();
-    app.UseSwaggerUI(options =>
-    {
-        options.SwaggerEndpoint("/swagger/v1/swagger.json", "SIPPro API v1");
-    });
-}
+    options.SwaggerEndpoint("/swagger/v1/swagger.json", "SIPPro API v1");
+});
 
 app.UseCors("AllowFrontend");
 

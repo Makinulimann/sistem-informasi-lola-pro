@@ -48,10 +48,9 @@ const BULAN_OPTIONS = [
     { value: 10, label: 'Oktober' }, { value: 11, label: 'November' }, { value: 12, label: 'Desember' },
 ];
 const BULAN_NAMES: Record<number, string> = Object.fromEntries(BULAN_OPTIONS.map(o => [o.value, o.label]));
-const currentDate = new Date();
-const currentMonth = currentDate.getMonth() + 1;
-const currentYear = currentDate.getFullYear();
-function generateYearOptions() { const years = []; for (let y = currentYear; y >= currentYear - 3; y--) years.push(y); return years; }
+function getInitialMonth() { return new Date().getMonth() + 1; }
+function getInitialYear() { return new Date().getFullYear(); }
+function generateYearOptions() { const y = new Date().getFullYear(); const years = []; for (let i = y; i >= y - 3; i--) years.push(i); return years; }
 function fmt(n: number): string { return n.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
 /* ─── Date Format: dd-MM-yyyy ─── */
@@ -76,8 +75,8 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
     const slug = productSlug || 'petro-gladiator';
 
     // ─── State ───
-    const [bulan, setBulan] = useState<number>(currentMonth);
-    const [tahun, setTahun] = useState<number>(currentYear);
+    const [bulan, setBulan] = useState<number>(getInitialMonth);
+    const [tahun, setTahun] = useState<number>(getInitialYear);
     const [search, setSearch] = useState('');
 
     // Tabs
@@ -296,9 +295,9 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
             const pg = getRawValue(row, 'pg');
             return [
                 formatDateShort(row.tanggal),
-                bs - ps,    // Belum Sampling display
-                ps - coa,   // Proses Sampling display
-                coa,        // COA display
+                bs - ps - Math.max(0, coa - ps),   // Belum Sampling display
+                Math.max(0, ps - coa),              // Proses Sampling display
+                coa,                                // COA display
                 row.kumulatif,
                 pg,
                 row.stokAkhir,
@@ -352,8 +351,8 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
             const pg = getRawValue(row, 'pg');
             return [
                 formatDateShort(row.tanggal),
-                fmt(bs - ps),
-                fmt(ps - coa),
+                fmt(bs - ps - Math.max(0, coa - ps)),
+                fmt(Math.max(0, ps - coa)),
                 fmt(coa),
                 fmt(row.kumulatif),
                 fmt(pg),
@@ -422,7 +421,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-                        Produksi — {productName}
+                        Produksi {productName}
                     </h1>
                     <p className="text-base text-gray-500 mt-2">
                         Input dan monitoring data produksi harian
@@ -581,10 +580,10 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                         const coa = getRawValue(row, 'coa');
                                         const pg = getRawValue(row, 'pg');
 
-                                        // Cascading display values
-                                        const bsDisplay = bs - ps;   // Remaining unsampled
-                                        const psDisplay = ps - coa;  // In sampling process
-                                        const coaDisplay = coa;      // Certified
+                                        // Cascading display values (COA draws from PS first, then BS)
+                                        const coaDisplay = coa;                              // Certified
+                                        const psDisplay = Math.max(0, ps - coa);             // Remaining in sampling
+                                        const bsDisplay = bs - ps - Math.max(0, coa - ps);   // Remaining unsampled
 
                                         return (
                                             <tr key={row.tanggal} className={`${highlight ? 'bg-amber-50/50' : 'hover:bg-gray-50/50'} transition-colors`}>
@@ -621,13 +620,13 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                                     </div>
                                                 </td>
 
-                                                {/* Proses Sampling: display = ps - coa (net value) */}
+                                                {/* Proses Sampling: stored independently */}
                                                 <td className="p-1">
                                                     <InputCell
-                                                        value={psDisplay}
+                                                        value={ps}
                                                         onChange={(val) => {
                                                             const valNum = val === '' ? 0 : Number(val);
-                                                            handleInputChange(row.tanggal, 'ps', valNum + coa);
+                                                            handleInputChange(row.tanggal, 'ps', valNum);
                                                         }}
                                                     />
                                                 </td>

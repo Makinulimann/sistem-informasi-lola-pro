@@ -20,5 +20,6 @@ public interface ISipProDbContext
     DbSet<AktivitasHarian> AktivitasHarians { get; set; }
     DbSet<LogbookPic> LogbookPics { get; set; }
     DbSet<LogbookLokasi> LogbookLokasis { get; set; }
+    DbSet<Maintenance> Maintenances { get; set; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 }

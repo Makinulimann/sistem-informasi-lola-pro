@@ -20,6 +20,9 @@ frontend/.pnpm-store/
 backend/**/appsettings.Development.json
 backend/**/appsettings.Production.json
 
+# Publish output (may contain secrets)
+backend/**/publish-result/
+
 # IDE
 .idea/
 .vscode/

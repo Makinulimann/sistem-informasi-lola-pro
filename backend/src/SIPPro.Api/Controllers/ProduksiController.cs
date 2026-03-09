@@ -168,8 +168,8 @@ public class ProduksiController : ControllerBase
         // Summary
         var summary = new
         {
-            totalProduksi = fullList.Sum(x => x.BS + x.COA + x.PG),
-            totalKeluar = fullList.Sum(x => x.PG), // PG is sent to warehouse
+            totalProduksi = fullList.Sum(x => x.BS),
+            totalKeluar = fullList.Sum(x => x.PG),
             kumulatif = runningKumulatif,
             stokAkhir = runningStok
         };

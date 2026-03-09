@@ -25,6 +25,7 @@ export interface ProductionSummary {
     totalProduksi: number;
     totalBelumSampling: number;
     totalProsesSampling: number;
+    totalCOA: number;
     totalPengiriman: number;
     stokAkhir: number;
 }
