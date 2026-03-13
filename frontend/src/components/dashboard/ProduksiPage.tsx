@@ -20,6 +20,8 @@ import {
     getProduksi,
     saveProduksi,
     cancelProduksiWithMaterials,
+    updateSampling,
+    updateCOA,
     type ProduksiTab,
     type ProduksiRow,
     type ProduksiSummary,
@@ -51,7 +53,7 @@ const BULAN_NAMES: Record<number, string> = Object.fromEntries(BULAN_OPTIONS.map
 function getInitialMonth() { return new Date().getMonth() + 1; }
 function getInitialYear() { return new Date().getFullYear(); }
 function generateYearOptions() { const y = new Date().getFullYear(); const years = []; for (let i = y; i >= y - 3; i--) years.push(i); return years; }
-function fmt(n: number): string { return n.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function fmt(n: number | null | undefined): string { return Number(n || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
 /* ─── Date Format: dd-MM-yyyy ─── */
 function formatDateShort(dateStr: string): string {
@@ -109,6 +111,20 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
     const [cancelConfirm, setCancelConfirm] = useState<{ isOpen: boolean; tanggal: string }>({ isOpen: false, tanggal: '' });
     const [cancelLoading, setCancelLoading] = useState(false);
 
+    // PS/COA Modal
+    const [psModal, setPsModal] = useState<{ isOpen: boolean; tanggal: string }>({ isOpen: false, tanggal: '' });
+    const [coaModal, setCoaModal] = useState<{ isOpen: boolean; tanggal: string }>({ isOpen: false, tanggal: '' });
+    const [psValue, setPsValue] = useState<string>('');
+    const [psBatchKode, setPsBatchKode] = useState<string>('');
+    const [coaValue, setCoaValue] = useState<string>('');
+    const [coaBatchKode, setCoaBatchKode] = useState<string>('');
+    const [psSaving, setPsSaving] = useState(false);
+    const [coaSaving, setCoaSaving] = useState(false);
+    const [psError, setPsError] = useState<string | null>(null);
+    const [coaError, setCoaError] = useState<string | null>(null);
+    const [psDropdownOpen, setPsDropdownOpen] = useState(false);
+    const [coaDropdownOpen, setCoaDropdownOpen] = useState(false);
+
     // ─── Fetch Tabs ───
     const fetchTabs = useCallback(async () => {
         setTabsLoading(true);
@@ -123,9 +139,9 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
             if (!activeTabId || !result.find(t => t.id === activeTabId)) {
                 setActiveTabId(result[0].id);
             }
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('Failed to load tabs:', err);
-            setError(`Gagal memuat tab: ${err.message || 'Periksa koneksi backend.'}`);
+            setError(`Gagal memuat tab: ${err instanceof Error ? err.message : 'Periksa koneksi backend.'}`);
         } finally {
             setTabsLoading(false);
         }
@@ -134,6 +150,8 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
     useEffect(() => { fetchTabs(); }, [fetchTabs]);
 
     // ─── Fetch Data ───
+    const [availableBatches, setAvailableBatches] = useState<{ kode: string, bsWip: number, psWip: number, coaWip: number }[]>([]);
+
     const fetchData = useCallback(async () => {
         if (!activeTabId) return;
         setLoading(true);
@@ -143,11 +161,13 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
             const result = await getProduksi(slug, activeTabId, bulan, tahun);
             setData(result.data);
             setSummary(result.summary);
-        } catch (err: any) {
+            setAvailableBatches(result.availableBatches || []);
+        } catch (err: unknown) {
             console.error('Failed to load produksi data:', err);
-            setError(`Gagal memuat data: ${err.message || 'Error tidak diketahui'}`);
+            setError(`Gagal memuat data: ${err instanceof Error ? err.message : 'Error tidak diketahui'}`);
             setData([]);
             setSummary({ totalProduksi: 0, totalKeluar: 0, kumulatif: 0, stokAkhir: 0 });
+            setAvailableBatches([]);
         } finally {
             setLoading(false);
         }
@@ -222,14 +242,15 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                 coa: dirty.coa !== undefined ? Number(dirty.coa) : original.coa,
                 pg: dirty.pg !== undefined ? Number(dirty.pg) : original.pg,
                 keterangan: dirty.keterangan !== undefined ? String(dirty.keterangan) : original.keterangan,
+                batchKode: original.batchKode || '',
             });
 
             setConfirmModal({ isOpen: false, rowDate: null });
             setDirtyRows(prev => { const { [date]: _, ...rest } = prev; return rest; });
             await fetchData();
-        } catch (err) {
+        } catch (err: Error | unknown) {
             console.error('Failed to save:', err);
-            alert('Gagal menyimpan data.');
+            alert(`Gagal menyimpan data: ${err instanceof Error ? err.message : String(err)}`);
             setConfirmModal({ isOpen: false, rowDate: null });
         }
     };
@@ -295,7 +316,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
             const pg = getRawValue(row, 'pg');
             return [
                 formatDateShort(row.tanggal),
-                bs - ps - Math.max(0, coa - ps),   // Belum Sampling display
+                Math.max(0, bs - coa),              // Belum Sampling display
                 Math.max(0, ps - coa),              // Proses Sampling display
                 coa,                                // COA display
                 row.kumulatif,
@@ -351,7 +372,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
             const pg = getRawValue(row, 'pg');
             return [
                 formatDateShort(row.tanggal),
-                fmt(bs - ps - Math.max(0, coa - ps)),
+                fmt(Math.max(0, bs - coa)),
                 fmt(Math.max(0, ps - coa)),
                 fmt(coa),
                 fmt(row.kumulatif),
@@ -411,6 +432,14 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
             row.keterangan.toLowerCase().includes(q)
         );
     }, [data, search]);
+
+    const psAvailableBatches = useMemo(() => {
+        return availableBatches.filter(b => b.bsWip > 0);
+    }, [availableBatches]);
+
+    const coaAvailableBatches = useMemo(() => {
+        return availableBatches.filter(b => b.coaWip > 0);
+    }, [availableBatches]);
 
     /* ═══════════════════════════════════════════ */
     /*  RENDER                                     */
@@ -580,10 +609,10 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                         const coa = getRawValue(row, 'coa');
                                         const pg = getRawValue(row, 'pg');
 
-                                        // Cascading display values (COA draws from PS first, then BS)
-                                        const coaDisplay = coa;                              // Certified
-                                        const psDisplay = Math.max(0, ps - coa);             // Remaining in sampling
-                                        const bsDisplay = bs - ps - Math.max(0, coa - ps);   // Remaining unsampled
+                                        // Cascading display values
+                                        const coaDisplay = coa;
+                                        const psDisplay = Math.max(0, ps - coa);
+                                        const bsDisplay = Math.max(0, bs - coa);
 
                                         return (
                                             <tr key={row.tanggal} className={`${highlight ? 'bg-amber-50/50' : 'hover:bg-gray-50/50'} transition-colors`}>
@@ -620,20 +649,42 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                                     </div>
                                                 </td>
 
-                                                {/* Proses Sampling: stored independently */}
+                                                {/* Proses Sampling: clickable button */}
                                                 <td className="p-1">
-                                                    <InputCell
-                                                        value={ps}
-                                                        onChange={(val) => {
-                                                            const valNum = val === '' ? 0 : Number(val);
-                                                            handleInputChange(row.tanggal, 'ps', valNum);
+                                                    <button
+                                                        onClick={() => {
+                                                            setPsModal({ isOpen: true, tanggal: row.tanggal });
+                                                            setPsValue(ps > 0 ? String(ps) : '');
+                                                            setPsBatchKode(row.psBatchKode || '');
+                                                            setPsError(null);
                                                         }}
-                                                    />
+                                                        className={`w-full h-10 px-3 text-right font-mono text-base rounded-lg transition-all outline-none cursor-pointer
+                                                            ${psDisplay > 0
+                                                                ? 'text-amber-700 font-semibold bg-amber-50/50 hover:bg-amber-100 border border-amber-200 hover:border-amber-300'
+                                                                : 'text-gray-400 bg-transparent hover:bg-gray-50 border border-transparent hover:border-gray-200'}`}
+                                                        title={'Klik untuk input sampling'}
+                                                    >
+                                                        {psDisplay > 0 ? fmt(psDisplay) : '0'}
+                                                    </button>
                                                 </td>
 
-                                                {/* COA */}
+                                                {/* COA: clickable button */}
                                                 <td className="p-1">
-                                                    <InputCell value={coa} onChange={v => handleInputChange(row.tanggal, 'coa', v)} />
+                                                    <button
+                                                        onClick={() => {
+                                                            setCoaModal({ isOpen: true, tanggal: row.tanggal });
+                                                            setCoaValue(coa > 0 ? String(coa) : '');
+                                                            setCoaBatchKode(row.coaBatchKode || '');
+                                                            setCoaError(null);
+                                                        }}
+                                                        className={`w-full h-10 px-3 text-right font-mono text-base rounded-lg transition-all outline-none cursor-pointer
+                                                            ${coa > 0
+                                                                ? 'text-blue-700 font-semibold bg-blue-50/50 hover:bg-blue-100 border border-blue-200 hover:border-blue-300'
+                                                                : 'text-gray-400 bg-transparent hover:bg-gray-50 border border-transparent hover:border-gray-200'}`}
+                                                        title={'Klik untuk input COA'}
+                                                    >
+                                                        {coa > 0 ? fmt(coa) : '0'}
+                                                    </button>
                                                 </td>
 
                                                 {/* Kumulatif Produksi (computed - read only) */}
@@ -693,6 +744,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                 tabId={activeTabId || 0}
                 tanggal={bsModal.tanggal}
                 currentBs={bsModal.currentBs}
+                currentBatchKode={data.find(r => r.tanggal === bsModal.tanggal)?.batchKode || ''}
                 bulan={bulan}
                 tahun={tahun}
             />
@@ -763,6 +815,193 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                     </div>
                 </div>
             )}
+
+            {/* ── PS (Proses Sampling) Modal ── */}
+            {psModal.isOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => { setPsModal({ isOpen: false, tanggal: '' }); setPsDropdownOpen(false); }}>
+                    <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 max-w-md w-full p-6 animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center gap-3 mb-5">
+                            <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6" /><path d="M10 9V3" /><path d="M14 9V3" /><path d="M6.864 18.364 10 9h4l3.136 9.364a2 2 0 0 1-1.894 2.636H8.758a2 2 0 0 1-1.894-2.636Z" /></svg>
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-900">Input Proses Sampling</h3>
+                        </div>
+
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">Kode Batch Target</label>
+                        <div className="relative mb-4">
+                            <button
+                                type="button"
+                                onClick={() => setPsDropdownOpen(!psDropdownOpen)}
+                                className="w-full flex items-center justify-between text-left text-base text-gray-900 px-4 py-3 bg-white border-2 border-amber-200 rounded-xl hover:border-amber-400 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all"
+                            >
+                                {psBatchKode ? (
+                                    <span className="font-medium">{psBatchKode}</span>
+                                ) : (
+                                    <span className="text-gray-400">Pilih kode batch...</span>
+                                )}
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`text-gray-400 transition-transform duration-200 ${psDropdownOpen ? 'rotate-180' : ''}`}><polyline points="6 9 12 15 18 9" /></svg>
+                            </button>
+                            {psDropdownOpen && (
+                                <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+                                    {psAvailableBatches.length === 0 ? (
+                                        <div className="px-4 py-3 text-sm text-gray-400 text-center">Tidak ada batch tersedia</div>
+                                    ) : (
+                                        psAvailableBatches.map(b => (
+                                            <button
+                                                key={b.kode}
+                                                type="button"
+                                                onClick={() => { setPsBatchKode(b.kode); setPsDropdownOpen(false); setPsError(null); }}
+                                                className={`w-full text-left px-4 py-3 flex items-center justify-between hover:bg-amber-50 transition-colors ${psBatchKode === b.kode ? 'bg-amber-50 border-l-3 border-amber-500' : ''}`}
+                                            >
+                                                <span className="font-medium text-gray-800">{b.kode}</span>
+                                                <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">Tersedia: {fmt(b.bsWip)}</span>
+                                            </button>
+                                        ))
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">Jumlah Sampling</label>
+                        <input
+                            type="number"
+                            step="any"
+                            value={psValue}
+                            onChange={e => { setPsValue(e.target.value); setPsError(null); }}
+                            className="w-full text-xl font-mono font-bold text-gray-900 px-4 py-3 border-2 border-amber-200 rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all placeholder:text-gray-300 mb-4"
+                            placeholder="0"
+                        />
+
+                        {psError && <p className="text-sm text-red-600 mb-3">{psError}</p>}
+
+                        <div className="flex justify-end gap-3">
+                            <button onClick={() => { setPsModal({ isOpen: false, tanggal: '' }); setPsDropdownOpen(false); }} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition-colors">Batal</button>
+                            <button
+                                onClick={async () => {
+                                    const val = Number(psValue);
+                                    if (!psBatchKode.trim()) { setPsError('Kode Batch wajib diisi'); return; }
+                                    if (!psValue || val < 0) { setPsError('Jumlah harus valid'); return; }
+
+                                    setPsSaving(true);
+                                    try {
+                                        await updateSampling({
+                                            productSlug: slug,
+                                            tabId: activeTabId || 0,
+                                            tanggal: psModal.tanggal,
+                                            batchKode: psBatchKode,
+                                            ps: val,
+                                        });
+                                        setPsModal({ isOpen: false, tanggal: '' });
+                                        setPsDropdownOpen(false);
+                                        fetchData();
+                                    } catch (err: unknown) {
+                                        setPsError(err instanceof Error ? err.message : String(err) || 'Gagal menyimpan. Pastikan kode batch benar dan pernah diproduksi.');
+                                    } finally {
+                                        setPsSaving(false);
+                                    }
+                                }}
+                                disabled={psSaving}
+                                className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-600 text-white hover:bg-amber-700 rounded-xl font-medium shadow-sm transition-colors disabled:opacity-50"
+                            >
+                                {psSaving ? <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> Menyimpan...</> : 'Simpan'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── COA Modal ── */}
+            {coaModal.isOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => { setCoaModal({ isOpen: false, tanggal: '' }); setCoaDropdownOpen(false); }}>
+                    <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 max-w-md w-full p-6 animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center gap-3 mb-5">
+                            <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-900">Input COA</h3>
+                        </div>
+
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">Kode Batch Target</label>
+                        <div className="relative mb-4">
+                            <button
+                                type="button"
+                                onClick={() => setCoaDropdownOpen(!coaDropdownOpen)}
+                                className="w-full flex items-center justify-between text-left text-base text-gray-900 px-4 py-3 bg-white border-2 border-blue-200 rounded-xl hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                            >
+                                {coaBatchKode ? (
+                                    <span className="font-medium">{coaBatchKode}</span>
+                                ) : (
+                                    <span className="text-gray-400">Pilih kode batch...</span>
+                                )}
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`text-gray-400 transition-transform duration-200 ${coaDropdownOpen ? 'rotate-180' : ''}`}><polyline points="6 9 12 15 18 9" /></svg>
+                            </button>
+                            {coaDropdownOpen && (
+                                <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+                                    {coaAvailableBatches.length === 0 ? (
+                                        <div className="px-4 py-3 text-sm text-gray-400 text-center">Tidak ada batch tersedia</div>
+                                    ) : (
+                                        coaAvailableBatches.map(b => (
+                                            <button
+                                                key={b.kode}
+                                                type="button"
+                                                onClick={() => { setCoaBatchKode(b.kode); setCoaDropdownOpen(false); setCoaError(null); }}
+                                                className={`w-full text-left px-4 py-3 flex items-center justify-between hover:bg-blue-50 transition-colors ${coaBatchKode === b.kode ? 'bg-blue-50 border-l-3 border-blue-500' : ''}`}
+                                            >
+                                                <span className="font-medium text-gray-800">{b.kode}</span>
+                                                <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-blue-100 text-blue-700">Tersedia: {fmt(b.coaWip)}</span>
+                                            </button>
+                                        ))
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">Jumlah COA</label>
+                        <input
+                            type="number"
+                            step="any"
+                            value={coaValue}
+                            onChange={e => { setCoaValue(e.target.value); setCoaError(null); }}
+                            className="w-full text-xl font-mono font-bold text-gray-900 px-4 py-3 border-2 border-blue-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all placeholder:text-gray-300 mb-4"
+                            placeholder="0"
+                        />
+                        {coaError && <p className="text-sm text-red-600 mb-3">{coaError}</p>}
+
+                        <div className="flex justify-end gap-3">
+                            <button onClick={() => { setCoaModal({ isOpen: false, tanggal: '' }); setCoaDropdownOpen(false); }} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition-colors">Batal</button>
+                            <button
+                                onClick={async () => {
+                                    const val = Number(coaValue);
+                                    if (!coaBatchKode.trim()) { setCoaError('Kode Batch wajib diisi'); return; }
+                                    if (!coaValue || val < 0) { setCoaError('Jumlah harus valid'); return; }
+
+                                    setCoaSaving(true);
+                                    try {
+                                        await updateCOA({
+                                            productSlug: slug,
+                                            tabId: activeTabId || 0,
+                                            tanggal: coaModal.tanggal,
+                                            batchKode: coaBatchKode,
+                                            coa: val,
+                                        });
+                                        setCoaModal({ isOpen: false, tanggal: '' });
+                                        setCoaDropdownOpen(false);
+                                        fetchData();
+                                    } catch (err: unknown) {
+                                        setCoaError(err instanceof Error ? err.message : String(err) || 'Gagal menyimpan. Pastikan kode batch benar dan pernah diproduksi.');
+                                    } finally {
+                                        setCoaSaving(false);
+                                    }
+                                }}
+                                disabled={coaSaving}
+                                className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white hover:bg-blue-700 rounded-xl font-medium shadow-sm transition-colors disabled:opacity-50"
+                            >
+                                {coaSaving ? <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> Menyimpan...</> : 'Simpan'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -783,7 +1022,7 @@ function InputCell({ value, onChange }: { value: string | number, onChange: (val
 
 /* ─── Summary Card ─── */
 function SummaryCard({ label, value, icon, color }: { label: string; value: string; icon: React.ReactNode; color: string }) {
-    const COLOR_MAP: Record<string, any> = {
+    const COLOR_MAP: Record<string, { bg: string, iconBg: string, text: string, border: string }> = {
         emerald: { bg: 'bg-emerald-50', iconBg: 'bg-emerald-100', text: 'text-emerald-700', border: 'border-emerald-100' },
         blue: { bg: 'bg-blue-50', iconBg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-100' },
         amber: { bg: 'bg-amber-50', iconBg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-100' },

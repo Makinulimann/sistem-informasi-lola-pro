@@ -65,6 +65,7 @@ interface BelumSamplingModalProps {
     tabId: number;
     tanggal: string; // yyyy-MM-dd
     currentBs: number;
+    currentBatchKode: string;
     bulan: number;
     tahun: number;
 }
@@ -79,8 +80,8 @@ interface MaterialInput {
 }
 
 /* ─── Helpers ─── */
-function fmt(n: number): string {
-    return n.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function fmt(n: number | null | undefined): string {
+    return Number(n || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function formatDateDisplay(dateStr: string): string {
@@ -144,11 +145,13 @@ export function BelumSamplingModal({
     tabId,
     tanggal,
     currentBs,
+    currentBatchKode,
     bulan,
     tahun,
 }: BelumSamplingModalProps) {
     const [step, setStep] = useState(0);
     const [bsValue, setBsValue] = useState<string>('');
+    const [batchKode, setBatchKode] = useState<string>('');
     const [keterangan, setKeterangan] = useState<string>('');
     const [materials, setMaterials] = useState<MaterialInput[]>([]);
     const [loadingMaterials, setLoadingMaterials] = useState(false);
@@ -161,13 +164,14 @@ export function BelumSamplingModal({
         if (isOpen) {
             setStep(0);
             setBsValue(currentBs > 0 ? String(currentBs) : '');
+            setBatchKode(currentBatchKode || '');
             setKeterangan('');
             setMaterials([]);
             setSaving(false);
             setSuccess(false);
             setError(null);
         }
-    }, [isOpen, currentBs]);
+    }, [isOpen, currentBs, currentBatchKode]);
 
     // Load materials when moving to step 2
     const loadMaterials = async () => {
@@ -221,6 +225,10 @@ export function BelumSamplingModal({
         if (step === 0) {
             if (!bsValue || Number(bsValue) <= 0) {
                 setError('Jumlah produksi harus lebih dari 0');
+                return;
+            }
+            if (!batchKode.trim()) {
+                setError('Kode Batch wajib diisi');
                 return;
             }
             setError(null);
@@ -294,6 +302,7 @@ export function BelumSamplingModal({
                 tanggal,
                 bs: Number(bsValue),
                 keterangan: keterangan || undefined,
+                batchKode: batchKode.trim(),
                 materials: materialsPayload,
             });
 
@@ -390,6 +399,25 @@ export function BelumSamplingModal({
                                         {currentBs > 0 && (
                                             <p className="mt-2 text-xs text-gray-400">
                                                 Nilai saat ini: <span className="font-semibold text-gray-600">{fmt(currentBs)}</span>
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    {/* Batch Code Input */}
+                                    <div className="bg-gradient-to-br from-blue-50 to-white rounded-xl border border-blue-100 p-6">
+                                        <label className="block text-sm font-semibold text-gray-700 mb-3">
+                                            Kode Batch <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={batchKode}
+                                            onChange={e => { setBatchKode(e.target.value); setError(null); }}
+                                            className="w-full text-lg font-mono font-bold text-gray-900 px-4 py-3 border-2 border-blue-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all bg-white placeholder:text-gray-300 uppercase"
+                                            placeholder="Contoh: B001"
+                                        />
+                                        {currentBatchKode && (
+                                            <p className="mt-2 text-xs text-gray-400">
+                                                Batch saat ini: <span className="font-semibold text-gray-600">{currentBatchKode}</span>
                                             </p>
                                         )}
                                     </div>
@@ -553,6 +581,9 @@ export function BelumSamplingModal({
                                                 Keterangan: {keterangan}
                                             </p>
                                         )}
+                                        <p className="text-xs text-gray-500 mt-1 ml-[52px]">
+                                            Kode Batch: <span className="font-semibold text-blue-700 font-mono">{batchKode}</span>
+                                        </p>
                                     </div>
 
                                     {/* Materials Summary */}

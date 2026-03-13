@@ -1,0 +1,192 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model AktivitasHarians {
+  Id          Int      @id(map: "PK_AktivitasHarians") @default(autoincrement())
+  Tanggal     DateTime @db.Timestamptz(6)
+  Pic         String   @db.VarChar(100)
+  Lokasi      String   @db.VarChar(200)
+  Deskripsi   String   @db.VarChar(2000)
+  Dokumentasi String?  @db.VarChar(500)
+  CreatedAt   DateTime @db.Timestamptz(6)
+}
+
+model BahanBakus {
+  Id           Int          @id(map: "PK_BahanBakus") @default(autoincrement())
+  Tipe         String       @db.VarChar(10)
+  ProductSlug  String       @db.VarChar(200)
+  PerusahaanId Int?
+  Tanggal      DateTime     @db.Timestamptz(6)
+  Jenis        String       @db.VarChar(50)
+  NamaBahan    String       @db.VarChar(100)
+  Kuantum      Float
+  Dokumen      String       @db.VarChar(100)
+  Keterangan   String       @db.VarChar(500)
+  Satuan       String       @default("") @db.VarChar(20)
+  Perusahaans  Perusahaans? @relation(fields: [PerusahaanId], references: [Id], onDelete: NoAction, onUpdate: NoAction, map: "FK_BahanBakus_Perusahaans_PerusahaanId")
+
+  @@index([PerusahaanId], map: "IX_BahanBakus_PerusahaanId")
+}
+
+model BalanceStokDetails {
+  Id            Int          @id(map: "PK_BalanceStokDetails") @default(autoincrement())
+  BalanceStokId Int
+  MaterialId    Int
+  Out           Float
+  In            Float
+  StokAkhir     Float
+  BalanceStoks  BalanceStoks @relation(fields: [BalanceStokId], references: [Id], onDelete: Cascade, onUpdate: NoAction, map: "FK_BalanceStokDetails_BalanceStoks_BalanceStokId")
+  Materials     Materials    @relation(fields: [MaterialId], references: [Id], onDelete: Cascade, onUpdate: NoAction, map: "FK_BalanceStokDetails_Materials_MaterialId")
+
+  @@index([BalanceStokId], map: "IX_BalanceStokDetails_BalanceStokId")
+  @@index([MaterialId], map: "IX_BalanceStokDetails_MaterialId")
+}
+
+model BalanceStoks {
+  Id                 Int                  @id(map: "PK_BalanceStoks") @default(autoincrement())
+  ProductSlug        String               @db.VarChar(200)
+  PerusahaanId       Int?
+  Tanggal            DateTime             @db.Timestamptz(6)
+  Produksi           Float
+  BalanceStokDetails BalanceStokDetails[]
+  Perusahaans        Perusahaans?         @relation(fields: [PerusahaanId], references: [Id], onDelete: NoAction, onUpdate: NoAction, map: "FK_BalanceStoks_Perusahaans_PerusahaanId")
+
+  @@index([PerusahaanId], map: "IX_BalanceStoks_PerusahaanId")
+}
+
+model LogbookLokasis {
+  Id       Int     @id(map: "PK_LogbookLokasis") @default(autoincrement())
+  Nama     String  @db.VarChar(200)
+  IsActive Boolean
+}
+
+model LogbookPics {
+  Id       Int     @id(map: "PK_LogbookPics") @default(autoincrement())
+  Nama     String  @db.VarChar(100)
+  IsActive Boolean
+}
+
+model Maintenances {
+  Id          Int      @id(map: "PK_Maintenances") @default(autoincrement())
+  Tanggal     DateTime @db.Timestamptz(6)
+  Equipment   String   @db.VarChar(200)
+  Area        String   @db.VarChar(200)
+  Kegiatan    String   @db.VarChar(2000)
+  Keterangan  String?  @db.VarChar(2000)
+  Dokumentasi String?  @db.VarChar(500)
+  CreatedAt   DateTime @db.Timestamptz(6)
+}
+
+model MasterItems {
+  Id               Int                @id(map: "PK_MasterItems") @default(autoincrement())
+  Nama             String             @db.VarChar(100)
+  Kode             String?            @db.VarChar(50)
+  SatuanDefault    String?            @db.VarChar(50)
+  IsActive         Boolean
+  ScopeProductSlug String?            @db.VarChar(200)
+  ProductMaterials ProductMaterials[]
+}
+
+model Materials {
+  Id                 Int                  @id(map: "PK_Materials") @default(autoincrement())
+  ProductSlug        String               @db.VarChar(200)
+  Nama               String               @db.VarChar(100)
+  Order              Int
+  IsActive           Boolean
+  BalanceStokDetails BalanceStokDetails[]
+}
+
+model Perusahaans {
+  Id           Int            @id(map: "PK_Perusahaans") @default(autoincrement())
+  Nama         String         @db.VarChar(200)
+  IsActive     Boolean
+  CreatedAt    DateTime       @db.Timestamptz(6)
+  BahanBakus   BahanBakus[]
+  BalanceStoks BalanceStoks[]
+}
+
+model ProductMaterials {
+  Id           Int         @id(map: "PK_ProductMaterials") @default(autoincrement())
+  ProductSlug  String      @db.VarChar(200)
+  MasterItemId Int
+  Jenis        String      @db.VarChar(20)
+  MasterItems  MasterItems @relation(fields: [MasterItemId], references: [Id], onDelete: Cascade, onUpdate: NoAction, map: "FK_ProductMaterials_MasterItems_MasterItemId")
+
+  @@index([MasterItemId], map: "IX_ProductMaterials_MasterItemId")
+}
+
+model ProduksiTabs {
+  Id          Int         @id(map: "PK_ProduksiTabs") @default(autoincrement())
+  ProductSlug String      @db.VarChar(200)
+  Nama        String      @db.VarChar(100)
+  Order       Int
+  Produksis   Produksis[]
+}
+
+model Produksis {
+  Id            Int          @id(map: "PK_Produksis") @default(autoincrement())
+  ProductSlug   String       @db.VarChar(200)
+  ProduksiTabId Int
+  Tanggal       DateTime     @db.Timestamptz(6)
+  BS            Float
+  PG            Float
+  Kumulatif     Float
+  StokAkhir     Float
+  COA           Float
+  Keterangan    String       @db.VarChar(500)
+  PS            Float        @default(0.0)
+  BatchKode     String       @default("") @db.VarChar(50)
+  PSBatchKode   String       @default("") @db.VarChar(50)
+  COABatchKode  String       @default("") @db.VarChar(50)
+  ProduksiTabs  ProduksiTabs @relation(fields: [ProduksiTabId], references: [Id], onDelete: Cascade, onUpdate: NoAction, map: "FK_Produksis_ProduksiTabs_ProduksiTabId")
+
+  @@index([ProduksiTabId], map: "IX_Produksis_ProduksiTabId")
+}
+
+model SidebarMenus {
+  Id                 Int            @id(map: "PK_SidebarMenus") @default(autoincrement())
+  Label              String         @db.VarChar(100)
+  Icon               String         @db.VarChar(50)
+  Href               String         @db.VarChar(200)
+  ParentId           Int?
+  Order              Int
+  IsActive           Boolean
+  RoleAccess         String         @db.VarChar(50)
+  SidebarMenus       SidebarMenus?  @relation("SidebarMenusToSidebarMenus", fields: [ParentId], references: [Id], onDelete: NoAction, onUpdate: NoAction, map: "FK_SidebarMenus_SidebarMenus_ParentId")
+  other_SidebarMenus SidebarMenus[] @relation("SidebarMenusToSidebarMenus")
+
+  @@index([ParentId], map: "IX_SidebarMenus_ParentId")
+}
+
+model Users {
+  Id                     String    @id(map: "PK_Users") @db.Uuid
+  Email                  String    @unique(map: "IX_Users_Email") @db.VarChar(255)
+  PasswordHash           String
+  FullName               String    @db.VarChar(100)
+  NoInduk                String    @db.VarChar(50)
+  Role                   String
+  IsVerified             Boolean
+  RefreshToken           String?
+  RefreshTokenExpiryTime DateTime? @db.Timestamptz(6)
+  CreatedAt              DateTime  @db.Timestamptz(6)
+  UpdatedAt              DateTime  @db.Timestamptz(6)
+}
+
+model EFMigrationsHistory {
+  MigrationId    String @id(map: "PK___EFMigrationsHistory") @db.VarChar(150)
+  ProductVersion String @db.VarChar(32)
+
+  @@map("__EFMigrationsHistory")
+}
+
+model app_settings {
+  key        String   @id(map: "PK_app_settings") @db.VarChar(256)
+  value      String   @db.VarChar(2048)
+  updated_at DateTime @db.Timestamptz(6)
+}

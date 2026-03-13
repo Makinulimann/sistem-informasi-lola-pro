@@ -1,10 +1,6 @@
 import Cookies from 'js-cookie';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? (
-    typeof window !== 'undefined'
-        ? `${window.location.protocol}//${window.location.hostname}:5062/api`
-        : 'http://localhost:5062/api'
-);
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? '/api';
 
 export class ApiError extends Error {
     constructor(
@@ -47,6 +43,19 @@ export const auth = {
     }
 };
 
+function toCamelCase(obj: any): any {
+    if (Array.isArray(obj)) {
+        return obj.map(v => toCamelCase(v));
+    } else if (obj !== null && typeof obj === 'object' && obj.constructor === Object) {
+        return Object.keys(obj).reduce((result, key) => {
+            const camelKey = key.charAt(0).toLowerCase() + key.slice(1);
+            result[camelKey] = toCamelCase(obj[key]);
+            return result;
+        }, {} as any);
+    }
+    return obj;
+}
+
 async function request<T>(
     endpoint: string,
     options: RequestInit = {},
@@ -74,7 +83,7 @@ async function request<T>(
     // Handle 401 Unauthorized globally
     if (res.status === 401) {
         auth.removeToken();
-        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/')) {
+        if (typeof window !== 'undefined' && window.location.pathname !== '/') {
             window.location.href = '/';
         }
     }
@@ -94,7 +103,11 @@ async function request<T>(
             throw new ApiError(res.status, res.statusText, message);
         } catch (e) {
             if (e instanceof ApiError) throw e;
-            throw new ApiError(res.status, res.statusText, body || 'Kesalahan tidak diketahui');
+
+            // Clean up massive RSC or HTML error payloads for the UI
+            const isHtmlOrRsc = typeof body === 'string' && (body.trim().startsWith('<') || body.trim().startsWith('['));
+            const errorMessage = isHtmlOrRsc ? `Server returned ${res.status} (Possible missing route or crash)` : (body || 'Kesalahan tidak diketahui');
+            throw new ApiError(res.status, res.statusText, errorMessage);
         }
     }
 
@@ -105,7 +118,7 @@ async function request<T>(
 
     // Handle empty response body
     const text = await res.text();
-    return text ? JSON.parse(text) : ({} as unknown as T);
+    return text ? toCamelCase(JSON.parse(text)) : ({} as unknown as T);
 }
 
 export const api = {

@@ -184,8 +184,8 @@ const MOCK_PRODUKSI: KegiatanProduksiRow[] = [
 
 /* ─── Helpers ─── */
 
-function fmt(n: number): string {
-    return n.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+function fmt(n: number | null | undefined): string {
+    return Number(n || 0).toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
 }
 
 /* ─── Status Badge ─── */

@@ -63,7 +63,7 @@ const PRODUCT_IMAGES: Record<string, string> = {
 };
 
 function fmt(n?: number | null): string {
-    if (n === undefined || n === null) return '0';
+    if (n === undefined || n === null || isNaN(n)) return '0';
     if (n === 0) return '0';
     return n % 1 === 0
         ? n.toLocaleString('id-ID')

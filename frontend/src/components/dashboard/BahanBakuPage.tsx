@@ -26,7 +26,8 @@ import { PencilIcon, Trash2Icon as TrashIcon } from 'lucide-react';
 type TabKey = 'suplai' | 'mutasi' | 'balance-stok' | 'konfigurasi';
 
 /** Format number with locale-aware thousand separators */
-const fmtNumber = (n: number) => n.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtNumber = (n: number | null | undefined) => Number(n || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtInteger = (n: number | null | undefined) => Number(n || 0).toLocaleString('id-ID');
 
 // ...
 
@@ -276,98 +277,29 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
     }, [fetchData]);
 
     const handleAddSuplai = async (data: any) => {
+        const payload = {
+            productSlug: defaultProductSlug,
+            perusahaanId: 0, // Default to 0
+            tanggal: data.date,
+            jenis: data.jenis,
+            namaBahan: data.namaBahan,
+            kuantum: parseFloat(data.quantum || 0),
+            satuan: data.satuan,
+            dokumen: data.file ? data.file.name : (editData?.dokumen || ''),
+            keterangan: data.keterangan || ''
+        };
         try {
             if (editingId) {
-                // Update mode (Single Item)
-                // We assume the modal returns lists, but we only update the single item we are editing.
-                // We need to extract the correct item from the lists.
-                let payload: any = null;
-
-                // Check if we are updating a Bahan Baku
-                if (data.bahanBakuList && data.bahanBakuList.length > 0 && data.bahanBakuList[0].name) {
-                    const item = data.bahanBakuList[0];
-                    payload = {
-                        productSlug: defaultProductSlug,
-                        perusahaanId: 0,
-                        tanggal: data.date,
-                        jenis: 'Bahan Baku',
-                        namaBahan: item.name,
-                        kuantum: parseFloat(item.quantum),
-                        satuan: item.satuan || 'Kg',
-                        dokumen: data.file ? data.file.name : (editData?.dokumen || ''),
-                        keterangan: data.keterangan
-                    };
-                }
-                // Check if we are updating a Bahan Penolong
-                else if (data.bahanPenolongList && data.bahanPenolongList.length > 0 && data.bahanPenolongList[0].name) {
-                    const item = data.bahanPenolongList[0];
-                    payload = {
-                        productSlug: defaultProductSlug,
-                        perusahaanId: 0,
-                        tanggal: data.date,
-                        jenis: 'Bahan Penolong',
-                        namaBahan: item.name,
-                        kuantum: parseFloat(item.quantum),
-                        satuan: item.satuan || 'Pcs',
-                        dokumen: data.file ? data.file.name : (editData?.dokumen || ''),
-                        keterangan: data.keterangan || ''
-                    };
-                }
-
-                if (payload) {
-                    await bahanBakuService.updateSuplai(editingId, payload);
-                }
+                await bahanBakuService.updateSuplai(editingId, payload);
             } else {
-                // Create mode (Multiple Items)
-                const promises = [];
-
-                // Process Bahan Baku
-                if (data.bahanBakuList && Array.isArray(data.bahanBakuList)) {
-                    for (const item of data.bahanBakuList) {
-                        if (item.name && parseFloat(item.quantum) > 0) {
-                            const payload = {
-                                productSlug: defaultProductSlug,
-                                perusahaanId: 0,
-                                tanggal: data.date,
-                                jenis: 'Bahan Baku',
-                                namaBahan: item.name,
-                                kuantum: parseFloat(item.quantum),
-                                satuan: item.satuan || 'Kg',
-                                dokumen: data.file ? data.file.name : '',
-                                keterangan: data.keterangan
-                            };
-                            promises.push(bahanBakuService.createSuplai(payload as any));
-                        }
-                    }
-                }
-
-                // Process Bahan Penolong
-                if (data.bahanPenolongList && Array.isArray(data.bahanPenolongList)) {
-                    for (const item of data.bahanPenolongList) {
-                        if (item.name && parseFloat(item.quantum) > 0) {
-                            const payload = {
-                                productSlug: defaultProductSlug,
-                                perusahaanId: 0,
-                                tanggal: data.date,
-                                jenis: 'Bahan Penolong',
-                                namaBahan: item.name,
-                                kuantum: parseFloat(item.quantum),
-                                satuan: item.satuan || 'Pcs',
-                                dokumen: data.file ? data.file.name : '',
-                                keterangan: data.keterangan || ''
-                            };
-                            promises.push(bahanBakuService.createSuplai(payload as any));
-                        }
-                    }
-                }
-                await Promise.all(promises);
+                await bahanBakuService.createSuplai(payload as any);
             }
             fetchData();
             setEditingId(null);
             setEditData(null);
         } catch (error) {
             console.error('Failed to save suplai:', error);
-            alert('Gagal menyimpan data suplai. Silakan coba lagi.');
+            alert('Gagal menyimpan data suplai.');
         }
     };
 
@@ -506,7 +438,7 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
                 format(new Date(row.tanggal), 'dd/MM/yyyy'),
                 row.jenis,
                 row.namaBahan,
-                row.kuantum.toLocaleString('id-ID'),
+                fmtInteger(row.kuantum),
                 row.satuan,
                 row.dokumen || '-',
                 row.keterangan || '-',
@@ -519,7 +451,7 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
                 format(new Date(row.tanggal), 'dd/MM/yyyy'),
                 row.jenis,
                 row.namaBahan,
-                row.kuantum.toLocaleString('id-ID'),
+                fmtInteger(row.kuantum),
                 row.satuan,
                 row.dokumen || '-',
                 row.keterangan || '-',
@@ -531,9 +463,9 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
                 row.nama,
                 row.jenis === 'Baku' ? 'Bahan Baku' : 'Bahan Penolong',
                 row.satuan,
-                row.totalIn.toLocaleString('id-ID'),
-                row.totalOut.toLocaleString('id-ID'),
-                row.stok.toLocaleString('id-ID'),
+                fmtInteger(row.totalIn),
+                fmtInteger(row.totalOut),
+                fmtInteger(row.stok),
             ]);
         }
 
@@ -849,7 +781,7 @@ function SuplaiTable({ data, search, onDelete, onEdit }: { data: SuplaiRow[]; se
                                     </td>
                                     <td className="px-4 py-3 text-gray-800 font-medium border border-gray-200">{row.namaBahan || '-'}</td>
                                     <td className="px-4 py-3 text-right font-mono text-gray-700 border border-gray-200">
-                                        {row.kuantum.toLocaleString('id-ID')} <span className="text-gray-400 text-xs ml-0.5">{row.satuan}</span>
+                                        {fmtInteger(row.kuantum)} <span className="text-gray-400 text-xs ml-0.5">{row.satuan}</span>
                                     </td>
                                     <td className="px-4 py-3 text-center border border-gray-200">
                                         {row.dokumen ? (
@@ -908,7 +840,7 @@ function SuplaiTable({ data, search, onDelete, onEdit }: { data: SuplaiRow[]; se
                             </div>
                             <div className="text-right">
                                 <p className="text-sm font-mono font-medium text-gray-700">
-                                    {row.kuantum.toLocaleString('id-ID')} {row.satuan}
+                                    {fmtInteger(row.kuantum)} {row.satuan}
                                 </p>
                             </div>
                         </div>
@@ -1014,7 +946,7 @@ function MutasiTable({ data, search, onEdit, onDelete }: { data: MutasiRow[]; se
                                     </td>
                                     <td className="px-4 py-3 text-gray-800 font-medium border border-gray-200">{row.namaBahan || '-'}</td>
                                     <td className="px-4 py-3 text-right font-mono text-gray-700 border border-gray-200">
-                                        {row.kuantum.toLocaleString('id-ID')} <span className="text-gray-400 text-xs ml-0.5">{row.satuan}</span>
+                                        {fmtInteger(row.kuantum)} <span className="text-gray-400 text-xs ml-0.5">{row.satuan}</span>
                                     </td>
                                     <td className="px-4 py-3 text-center border border-gray-200">
                                         {row.dokumen ? (
@@ -1076,7 +1008,7 @@ function MutasiTable({ data, search, onEdit, onDelete }: { data: MutasiRow[]; se
                             </div>
                             <div className="text-right">
                                 <p className="text-sm font-mono font-medium text-gray-700">
-                                    {row.kuantum.toLocaleString('id-ID')} {row.satuan}
+                                    {fmtInteger(row.kuantum)} {row.satuan}
                                 </p>
                             </div>
                         </div>

@@ -39,24 +39,6 @@ export const navigation: NavSection[] = [
         ]
     },
     {
-        label: 'Produk Petroganik',
-        icon: 'package',
-        children: [
-            { label: 'Nitrea 5Kg', children: subItems('/dashboard/produk-petroganik/nitrea5kg') },
-            { label: 'Phosgreen', children: subItems('/dashboard/produk-petroganik/phosgreen') },
-            { label: 'Phonska', children: subItems('/dashboard/produk-petroganik/phonska') },
-        ],
-    },
-    {
-        label: 'Produk Non Petroganik',
-        icon: 'package',
-        children: [
-            { label: 'Petrocas', children: subItems('/dashboard/produk-non-petroganik/petrocas') },
-            { label: 'Kaptan', children: subItems('/dashboard/produk-non-petroganik/kaptan') },
-            { label: 'Filler Plus', children: subItems('/dashboard/produk-non-petroganik/filler-plus') },
-        ],
-    },
-    {
         label: 'Produk Pengembangan',
         icon: 'flask',
         children: [

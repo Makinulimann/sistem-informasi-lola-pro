@@ -20,8 +20,6 @@ const PAGE_COMPONENT_MAP: Record<string, React.ComponentType<{ productCategory: 
 // Known category slugs
 const CATEGORY_SLUGS = [
     'produk-pengembangan',
-    'produk-petroganik',
-    'produk-non-petroganik',
 ];
 
 function titleCase(s: string) {

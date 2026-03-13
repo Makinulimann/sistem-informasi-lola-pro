@@ -41,24 +41,24 @@ export const aktivitasHarianService = {
     // Aktivitas Harian
     getAll: (params: { bulan?: string; tahun?: string; search?: string; page?: number; limit?: number; sortBy?: string; sortDesc?: boolean }) => {
         const query = new URLSearchParams(cleanParams(params)).toString();
-        return api.get<AktivitasHarianResponse>(`/aktivitasharian?${query}`);
+        return api.get<AktivitasHarianResponse>(`/AktivitasHarian?${query}`);
     },
-    getById: (id: number) => api.get<AktivitasHarian>(`/aktivitasharian/${id}`),
+    getById: (id: number) => api.get<AktivitasHarian>(`/AktivitasHarian/${id}`),
     create: (data: Omit<AktivitasHarian, 'id' | 'createdAt'>) =>
-        api.post<AktivitasHarian>('/aktivitasharian', data),
+        api.post<AktivitasHarian>('/AktivitasHarian', data),
     update: (id: number, data: Omit<AktivitasHarian, 'id' | 'createdAt'>) =>
-        api.put<AktivitasHarian>(`/aktivitasharian/${id}`, data),
-    delete: (id: number) => api.delete(`/aktivitasharian/${id}`),
+        api.put<AktivitasHarian>(`/AktivitasHarian/${id}`, data),
+    delete: (id: number) => api.delete(`/AktivitasHarian/${id}`),
 
     // PIC Templates
-    getPics: () => api.get<LogbookPic[]>('/aktivitasharian/pic'),
-    createPic: (nama: string) => api.post<LogbookPic>('/aktivitasharian/pic', { nama }),
-    updatePic: (id: number, nama: string) => api.put<LogbookPic>(`/aktivitasharian/pic/${id}`, { nama }),
-    deletePic: (id: number) => api.delete(`/aktivitasharian/pic/${id}`),
+    getPics: () => api.get<LogbookPic[]>('/AktivitasHarian/pic'),
+    createPic: (nama: string) => api.post<LogbookPic>('/AktivitasHarian/pic', { nama }),
+    updatePic: (id: number, nama: string) => api.put<LogbookPic>(`/AktivitasHarian/pic/${id}`, { nama }),
+    deletePic: (id: number) => api.delete(`/AktivitasHarian/pic/${id}`),
 
     // Lokasi Templates
-    getLokasis: () => api.get<LogbookLokasi[]>('/aktivitasharian/lokasi'),
-    createLokasi: (nama: string) => api.post<LogbookLokasi>('/aktivitasharian/lokasi', { nama }),
-    updateLokasi: (id: number, nama: string) => api.put<LogbookLokasi>(`/aktivitasharian/lokasi/${id}`, { nama }),
-    deleteLokasi: (id: number) => api.delete(`/aktivitasharian/lokasi/${id}`),
+    getLokasis: () => api.get<LogbookLokasi[]>('/AktivitasHarian/lokasi'),
+    createLokasi: (nama: string) => api.post<LogbookLokasi>('/AktivitasHarian/lokasi', { nama }),
+    updateLokasi: (id: number, nama: string) => api.put<LogbookLokasi>(`/AktivitasHarian/lokasi/${id}`, { nama }),
+    deleteLokasi: (id: number) => api.delete(`/AktivitasHarian/lokasi/${id}`),
 };

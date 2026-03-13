@@ -29,14 +29,14 @@ export interface MaintenanceResponse {
 export const maintenanceService = {
     getAll: (params: { bulan?: string; tahun?: string; search?: string; page?: number; limit?: number; sortBy?: string; sortDesc?: boolean }) => {
         const query = new URLSearchParams(cleanParams(params)).toString();
-        return api.get<MaintenanceResponse>(`/maintenance?${query}`);
+        return api.get<MaintenanceResponse>(`/Maintenance?${query}`);
     },
-    getById: (id: number) => api.get<Maintenance>(`/maintenance/${id}`),
+    getById: (id: number) => api.get<Maintenance>(`/Maintenance/${id}`),
     create: (data: Omit<Maintenance, 'id' | 'createdAt'>) =>
-        api.post<Maintenance>('/maintenance', data),
+        api.post<Maintenance>('/Maintenance', data),
     update: (id: number, data: Omit<Maintenance, 'id' | 'createdAt'>) =>
-        api.put<Maintenance>(`/maintenance/${id}`, data),
-    delete: (id: number) => api.delete(`/maintenance/${id}`),
+        api.put<Maintenance>(`/Maintenance/${id}`, data),
+    delete: (id: number) => api.delete(`/Maintenance/${id}`),
 };
 
 export interface MaintenanceSummary {
@@ -61,5 +61,5 @@ export function getMaintenanceSummary(
     if (tahun) params.set('tahun', String(tahun));
     if (area) params.set('area', area);
     if (equipment) params.set('equipment', equipment);
-    return api.get<MaintenanceSummary>(`/maintenance/summary?${params.toString()}`);
+    return api.get<MaintenanceSummary>(`/Maintenance/summary?${params.toString()}`);
 }

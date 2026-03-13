@@ -66,56 +66,56 @@ const cleanParams = (params: any) => {
 
 export const bahanBakuService = {
     // Perusahaan
-    getPerusahaan: () => api.get<Perusahaan[]>('/bahanbaku/perusahaan'),
-    createPerusahaan: (nama: string) => api.post<Perusahaan>('/bahanbaku/perusahaan', { nama }),
+    getPerusahaan: () => api.get<Perusahaan[]>('/BahanBaku/perusahaan'),
+    createPerusahaan: (nama: string) => api.post<Perusahaan>('/BahanBaku/perusahaan', { nama }),
 
     // Suplai
     getSuplai: (params: { productSlug: string; perusahaanId?: number; bulan?: string; tahun?: string }) => {
         const query = new URLSearchParams(cleanParams(params)).toString();
-        return api.get<BahanBaku[]>(`/bahanbaku/suplai?${query}`);
+        return api.get<BahanBaku[]>(`/BahanBaku/suplai?${query}`);
     },
     createSuplai: (data: Omit<BahanBaku, 'id' | 'tipe' | 'perusahaan'>) =>
-        api.post<BahanBaku>('/bahanbaku/suplai', data),
+        api.post<BahanBaku>('/BahanBaku/suplai', data),
     updateSuplai: (id: number, data: Omit<BahanBaku, 'id' | 'tipe' | 'perusahaan'>) =>
-        api.put<BahanBaku>(`/bahanbaku/${id}`, data),
-    deleteSuplai: (id: number) => api.delete(`/bahanbaku/${id}`),
+        api.put<BahanBaku>(`/BahanBaku/${id}`, data),
+    deleteSuplai: (id: number) => api.delete(`/BahanBaku/${id}`),
 
     // Mutasi
     getMutasi: (params: { productSlug: string; perusahaanId?: number; bulan?: string; tahun?: string }) => {
         const query = new URLSearchParams(cleanParams(params)).toString();
-        return api.get<BahanBaku[]>(`/bahanbaku/mutasi?${query}`);
+        return api.get<BahanBaku[]>(`/BahanBaku/mutasi?${query}`);
     },
     createMutasi: (data: Omit<BahanBaku, 'id' | 'tipe' | 'perusahaan'>) =>
-        api.post<BahanBaku>('/bahanbaku/mutasi', data),
+        api.post<BahanBaku>('/BahanBaku/mutasi', data),
     updateMutasi: (id: number, data: Omit<BahanBaku, 'id' | 'tipe' | 'perusahaan'>) =>
-        api.put<BahanBaku>(`/bahanbaku/${id}`, data),
-    deleteMutasi: (id: number) => api.delete(`/bahanbaku/${id}`),
+        api.put<BahanBaku>(`/BahanBaku/${id}`, data),
+    deleteMutasi: (id: number) => api.delete(`/BahanBaku/${id}`),
 
     // Materials
     getMaterials: (productSlug: string) =>
-        api.get<Material[]>(`/bahanbaku/materials?productSlug=${productSlug}`),
+        api.get<Material[]>(`/BahanBaku/materials?productSlug=${productSlug}`),
     createMaterial: (productSlug: string, nama: string) =>
-        api.post<Material>('/bahanbaku/materials', { productSlug, nama }),
+        api.post<Material>('/BahanBaku/materials', { productSlug, nama }),
     updateMaterial: (id: number, nama: string) =>
-        api.put<Material>(`/bahanbaku/materials/${id}`, { nama }),
+        api.put<Material>(`/BahanBaku/materials/${id}`, { nama }),
     deleteMaterial: (id: number) =>
-        api.delete(`/bahanbaku/materials/${id}`),
+        api.delete(`/BahanBaku/materials/${id}`),
 
     // Balance Stok (computed from Suplai/Mutasi)
     getBalanceStok: (params: { productSlug: string; bulan?: string; tahun?: string }) => {
         const query = new URLSearchParams(cleanParams(params)).toString();
-        return api.get<BalanceStokRow[]>(`/bahanbaku/balance-stok?${query}`);
+        return api.get<BalanceStokRow[]>(`/BahanBaku/balance-stok?${query}`);
     },
 
     // History (drill-down for specific material)
     getHistory: (params: { productSlug: string; namaBahan: string; tipe: string; bulan?: string; tahun?: string }) => {
         const query = new URLSearchParams(cleanParams(params)).toString();
-        return api.get<BahanBaku[]>(`/bahanbaku/history?${query}`);
+        return api.get<BahanBaku[]>(`/BahanBaku/history?${query}`);
     },
 
     // Balance Stok (legacy)
     getBalance: (params: { productSlug: string; perusahaanId?: number; bulan?: string; tahun?: string }) => {
         const query = new URLSearchParams(cleanParams(params)).toString();
-        return api.get<BalanceStok[]>(`/bahanbaku/balance?${query}`);
+        return api.get<BalanceStok[]>(`/BahanBaku/balance?${query}`);
     }
 };

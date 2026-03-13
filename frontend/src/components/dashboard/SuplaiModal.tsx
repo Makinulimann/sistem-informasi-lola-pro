@@ -23,24 +23,6 @@ function XIcon() {
     );
 }
 
-function PlusIcon() {
-    return (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-        </svg>
-    );
-}
-
-function TrashIcon() {
-    return (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="3 6 5 6 21 6" />
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-        </svg>
-    );
-}
-
 function CalendarIcon() {
     return (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -62,7 +44,7 @@ function UploadIcon() {
     );
 }
 
-/* ─── Mock Options ─── */
+/* ─── Options ─── */
 
 /* ─── Unit Families ─── */
 
@@ -84,14 +66,11 @@ const getUnitOptions = (baseUnit?: string) => {
     return entry ? entry[1] : Object.values(UNIT_FAMILIES).flat();
 };
 
-/* ─── Types ─── */
+/* ─── Options ─── */
 
-interface MaterialRow {
-    id: string;
-    name: string;
-    quantum: string;
-    satuan: string;
-}
+const JENIS_OPTIONS = ['Bahan Baku', 'Bahan Penolong'];
+
+/* ─── Types ─── */
 
 interface SuplaiModalProps {
     isOpen: boolean;
@@ -103,12 +82,14 @@ interface SuplaiModalProps {
 
 export function SuplaiModal({ isOpen, onClose, onSubmit, productSlug, initialData }: SuplaiModalProps) {
     const [date, setDate] = useState<Date | undefined>(undefined);
-    const [bahanBakuList, setBahanBakuList] = useState<MaterialRow[]>([{ id: '1', name: '', quantum: '', satuan: 'Kg' }]);
-    const [bahanPenolongList, setBahanPenolongList] = useState<MaterialRow[]>([{ id: '1', name: '', quantum: '', satuan: 'Pcs' }]);
+    const [jenis, setJenis] = useState('');
+    const [namaBahan, setNamaBahan] = useState('');
+    const [quantum, setQuantum] = useState('');
+    const [satuan, setSatuan] = useState('Kg');
     const [file, setFile] = useState<File | null>(null);
     const [keterangan, setKeterangan] = useState('');
 
-    // Metadata state
+    // Metadata
     const [availableBaku, setAvailableBaku] = useState<ProductMaterial[]>([]);
     const [availablePenolong, setAvailablePenolong] = useState<ProductMaterial[]>([]);
 
@@ -121,81 +102,33 @@ export function SuplaiModal({ isOpen, onClose, onSubmit, productSlug, initialDat
 
             if (initialData) {
                 setDate(initialData.tanggal ? new Date(initialData.tanggal) : undefined);
+                setJenis(initialData.jenis || '');
+                setNamaBahan(initialData.namaBahan || '');
+                setQuantum(initialData.kuantum?.toString() || '');
+                setSatuan(initialData.satuan || 'Kg');
                 setKeterangan(initialData.keterangan || '');
-                // Populate lists based on kind. Since existing data is single row per record, we populate accordingly.
-                // However, the modal is designed for multiple items.
-                // For editing single item (from table row), we might want to just show that item.
-                if (initialData.jenis === 'Bahan Baku') {
-                    setBahanBakuList([{ id: '1', name: initialData.namaBahan, quantum: initialData.kuantum.toString(), satuan: initialData.satuan || 'Kg' }]);
-                    setBahanPenolongList([{ id: '1', name: '', quantum: '', satuan: 'Pcs' }]);
-                } else if (initialData.jenis === 'Bahan Penolong') {
-                    setBahanBakuList([{ id: '1', name: '', quantum: '', satuan: 'Kg' }]);
-                    setBahanPenolongList([{ id: '1', name: initialData.namaBahan, quantum: initialData.kuantum.toString(), satuan: initialData.satuan || 'Pcs' }]);
-                }
+                setFile(null); // Reset file input
             } else {
                 // Reset form
                 setDate(undefined);
-                setBahanBakuList([{ id: '1', name: '', quantum: '', satuan: 'Kg' }]);
-                setBahanPenolongList([{ id: '1', name: '', quantum: '', satuan: 'Pcs' }]);
-                setKeterangan('');
+                setJenis('');
+                setNamaBahan('');
+                setQuantum('');
+                setSatuan('Kg');
                 setFile(null);
+                setKeterangan('');
             }
         }
     }, [isOpen, productSlug, initialData]);
 
     if (!isOpen) return null;
 
-    /* Handlers */
+    const availableBahan = jenis === 'Bahan Baku' ? availableBaku :
+        jenis === 'Bahan Penolong' ? availablePenolong : [];
 
-    const addBahanBaku = () => {
-        setBahanBakuList([...bahanBakuList, { id: crypto.randomUUID(), name: '', quantum: '', satuan: 'Kg' }]);
-    };
-
-    const removeBahanBaku = (id: string) => {
-        if (bahanBakuList.length > 1) {
-            setBahanBakuList(bahanBakuList.filter((item) => item.id !== id));
-        }
-    };
-
-    const updateBahanBaku = (id: string, field: keyof MaterialRow, value: string) => {
-        setBahanBakuList(bahanBakuList.map((item) => {
-            if (item.id === id) {
-                const updated = { ...item, [field]: value };
-                // If name changed, reset unit to default if possible, or keep existing if compatible?
-                // For now just update. User will see updated options
-                if (field === 'name') {
-                    const mat = availableBaku.find(m => m.nama === value);
-                    if (mat && mat.satuan) updated.satuan = mat.satuan;
-                }
-                return updated;
-            }
-            return item;
-        }));
-    };
-
-    const addBahanPenolong = () => {
-        setBahanPenolongList([...bahanPenolongList, { id: crypto.randomUUID(), name: '', quantum: '', satuan: 'Pcs' }]);
-    };
-
-    const removeBahanPenolong = (id: string) => {
-        if (bahanPenolongList.length > 1) {
-            setBahanPenolongList(bahanPenolongList.filter((item) => item.id !== id));
-        }
-    };
-
-    const updateBahanPenolong = (id: string, field: keyof MaterialRow, value: string) => {
-        setBahanPenolongList(bahanPenolongList.map((item) => {
-            if (item.id === id) {
-                const updated = { ...item, [field]: value };
-                if (field === 'name') {
-                    const mat = availablePenolong.find(m => m.nama === value);
-                    if (mat && mat.satuan) updated.satuan = mat.satuan;
-                }
-                return updated;
-            }
-            return item;
-        }));
-    };
+    // Derive unit options based on selected material
+    const selectedMaterial = availableBahan.find(m => m.nama === namaBahan);
+    const unitOptions = getUnitOptions(selectedMaterial?.satuan);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -203,32 +136,48 @@ export function SuplaiModal({ isOpen, onClose, onSubmit, productSlug, initialDat
         }
     };
 
+    const handleJenisChange = (value: string) => {
+        setJenis(value);
+        setNamaBahan(''); // Reset nama bahan when jenis changes
+    };
+
+    const handleNamaBahanChange = (value: string) => {
+        setNamaBahan(value);
+        // Auto-update unit to default if available
+        const mat = availableBahan.find(m => m.nama === value);
+        if (mat && mat.satuan) {
+            setSatuan(mat.satuan);
+        }
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
         if (!date) {
-            alert("Mohon pilih Tanggal Suplai terlebih dahulu.");
+            alert('Mohon pilih Tanggal Data Suplai terlebih dahulu.');
             return;
         }
 
-        onSubmit({ date, bahanBakuList, bahanPenolongList, file, keterangan });
+        onSubmit({ date, jenis, namaBahan, quantum, satuan, file, keterangan });
         onClose();
     };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-            {/* Backdrop with blur */}
+            {/* Backdrop */}
             <div
                 className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
                 onClick={onClose}
             />
 
-            {/* Modal Content */}
-            <div className="relative w-full max-w-4xl bg-white rounded-xl shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+            {/* Modal */}
+            <div className="relative w-full max-w-lg bg-white rounded-xl shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
 
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
-                    <h2 className="text-lg font-bold text-gray-800">Tambah Data Suplai</h2>
+                    <h2 className="text-lg font-bold text-gray-800">
+                        {initialData ? 'Edit Data Suplai' : 'Tambah Data Suplai'}
+                    </h2>
                     <button
                         onClick={onClose}
                         className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-full transition-colors"
@@ -239,12 +188,12 @@ export function SuplaiModal({ isOpen, onClose, onSubmit, productSlug, initialDat
 
                 {/* Scrollable Form Body */}
                 <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
-                    <form id="suplai-form" onSubmit={handleSubmit} className="space-y-8">
+                    <form id="suplai-form" onSubmit={handleSubmit} className="space-y-5">
 
                         {/* Tanggal */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Tanggal Suplai <span className="text-red-500">*</span>
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                Tanggal <span className="text-red-500">*</span>
                             </label>
                             <Popover>
                                 <PopoverTrigger asChild>
@@ -256,7 +205,7 @@ export function SuplaiModal({ isOpen, onClose, onSubmit, productSlug, initialDat
                                         )}
                                     >
                                         <CalendarIcon />
-                                        {date ? format(date, "PPP") : <span>Pilih tanggal</span>}
+                                        {date ? format(date, "dd/MM/yyyy") : <span>dd/mm/yyyy</span>}
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0" align="start">
@@ -270,194 +219,120 @@ export function SuplaiModal({ isOpen, onClose, onSubmit, productSlug, initialDat
                             </Popover>
                         </div>
 
-                        {/* Bahan Baku Section */}
+                        {/* Jenis */}
                         <div>
-                            <div className="flex items-center justify-between mb-3">
-                                <h3 className="text-sm font-bold text-gray-800">Bahan Baku</h3>
-                            </div>
-                            <div className="space-y-3">
-                                {bahanBakuList.map((row) => {
-                                    const selectedMaterial = availableBaku.find(m => m.nama === row.name);
-                                    const unitOptions = getUnitOptions(selectedMaterial?.satuan);
-
-                                    return (
-                                        <div key={row.id} className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-                                            <div className="flex-1 w-full">
-                                                {availableBaku.length > 0 ? (
-                                                    <select
-                                                        value={row.name}
-                                                        onChange={(e) => updateBahanBaku(row.id, 'name', e.target.value)}
-                                                        className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
-                                                    >
-                                                        <option value="" disabled>Pilih Bahan Baku</option>
-                                                        {availableBaku.map((item) => (
-                                                            <option key={item.id} value={item.nama}>{item.nama}</option>
-                                                        ))}
-                                                    </select>
-                                                ) : (
-                                                    <div className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 border-dashed rounded-lg text-sm text-gray-400 italic">
-                                                        Belum ada bahan baku dikonfigurasi.
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <div className="flex gap-3 w-full sm:w-auto">
-                                                <div className="w-full sm:w-32">
-                                                    <input
-                                                        type="number"
-                                                        placeholder="Kuantum"
-                                                        value={row.quantum}
-                                                        onChange={(e) => updateBahanBaku(row.id, 'quantum', e.target.value)}
-                                                        className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
-                                                    />
-                                                </div>
-                                                <div className="w-full sm:w-28">
-                                                    <select
-                                                        value={row.satuan}
-                                                        onChange={(e) => updateBahanBaku(row.id, 'satuan', e.target.value)}
-                                                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all cursor-pointer"
-                                                    >
-                                                        {unitOptions.map((opt) => (
-                                                            <option key={opt} value={opt}>{opt}</option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                            </div>
-                                            {bahanBakuList.length > 1 && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => removeBahanBaku(row.id)}
-                                                    className="p-2.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                                >
-                                                    <TrashIcon />
-                                                </button>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                            <button
-                                type="button"
-                                onClick={addBahanBaku}
-                                className="mt-3 inline-flex items-center justify-center w-8 h-8 rounded-full bg-emerald-600 text-white hover:bg-emerald-700 transition-all shadow-sm hover:shadow-md"
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                Jenis <span className="text-red-500">*</span>
+                            </label>
+                            <select
+                                value={jenis}
+                                onChange={(e) => handleJenisChange(e.target.value)}
+                                required
+                                className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all appearance-none cursor-pointer"
                             >
-                                <PlusIcon />
-                            </button>
+                                <option value="" disabled>Pilih</option>
+                                <option value="Bahan Baku">Bahan Baku</option>
+                                <option value="Bahan Penolong">Bahan Penolong</option>
+                            </select>
                         </div>
 
-                        <div className="h-px bg-gray-100" />
-
-                        {/* Bahan Penolong Section */}
+                        {/* Nama Bahan */}
                         <div>
-                            <div className="flex items-center justify-between mb-3">
-                                <h3 className="text-sm font-bold text-gray-800">Bahan Penolong</h3>
-                            </div>
-                            <div className="space-y-3">
-                                {bahanPenolongList.map((row) => {
-                                    const selectedMaterial = availablePenolong.find(m => m.nama === row.name);
-                                    const unitOptions = getUnitOptions(selectedMaterial?.satuan);
-
-                                    return (
-                                        <div key={row.id} className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-                                            <div className="flex-1 w-full">
-                                                {availablePenolong.length > 0 ? (
-                                                    <select
-                                                        value={row.name}
-                                                        onChange={(e) => updateBahanPenolong(row.id, 'name', e.target.value)}
-                                                        className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
-                                                    >
-                                                        <option value="" disabled>Pilih Bahan Penolong</option>
-                                                        {availablePenolong.map((item) => (
-                                                            <option key={item.id} value={item.nama}>{item.nama}</option>
-                                                        ))}
-                                                    </select>
-                                                ) : (
-                                                    <div className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 border-dashed rounded-lg text-sm text-gray-400 italic">
-                                                        Belum ada bahan penolong dikonfigurasi.
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <div className="flex gap-3 w-full sm:w-auto">
-                                                <div className="w-full sm:w-32">
-                                                    <input
-                                                        type="number"
-                                                        placeholder="Kuantum"
-                                                        value={row.quantum}
-                                                        onChange={(e) => updateBahanPenolong(row.id, 'quantum', e.target.value)}
-                                                        className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
-                                                    />
-                                                </div>
-                                                <div className="w-full sm:w-28">
-                                                    <select
-                                                        value={row.satuan}
-                                                        onChange={(e) => updateBahanPenolong(row.id, 'satuan', e.target.value)}
-                                                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all cursor-pointer"
-                                                    >
-                                                        {unitOptions.map((opt) => (
-                                                            <option key={opt} value={opt}>{opt}</option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                            </div>
-                                            {bahanPenolongList.length > 1 && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => removeBahanPenolong(row.id)}
-                                                    className="p-2.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                                >
-                                                    <TrashIcon />
-                                                </button>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                            <button
-                                type="button"
-                                onClick={addBahanPenolong}
-                                className="mt-3 inline-flex items-center justify-center w-8 h-8 rounded-full bg-emerald-600 text-white hover:bg-emerald-700 transition-all shadow-sm hover:shadow-md"
-                            >
-                                <PlusIcon />
-                            </button>
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                Nama Bahan <span className="text-red-500">*</span>
+                            </label>
+                            {availableBahan.length > 0 ? (
+                                <select
+                                    value={namaBahan}
+                                    onChange={(e) => handleNamaBahanChange(e.target.value)}
+                                    required
+                                    disabled={!jenis}
+                                    className={cn(
+                                        "w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all appearance-none cursor-pointer",
+                                        !jenis && "bg-gray-50 text-gray-400 cursor-not-allowed"
+                                    )}
+                                >
+                                    <option value="" disabled>Pilih</option>
+                                    {availableBahan.map((item) => (
+                                        <option key={item.id} value={item.nama}>{item.nama}</option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <div className={cn(
+                                    "w-full px-4 py-2.5 bg-gray-50 border border-gray-200 border-dashed rounded-lg text-sm text-gray-400 italic",
+                                    !jenis && "bg-gray-50"
+                                )}>
+                                    {!jenis ? 'Pilih jenis terlebih dahulu' : 'Belum ada material dikonfigurasi'}
+                                </div>
+                            )}
                         </div>
 
-                        <div className="h-px bg-gray-100" />
-
-                        {/* Dokumen & Keterangan */}
-                        <div className="grid grid-cols-1 gap-6">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Dokumen <span className="text-gray-400 font-normal italic ml-1">(Optional)</span>
-                                </label>
-                                <div className="relative group">
+                        {/* Kuantum + Satuan */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                Kuantum <span className="text-red-500">*</span>
+                            </label>
+                            <div className="flex gap-3">
+                                <div className="flex-1">
                                     <input
-                                        type="file"
-                                        onChange={handleFileChange}
-                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                        type="number"
+                                        step="any"
+                                        value={quantum}
+                                        onChange={(e) => setQuantum(e.target.value)}
+                                        required
+                                        placeholder="Masukkan jumlah"
+                                        className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
                                     />
-                                    <div className="flex items-center px-4 py-2.5 bg-white border border-gray-300 rounded-lg hover:border-emerald-500 hover:ring-1 hover:ring-emerald-500 transition-all h-11">
-                                        <span className="inline-flex items-center px-3 py-1 bg-gray-100 text-xs font-medium text-gray-600 rounded border border-gray-200 mr-3 group-hover:bg-emerald-50 group-hover:text-emerald-700 group-hover:border-emerald-200 transition-colors">
-                                            Choose File
-                                        </span>
-                                        <span className="text-sm text-gray-500 truncate flex-1">
-                                            {file ? file.name : 'No file chosen'}
-                                        </span>
-                                        <UploadIcon />
-                                    </div>
+                                </div>
+                                <div className="w-28">
+                                    <select
+                                        value={satuan}
+                                        onChange={(e) => setSatuan(e.target.value)}
+                                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all cursor-pointer"
+                                    >
+                                        {unitOptions.map((opt) => (
+                                            <option key={opt} value={opt}>{opt}</option>
+                                        ))}
+                                    </select>
                                 </div>
                             </div>
+                        </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Keterangan
-                                </label>
-                                <textarea
-                                    value={keterangan}
-                                    onChange={(e) => setKeterangan(e.target.value)}
-                                    rows={3}
-                                    className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all resize-none"
-                                    placeholder="Tambahkan catatan jika diperlukan..."
+                        {/* Dokumen */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                Dokumen <span className="text-gray-400 font-normal italic ml-1">(Optional)</span>
+                            </label>
+                            <div className="relative group">
+                                <input
+                                    type="file"
+                                    onChange={handleFileChange}
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                                 />
+                                <div className="flex items-center px-4 py-2.5 bg-white border border-gray-300 rounded-lg hover:border-emerald-500 hover:ring-1 hover:ring-emerald-500 transition-all h-11">
+                                    <span className="inline-flex items-center px-3 py-1 bg-gray-100 text-xs font-medium text-gray-600 rounded border border-gray-200 mr-3 group-hover:bg-emerald-50 group-hover:text-emerald-700 group-hover:border-emerald-200 transition-colors">
+                                        Choose File
+                                    </span>
+                                    <span className="text-sm text-gray-500 truncate flex-1">
+                                        {file ? file.name : (initialData?.dokumen || 'No file chosen')}
+                                    </span>
+                                    <UploadIcon />
+                                </div>
                             </div>
+                        </div>
+
+                        {/* Keterangan */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                Keterangan
+                            </label>
+                            <textarea
+                                value={keterangan}
+                                onChange={(e) => setKeterangan(e.target.value)}
+                                rows={3}
+                                className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all resize-none"
+                                placeholder="Tambahkan catatan jika diperlukan..."
+                            />
                         </div>
 
                     </form>
@@ -483,3 +358,4 @@ export function SuplaiModal({ isOpen, onClose, onSubmit, productSlug, initialDat
         </div>
     );
 }
+
