@@ -1,8 +1,5 @@
 'use client';
 
-export const runtime = 'edge';
-
-
 import { use } from 'react';
 import { BahanBakuPage } from '@/components/dashboard/BahanBakuPage';
 import { ProduksiPage } from '@/components/dashboard/ProduksiPage';
