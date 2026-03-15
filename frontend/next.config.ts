@@ -5,6 +5,13 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ['lucide-react', 'date-fns', 'recharts'],
   },
+  outputFileTracingExcludes: {
+    '*': [
+      'node_modules/@vercel/og/dist/**',
+      'node_modules/next/dist/compiled/@vercel/og/**',
+      'node_modules/@prisma/engines/**',
+    ],
+  },
 };
 
 export default nextConfig;
