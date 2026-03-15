@@ -190,3 +190,32 @@ model app_settings {
   value      String   @db.VarChar(2048)
   updated_at DateTime @db.Timestamptz(6)
 }
+
+model Analisas {
+  Id              Int       @id @default(autoincrement())
+  ProductSlug     String    @db.VarChar(200)
+  Bulan           Int
+  Tahun           Int
+  TanggalSampling DateTime  @db.Timestamptz(6)
+  NoBAPC          String    @db.VarChar(100)
+  Kuantum         Float
+  Lembaga         String    @db.VarChar(100)
+  HasilAnalisa    String    @db.VarChar(50)
+  TanggalAnalisa  DateTime? @db.Timestamptz(6)
+  CreatedAt       DateTime  @default(now()) @db.Timestamptz(6)
+  UpdatedAt       DateTime  @updatedAt @db.Timestamptz(6)
+
+  @@index([ProductSlug, Bulan, Tahun])
+}
+
+model Rkaps {
+  Id          Int      @id @default(autoincrement())
+  ProductSlug String   @db.VarChar(200)
+  Bulan       Int
+  Tahun       Int
+  Target      Float
+  CreatedAt   DateTime @default(now()) @db.Timestamptz(6)
+  UpdatedAt   DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([ProductSlug, Bulan, Tahun])
+}

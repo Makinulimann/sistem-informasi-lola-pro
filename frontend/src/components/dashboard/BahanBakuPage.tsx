@@ -136,6 +136,26 @@ function SortIcon({ direction }: { direction?: 'asc' | 'desc' }) {
 
 
 
+function AlertTriangleIcon() {
+    return (
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+            <path d="M12 9v4" />
+            <path d="M12 17h.01" />
+        </svg>
+    );
+}
+
+function MoreIcon() {
+    return (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="1" />
+            <circle cx="12" cy="5" r="1" />
+            <circle cx="12" cy="19" r="1" />
+        </svg>
+    );
+}
+
 function CheckIcon() {
     return (
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -218,6 +238,10 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
     const [isMutasiModalOpen, setIsMutasiModalOpen] = useState(false);
     const [editingId, setEditingId] = useState<number | null>(null);
     const [editData, setEditData] = useState<any>(null);
+
+    const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; id: number | null; type: 'suplai' | 'mutasi' | null }>({ isOpen: false, id: null, type: null });
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [pageError, setPageError] = useState<string | null>(null);
 
 
 
@@ -330,27 +354,28 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
         }
     };
 
-    const handleDeleteSuplai = async (id: number) => {
-        if (confirm('Apakah Anda yakin ingin menghapus data ini?')) {
-            try {
-                await bahanBakuService.deleteSuplai(id);
-                fetchData();
-            } catch (error) {
-                console.error('Failed to delete suplai:', error);
-                alert('Gagal menghapus data.');
-            }
-        }
+    const confirmDelete = (type: 'suplai' | 'mutasi', id: number) => {
+        setDeleteModal({ isOpen: true, id, type });
     };
 
-    const handleDeleteMutasi = async (id: number) => {
-        if (confirm('Apakah Anda yakin ingin menghapus data ini?')) {
-            try {
-                await bahanBakuService.deleteMutasi(id);
-                fetchData();
-            } catch (error) {
-                console.error('Failed to delete mutasi:', error);
-                alert('Gagal menghapus data.');
+    const executeDelete = async () => {
+        if (!deleteModal.id || !deleteModal.type) return;
+        try {
+            setIsDeleting(true);
+            setPageError(null);
+            if (deleteModal.type === 'suplai') {
+                await bahanBakuService.deleteSuplai(deleteModal.id);
+            } else {
+                await bahanBakuService.deleteMutasi(deleteModal.id);
             }
+            fetchData();
+            setDeleteModal({ isOpen: false, id: null, type: null });
+        } catch (error) {
+            console.error('Failed to delete data:', error);
+            setPageError('Gagal menghapus data.');
+            setDeleteModal({ isOpen: false, id: null, type: null });
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -524,6 +549,33 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
                 initialData={editData}
             />
 
+            {deleteModal.isOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 animate-in fade-in zoom-in-95 duration-200">
+                        <div className="flex flex-col items-center text-center">
+                            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-4">
+                                <AlertTriangleIcon />
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-900 mb-2">Hapus Data?</h3>
+                            <p className="text-sm text-gray-500 mb-6">Data yang dihapus tidak dapat dikembalikan. Lanjutkan?</p>
+                        </div>
+                        <div className="flex gap-3 w-full">
+                            <button onClick={() => setDeleteModal({ isOpen: false, id: null, type: null })} className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors">Batal</button>
+                            <button onClick={executeDelete} disabled={isDeleting} className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50">
+                                {isDeleting ? 'Menghapus...' : 'Ya, Hapus'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {pageError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center justify-between shadow-sm">
+                    <span className="text-sm font-medium text-red-800">{pageError}</span>
+                    <button onClick={() => setPageError(null)} className="px-3 py-1.5 text-sm font-semibold text-red-700 bg-red-100 hover:bg-red-200 rounded-lg transition-colors">Tutup</button>
+                </div>
+            )}
+
             {/* Breadcrumb */}
             <div className="flex items-center gap-2 text-sm text-gray-400">
                 <span className="text-gray-500">Dashboard</span>
@@ -665,8 +717,8 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
                         </div>
                     ) : (
                         <>
-                            {activeTab === 'suplai' && <SuplaiTable data={suplaiData} search={search} onDelete={handleDeleteSuplai} onEdit={handleEditSuplai} />}
-                            {activeTab === 'mutasi' && <MutasiTable data={mutasiData} search={search} onEdit={handleEditMutasi} onDelete={handleDeleteMutasi} />}
+                            {activeTab === 'suplai' && <SuplaiTable data={suplaiData} search={search} onDelete={(id) => confirmDelete('suplai', id)} onEdit={handleEditSuplai} />}
+                            {activeTab === 'mutasi' && <MutasiTable data={mutasiData} search={search} onEdit={handleEditMutasi} onDelete={(id) => confirmDelete('mutasi', id)} />}
                             {activeTab === 'balance-stok' && (
                                 <BalanceStokTable
                                     data={balanceStokRows}
@@ -731,47 +783,47 @@ function SuplaiTable({ data, search, onDelete, onEdit }: { data: SuplaiRow[]; se
                 <table className="w-full text-sm border-collapse border border-gray-200">
                     <thead>
                         <tr className="bg-gray-50/80">
-                            <th className="px-4 py-3 text-left font-semibold text-gray-700 w-16 border border-gray-200">No.</th>
-                            <th className="px-4 py-3 text-left font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors border border-gray-200" onClick={() => requestSort('tanggal')}>
+                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-center w-16">No</th>
+                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-left cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => requestSort('tanggal')}>
                                 <div className="flex items-center gap-1.5">
                                     Tanggal <SortIcon direction={sortConfig.key === 'tanggal' ? sortConfig.direction : undefined} />
                                 </div>
                             </th>
-                            <th className="px-4 py-3 text-left font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors border border-gray-200" onClick={() => requestSort('jenis')}>
+                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-left cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => requestSort('jenis')}>
                                 <div className="flex items-center gap-1.5">
                                     Jenis <SortIcon direction={sortConfig.key === 'jenis' ? sortConfig.direction : undefined} />
                                 </div>
                             </th>
-                            <th className="px-4 py-3 text-left font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors border border-gray-200" onClick={() => requestSort('namaBahan')}>
+                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-left cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => requestSort('namaBahan')}>
                                 <div className="flex items-center gap-1.5">
                                     Nama Bahan <SortIcon direction={sortConfig.key === 'namaBahan' ? sortConfig.direction : undefined} />
                                 </div>
                             </th>
-                            <th className="px-4 py-3 text-right font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors border border-gray-200" onClick={() => requestSort('kuantum')}>
+                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-right cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => requestSort('kuantum')}>
                                 <div className="flex items-center justify-end gap-1.5">
                                     Kuantum <SortIcon direction={sortConfig.key === 'kuantum' ? sortConfig.direction : undefined} />
                                 </div>
                             </th>
-                            <th className="px-4 py-3 text-center font-semibold text-gray-700 border border-gray-200">Dokumen</th>
-                            <th className="px-4 py-3 text-left font-semibold text-gray-700 border border-gray-200">Keterangan</th>
-                            <th className="px-4 py-3 text-center font-semibold text-gray-700 w-24 border border-gray-200">Aksi</th>
+                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-center">Dokumen</th>
+                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-left">Keterangan</th>
+                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-center w-24">Aksi</th>
                         </tr>
                     </thead>
                     <tbody className="bg-white">
                         {sortedData.length === 0 ? (
                             <tr>
-                                <td colSpan={8} className="px-4 py-12 text-center text-gray-400 border border-gray-200">
+                                <td colSpan={8} className="p-12 text-center text-gray-400 text-sm border border-gray-200">
                                     Tidak ada data ditemukan.
                                 </td>
                             </tr>
                         ) : (
                             sortedData.map((row) => (
                                 <tr key={row.id} className="hover:bg-emerald-50/10 transition-colors">
-                                    <td className="px-4 py-3 text-emerald-600 font-medium border border-gray-200">{row.no}</td>
+                                    <td className="px-4 py-3 text-gray-700 font-medium text-center border border-gray-200">{row.no}</td>
                                     <td className="px-4 py-3 text-gray-700 border border-gray-200">{format(new Date(row.tanggal), 'dd/MM/yyyy')}</td>
                                     <td className="px-4 py-3 border border-gray-200">
                                         <span className={cn(
-                                            "inline-flex px-2 py-0.5 text-xs font-medium rounded-full border",
+                                            "inline-flex px-2 py-0.5 text-[11px] font-medium rounded-full border",
                                             row.jenis === 'Bahan Baku'
                                                 ? "bg-blue-50 text-blue-700 border-blue-100"
                                                 : "bg-emerald-50 text-emerald-700 border-emerald-100"
@@ -781,7 +833,7 @@ function SuplaiTable({ data, search, onDelete, onEdit }: { data: SuplaiRow[]; se
                                     </td>
                                     <td className="px-4 py-3 text-gray-800 font-medium border border-gray-200">{row.namaBahan || '-'}</td>
                                     <td className="px-4 py-3 text-right font-mono text-gray-700 border border-gray-200">
-                                        {fmtInteger(row.kuantum)} <span className="text-gray-400 text-xs ml-0.5">{row.satuan}</span>
+                                        {fmtInteger(row.kuantum)} <span className="text-gray-400 text-[11px] ml-0.5">{row.satuan}</span>
                                     </td>
                                     <td className="px-4 py-3 text-center border border-gray-200">
                                         {row.dokumen ? (
@@ -795,18 +847,10 @@ function SuplaiTable({ data, search, onDelete, onEdit }: { data: SuplaiRow[]; se
                                     <td className="px-4 py-3 text-gray-600 max-w-xs truncate border border-gray-200">{row.keterangan || '-'}</td>
                                     <td className="px-4 py-3 text-center border border-gray-200">
                                         <div className="flex items-center justify-center gap-1">
-                                            <button
-                                                onClick={() => onEdit(row)}
-                                                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
-                                                title="Edit Data"
-                                            >
+                                            <button onClick={() => onEdit(row)} className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors" title="Edit">
                                                 <PencilIcon size={14} />
                                             </button>
-                                            <button
-                                                onClick={() => onDelete(row.id)}
-                                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                                                title="Hapus Data"
-                                            >
+                                            <button onClick={() => onDelete(row.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors" title="Hapus">
                                                 <TrashIcon size={14} />
                                             </button>
                                         </div>
@@ -896,47 +940,47 @@ function MutasiTable({ data, search, onEdit, onDelete }: { data: MutasiRow[]; se
                 <table className="w-full text-sm border-collapse border border-gray-200">
                     <thead>
                         <tr className="bg-gray-50/80">
-                            <th className="px-4 py-3 text-left font-semibold text-gray-700 w-16 border border-gray-200">No.</th>
-                            <th className="px-4 py-3 text-left font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors border border-gray-200" onClick={() => requestSort('tanggal')}>
+                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-center w-16">No</th>
+                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-left cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => requestSort('tanggal')}>
                                 <div className="flex items-center gap-1.5">
                                     Tanggal <SortIcon direction={sortConfig.key === 'tanggal' ? sortConfig.direction : undefined} />
                                 </div>
                             </th>
-                            <th className="px-4 py-3 text-left font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors border border-gray-200" onClick={() => requestSort('jenis')}>
+                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-left cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => requestSort('jenis')}>
                                 <div className="flex items-center gap-1.5">
                                     Jenis <SortIcon direction={sortConfig.key === 'jenis' ? sortConfig.direction : undefined} />
                                 </div>
                             </th>
-                            <th className="px-4 py-3 text-left font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors border border-gray-200" onClick={() => requestSort('namaBahan')}>
+                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-left cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => requestSort('namaBahan')}>
                                 <div className="flex items-center gap-1.5">
                                     Nama Bahan <SortIcon direction={sortConfig.key === 'namaBahan' ? sortConfig.direction : undefined} />
                                 </div>
                             </th>
-                            <th className="px-4 py-3 text-right font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors border border-gray-200" onClick={() => requestSort('kuantum')}>
+                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-right cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => requestSort('kuantum')}>
                                 <div className="flex items-center justify-end gap-1.5">
                                     Kuantum <SortIcon direction={sortConfig.key === 'kuantum' ? sortConfig.direction : undefined} />
                                 </div>
                             </th>
-                            <th className="px-4 py-3 text-center font-semibold text-gray-700 border border-gray-200">Dokumen</th>
-                            <th className="px-4 py-3 text-left font-semibold text-gray-700 border border-gray-200">Keterangan</th>
-                            <th className="px-4 py-3 text-center font-semibold text-gray-700 w-24 border border-gray-200">Aksi</th>
+                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-center">Dokumen</th>
+                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-left">Keterangan</th>
+                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-center w-24">Aksi</th>
                         </tr>
                     </thead>
                     <tbody className="bg-white">
                         {sortedData.length === 0 ? (
                             <tr>
-                                <td colSpan={8} className="px-4 py-12 text-center text-gray-400 border border-gray-200">
+                                <td colSpan={8} className="p-12 text-center text-gray-400 text-sm border border-gray-200">
                                     Tidak ada data ditemukan.
                                 </td>
                             </tr>
                         ) : (
                             sortedData.map((row) => (
                                 <tr key={row.id} className="hover:bg-emerald-50/10 transition-colors">
-                                    <td className="px-4 py-3 text-emerald-600 font-medium border border-gray-200">{row.no}</td>
+                                    <td className="px-4 py-3 text-gray-700 font-medium text-center border border-gray-200">{row.no}</td>
                                     <td className="px-4 py-3 text-gray-700 border border-gray-200">{row.tanggal}</td>
                                     <td className="px-4 py-3 border border-gray-200">
                                         <span className={cn(
-                                            "inline-flex px-2 py-0.5 text-xs font-medium rounded-full border",
+                                            "inline-flex px-2 py-0.5 text-[11px] font-medium rounded-full border",
                                             row.jenis === 'Bahan Baku'
                                                 ? "bg-blue-50 text-blue-700 border-blue-100"
                                                 : "bg-emerald-50 text-emerald-700 border-emerald-100"
@@ -946,7 +990,7 @@ function MutasiTable({ data, search, onEdit, onDelete }: { data: MutasiRow[]; se
                                     </td>
                                     <td className="px-4 py-3 text-gray-800 font-medium border border-gray-200">{row.namaBahan || '-'}</td>
                                     <td className="px-4 py-3 text-right font-mono text-gray-700 border border-gray-200">
-                                        {fmtInteger(row.kuantum)} <span className="text-gray-400 text-xs ml-0.5">{row.satuan}</span>
+                                        {fmtInteger(row.kuantum)} <span className="text-gray-400 text-[11px] ml-0.5">{row.satuan}</span>
                                     </td>
                                     <td className="px-4 py-3 text-center border border-gray-200">
                                         {row.dokumen ? (
@@ -960,18 +1004,10 @@ function MutasiTable({ data, search, onEdit, onDelete }: { data: MutasiRow[]; se
                                     <td className="px-4 py-3 text-gray-600 max-w-xs truncate border border-gray-200">{row.keterangan || '-'}</td>
                                     <td className="px-4 py-3 text-center border border-gray-200">
                                         <div className="flex items-center justify-center gap-1">
-                                            <button
-                                                onClick={() => onEdit(row)}
-                                                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
-                                                title="Edit Data"
-                                            >
+                                            <button onClick={() => onEdit(row)} className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors" title="Edit">
                                                 <PencilIcon size={14} />
                                             </button>
-                                            <button
-                                                onClick={() => onDelete(row.id)}
-                                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                                                title="Hapus Data"
-                                            >
+                                            <button onClick={() => onDelete(row.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors" title="Hapus">
                                                 <TrashIcon size={14} />
                                             </button>
                                         </div>
@@ -1171,23 +1207,20 @@ function BalanceStokTable({ data, productSlug, search, bulan, tahun }: BalanceSt
         const unitFamily = getUnitFamily(row.satuan);
 
         return (
-            <tr key={`${row.jenis}-${row.nama}`} className={cn(
-                'group transition-colors hover:bg-emerald-50/10',
-                isLast && 'border-b-0'
-            )}>
-                <td className="px-5 py-3.5 text-gray-700 text-xs font-medium border border-gray-200">{idx + 1}</td>
-                <td className="px-5 py-3.5 border border-gray-200">
+            <tr key={`${row.jenis}-${row.nama}`} className="hover:bg-emerald-50/10 transition-colors group">
+                <td className="px-4 py-3 text-emerald-600 font-medium text-center border border-gray-200">{idx + 1}</td>
+                <td className="px-4 py-3 border border-gray-200">
                     <div className="flex items-center gap-2.5">
                         <div className={cn(
                             'w-2 h-2 rounded-full shrink-0',
                             row.jenis === 'Baku' ? 'bg-emerald-500' : 'bg-amber-500'
                         )} />
-                        <span className="text-sm font-medium text-gray-800">{row.nama}</span>
+                        <span className="text-gray-800 font-medium">{row.nama}</span>
                     </div>
                 </td>
-                <td className="px-5 py-3.5 border border-gray-200">
+                <td className="px-4 py-3 border border-gray-200">
                     <span className={cn(
-                        'inline-flex px-2.5 py-0.5 text-[11px] font-semibold rounded-full border',
+                        'inline-flex px-2 py-0.5 text-[11px] font-medium rounded-full border',
                         row.jenis === 'Baku'
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
                             : 'bg-amber-50 text-amber-700 border-amber-100'
@@ -1195,12 +1228,12 @@ function BalanceStokTable({ data, productSlug, search, bulan, tahun }: BalanceSt
                         {row.jenis === 'Baku' ? 'Bahan Baku' : 'Bahan Penolong'}
                     </span>
                 </td>
-                <td className="px-5 py-3.5 text-center border border-gray-200">
+                <td className="px-4 py-3 text-center border border-gray-200">
                     {unitFamily.length > 1 ? (
                         <select
                             value={converted.satuan}
                             onChange={(e) => handleSatuanChange(row.nama, e.target.value)}
-                            className="bg-gray-50 border border-gray-200 text-xs font-semibold text-gray-700 rounded-md px-2 py-1 cursor-pointer hover:border-emerald-300 focus:outline-none focus:ring-1 focus:ring-emerald-400 transition-all appearance-none text-center"
+                            className="bg-gray-50 border border-gray-200 text-sm font-medium text-gray-700 rounded-lg px-2 py-1 cursor-pointer hover:border-emerald-300 focus:outline-none focus:ring-1 focus:ring-emerald-400 transition-all appearance-none text-center"
                             style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 4px center', paddingRight: '18px' }}
                         >
                             {unitFamily.map(u => (
@@ -1208,45 +1241,45 @@ function BalanceStokTable({ data, productSlug, search, bulan, tahun }: BalanceSt
                             ))}
                         </select>
                     ) : (
-                        <span className="text-xs text-gray-500 font-medium">{converted.satuan}</span>
+                        <span className="text-sm text-gray-500">{converted.satuan}</span>
                     )}
                 </td>
-                <td className="px-5 py-3.5 text-center border border-gray-200">
+                <td className="px-4 py-3 text-center border border-gray-200">
                     {converted.totalIn > 0 ? (
                         <button
                             onClick={() => openHistory(row.nama, 'Suplai')}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-100 hover:border-blue-200 transition-all cursor-pointer group/in"
+                            className="inline-flex items-center gap-1 px-3 py-1 rounded-md text-sm font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-100 hover:border-blue-200 transition-all cursor-pointer group/in"
                         >
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500"><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /></svg>
-                            {fmtNumber(converted.totalIn)} <span className="text-[10px] font-normal text-blue-600/70">{converted.satuan}</span>
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="opacity-0 group-hover/in:opacity-100 transition-opacity text-blue-400"><polyline points="9 18 15 12 9 6" /></svg>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500"><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /></svg>
+                            {fmtNumber(converted.totalIn)} <span className="text-[11px] font-normal text-blue-600/70">{converted.satuan}</span>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="opacity-0 group-hover/in:opacity-100 transition-opacity text-blue-400"><polyline points="9 18 15 12 9 6" /></svg>
                         </button>
                     ) : (
-                        <span className="text-xs text-gray-300 font-mono">—</span>
+                        <span className="text-sm text-gray-300 font-mono">—</span>
                     )}
                 </td>
-                <td className="px-5 py-3.5 text-center border border-gray-200">
+                <td className="px-4 py-3 text-center border border-gray-200">
                     {converted.totalOut > 0 ? (
                         <button
                             onClick={() => openHistory(row.nama, 'Mutasi')}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-100 hover:border-orange-200 transition-all cursor-pointer group/out"
+                            className="inline-flex items-center gap-1 px-3 py-1 rounded-md text-sm font-semibold text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-100 hover:border-orange-200 transition-all cursor-pointer group/out"
                         >
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-orange-500"><polyline points="7 1 3 5 7 9" /><path d="M21 11V9a4 4 0 0 0-4-4H3" /></svg>
-                            {fmtNumber(converted.totalOut)} <span className="text-[10px] font-normal text-orange-600/70">{converted.satuan}</span>
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="opacity-0 group-hover/out:opacity-100 transition-opacity text-orange-400"><polyline points="9 18 15 12 9 6" /></svg>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-orange-500"><polyline points="7 1 3 5 7 9" /><path d="M21 11V9a4 4 0 0 0-4-4H3" /></svg>
+                            {fmtNumber(converted.totalOut)} <span className="text-[11px] font-normal text-orange-600/70">{converted.satuan}</span>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="opacity-0 group-hover/out:opacity-100 transition-opacity text-orange-400"><polyline points="9 18 15 12 9 6" /></svg>
                         </button>
                     ) : (
-                        <span className="text-xs text-gray-300 font-mono">—</span>
+                        <span className="text-sm text-gray-300 font-mono">—</span>
                     )}
                 </td>
-                <td className="px-5 py-3.5 text-center border border-gray-200">
+                <td className="px-4 py-3 text-center border border-gray-200">
                     <span className={cn(
-                        'inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-bold',
-                        converted.stok > 0 ? 'bg-emerald-50 text-emerald-700' :
-                            converted.stok < 0 ? 'bg-red-50 text-red-600' :
-                                'bg-gray-50 text-gray-400'
+                        'inline-flex items-center gap-1 px-3 py-1 rounded-lg text-sm font-bold',
+                        converted.stok > 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                            converted.stok < 0 ? 'bg-red-50 text-red-600 border border-red-100' :
+                                'bg-gray-50 text-gray-400 border border-gray-100'
                     )}>
-                        {fmtNumber(converted.stok)} <span className="text-[10px] font-normal opacity-70">{converted.satuan}</span>
+                        {fmtNumber(converted.stok)} <span className="text-xs font-normal opacity-70">{converted.satuan}</span>
                     </span>
                 </td>
             </tr>
@@ -1277,29 +1310,29 @@ function BalanceStokTable({ data, productSlug, search, bulan, tahun }: BalanceSt
                 <table className="w-full text-sm border-collapse border border-gray-200">
                     <thead>
                         <tr className="bg-gray-50/80">
-                            <th className="px-5 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-12 border border-gray-200">No.</th>
-                            <th className="px-5 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200">Nama Bahan</th>
-                            <th className="px-5 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200">Jenis</th>
-                            <th className="px-5 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider w-24 border border-gray-200">Satuan</th>
-                            <th className="px-5 py-3 text-center text-xs font-semibold text-blue-600 uppercase tracking-wider border border-gray-200">
+                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-center w-12">No</th>
+                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-left">Nama Bahan</th>
+                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-left">Jenis</th>
+                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-center w-24">Satuan</th>
+                            <th className="px-4 py-3 text-xs font-semibold text-blue-700 uppercase tracking-wider border border-gray-200 text-center">
                                 <div className="flex items-center justify-center gap-1">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-blue-500"><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /></svg>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-blue-600"><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /></svg>
                                     In (Masuk)
                                 </div>
                             </th>
-                            <th className="px-5 py-3 text-center text-xs font-semibold text-orange-600 uppercase tracking-wider border border-gray-200">
+                            <th className="px-4 py-3 text-xs font-semibold text-orange-700 uppercase tracking-wider border border-gray-200 text-center">
                                 <div className="flex items-center justify-center gap-1">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-orange-500"><polyline points="7 1 3 5 7 9" /><path d="M21 11V9a4 4 0 0 0-4-4H3" /></svg>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-orange-600"><polyline points="7 1 3 5 7 9" /><path d="M21 11V9a4 4 0 0 0-4-4H3" /></svg>
                                     Out (Keluar)
                                 </div>
                             </th>
-                            <th className="px-5 py-3 text-center text-xs font-semibold text-emerald-600 uppercase tracking-wider border border-gray-200">Stok Akhir</th>
+                            <th className="px-4 py-3 text-xs font-semibold text-emerald-700 uppercase tracking-wider border border-gray-200 text-center">Stok Akhir</th>
                         </tr>
                     </thead>
                     <tbody className="bg-white">
                         {filteredData.length === 0 ? (
                             <tr>
-                                <td colSpan={7} className="px-5 py-8 text-center text-gray-500 border border-gray-200">
+                                <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
                                     Tidak ada data yang cocok dengan filter atau pencarian.
                                 </td>
                             </tr>
@@ -1369,34 +1402,34 @@ function BalanceStokTable({ data, productSlug, search, bulan, tahun }: BalanceSt
                                         <p className="text-sm">Tidak ada data riwayat.</p>
                                     </div>
                                 ) : (
-                                    <table className="w-full text-sm">
-                                        <thead className="sticky top-0 bg-white">
-                                            <tr className="border-b border-gray-100">
-                                                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 w-10">No.</th>
-                                                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500">Tanggal</th>
-                                                <th className="px-5 py-3 text-right text-xs font-semibold text-gray-500">Kuantum</th>
-                                                <th className="px-5 py-3 text-center text-xs font-semibold text-gray-500">Satuan</th>
-                                                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500">Dokumen</th>
-                                                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500">Keterangan</th>
+                                    <table className="w-full text-sm border-collapse border border-gray-200">
+                                        <thead className="sticky top-0 bg-white z-10">
+                                            <tr className="bg-gray-50/80">
+                                                <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-center w-10">No</th>
+                                                <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-left">Tanggal</th>
+                                                <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-right">Kuantum</th>
+                                                <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-center">Satuan</th>
+                                                <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-left">Dokumen</th>
+                                                <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-left">Keterangan</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-gray-50">
+                                        <tbody className="bg-white">
                                             {historyData.map((item, idx) => (
-                                                <tr key={item.id} className="hover:bg-gray-50/50 transition-colors border-t border-gray-100">
-                                                    <td className="px-5 py-3 text-xs text-gray-400 border border-gray-200">{idx + 1}</td>
-                                                    <td className="px-5 py-3 text-sm text-gray-700 border border-gray-200">{format(new Date(item.tanggal), 'dd/MM/yyyy')}</td>
-                                                    <td className="px-5 py-3 text-right font-mono text-sm font-medium text-gray-800 border border-gray-200">{fmtNumber(item.kuantum)}</td>
-                                                    <td className="px-5 py-3 text-center text-xs text-gray-500 border border-gray-200">{item.satuan || 'Kg'}</td>
-                                                    <td className="px-5 py-3 text-sm text-gray-600 border border-gray-200">{item.dokumen || '—'}</td>
-                                                    <td className="px-5 py-3 text-sm text-gray-500 max-w-[200px] truncate border border-gray-200">{item.keterangan || '—'}</td>
+                                                <tr key={item.id} className="hover:bg-emerald-50/10 transition-colors group">
+                                                    <td className="px-4 py-3 text-gray-700 text-center font-medium border border-gray-200">{idx + 1}</td>
+                                                    <td className="px-4 py-3 text-gray-700 border border-gray-200">{format(new Date(item.tanggal), 'dd/MM/yyyy')}</td>
+                                                    <td className="px-4 py-3 text-right font-mono text-gray-700 border border-gray-200">{fmtNumber(item.kuantum)}</td>
+                                                    <td className="px-4 py-3 text-center text-[11px] text-gray-500 border border-gray-200">{item.satuan || 'Kg'}</td>
+                                                    <td className="px-4 py-3 text-gray-700 border border-gray-200">{item.dokumen || '—'}</td>
+                                                    <td className="px-4 py-3 text-gray-600 max-w-xs truncate border border-gray-200">{item.keterangan || '—'}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
-                                        <tfoot>
-                                            <tr className="bg-gray-50 border-t border-gray-200">
-                                                <td colSpan={2} className="px-5 py-3 text-right text-xs font-bold text-gray-600">Total</td>
-                                                <td className="px-5 py-3 text-right font-mono text-sm font-bold text-gray-800">{fmtNumber(historyData.reduce((s, i) => s + i.kuantum, 0))}</td>
-                                                <td colSpan={3}></td>
+                                        <tfoot className="bg-gray-50/80">
+                                            <tr>
+                                                <td colSpan={2} className="px-4 py-3 text-right text-xs font-bold text-gray-700 border border-gray-200 uppercase tracking-wider">Total</td>
+                                                <td className="px-4 py-3 text-right font-mono font-bold text-gray-800 border border-gray-200">{fmtNumber(historyData.reduce((s, i) => s + i.kuantum, 0))}</td>
+                                                <td colSpan={3} className="border border-gray-200"></td>
                                             </tr>
                                         </tfoot>
                                     </table>

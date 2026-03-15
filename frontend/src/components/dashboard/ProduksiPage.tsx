@@ -576,28 +576,28 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                     <div className="p-12 text-center text-gray-400 text-lg">Memuat data...</div>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="w-full text-base">
+                        <table className="w-full text-sm border-collapse border border-gray-200">
                             <thead>
                                 {/* Row 1: Group headers */}
-                                <tr className="bg-gray-50 border-b border-gray-200">
-                                    <th rowSpan={2} className="px-4 py-4 font-semibold text-gray-600 sticky left-0 bg-gray-50 z-10 text-left w-32">Tanggal</th>
-                                    <th colSpan={3} className="px-4 py-3 font-semibold text-gray-700 text-center border-b border-gray-200 bg-emerald-50/50">Produksi</th>
-                                    <th rowSpan={2} className="px-4 py-4 font-semibold text-gray-600 text-right w-32 bg-blue-50/30">Kumulatif Produksi</th>
-                                    <th rowSpan={2} className="px-4 py-4 font-semibold text-gray-600 text-center w-32 bg-amber-50/30">Pengiriman Gudang</th>
-                                    <th rowSpan={2} className="px-4 py-4 font-semibold text-gray-600 text-right w-28">Stok Akhir</th>
-                                    <th rowSpan={2} className="px-4 py-4 font-semibold text-gray-600 w-44">Keterangan</th>
-                                    <th rowSpan={2} className="px-4 py-4 font-semibold text-gray-600 w-20 text-center">Aksi</th>
+                                <tr className="bg-gray-50/80">
+                                    <th rowSpan={2} className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 sticky left-0 bg-gray-50/80 z-10 text-left w-32">Tanggal</th>
+                                    <th colSpan={3} className="px-4 py-3 font-semibold text-gray-700 text-center border border-gray-200 bg-gray-50/80">Produksi</th>
+                                    <th rowSpan={2} className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-right w-32">Kumulatif Produksi</th>
+                                    <th rowSpan={2} className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-center w-32">Pengiriman Gudang</th>
+                                    <th rowSpan={2} className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-right w-28">Stok Akhir</th>
+                                    <th rowSpan={2} className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-left w-44">Keterangan</th>
+                                    <th rowSpan={2} className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-center w-20">Aksi</th>
                                 </tr>
                                 {/* Row 2: Sub-headers under Produksi */}
-                                <tr className="bg-gray-50 border-b border-gray-200">
-                                    <th className="px-3 py-2.5 font-medium text-gray-500 text-center text-xs uppercase tracking-wider bg-emerald-50/50 w-28">Belum Sampling</th>
-                                    <th className="px-3 py-2.5 font-medium text-gray-500 text-center text-xs uppercase tracking-wider bg-emerald-50/50 w-28">Proses Sampling</th>
-                                    <th className="px-3 py-2.5 font-medium text-gray-500 text-center text-xs uppercase tracking-wider bg-emerald-50/50 w-20">COA</th>
+                                <tr className="bg-gray-50/80">
+                                    <th className="px-3 py-2.5 font-medium text-gray-600 text-center text-[11px] uppercase tracking-wider border border-gray-200 w-28">Belum Sampling</th>
+                                    <th className="px-3 py-2.5 font-medium text-gray-600 text-center text-[11px] uppercase tracking-wider border border-gray-200 w-28">Proses Sampling</th>
+                                    <th className="px-3 py-2.5 font-medium text-gray-600 text-center text-[11px] uppercase tracking-wider border border-gray-200 w-20">COA</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100">
+                            <tbody className="bg-white">
                                 {filtered.length === 0 ? (
-                                    <tr><td colSpan={9} className="p-12 text-center text-gray-400 text-lg">Tidak ada data.</td></tr>
+                                    <tr><td colSpan={9} className="p-12 text-center text-gray-400 text-sm border border-gray-200">Tidak ada data.</td></tr>
                                 ) : (
                                     filtered.map(row => {
                                         const highlight = isToday(row.tanggal);
@@ -615,19 +615,19 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                         const bsDisplay = Math.max(0, bs - coa);
 
                                         return (
-                                            <tr key={row.tanggal} className={`${highlight ? 'bg-amber-50/50' : 'hover:bg-gray-50/50'} transition-colors`}>
+                                            <tr key={row.tanggal} className={`${highlight ? 'bg-amber-50/50' : 'hover:bg-emerald-50/10'} transition-colors`}>
                                                 {/* Tanggal */}
-                                                <td className={`px-4 py-3 font-medium sticky left-0 z-10 ${highlight ? 'text-amber-700 bg-amber-50/90' : 'text-gray-700 bg-white'}`}>
+                                                <td className={`px-4 py-3 font-medium sticky left-0 z-10 border border-gray-200 ${highlight ? 'text-amber-700 bg-amber-50/90' : 'text-gray-700 bg-white'}`}>
                                                     {formatDateShort(row.tanggal)}
                                                 </td>
 
                                                 {/* ── Produksi Group ── */}
                                                 {/* Belum Sampling: clickable cell → opens modal */}
-                                                <td className="p-1">
+                                                <td className="p-1 border border-gray-200">
                                                     <div className="flex items-center gap-0.5">
                                                         <button
                                                             onClick={() => setBsModal({ isOpen: true, tanggal: row.tanggal, currentBs: bs })}
-                                                            className={`flex-1 h-10 px-3 text-right font-mono text-base rounded-lg transition-all outline-none cursor-pointer
+                                                            className={`flex-1 h-9 px-3 text-right font-mono text-sm rounded-lg transition-all outline-none cursor-pointer
                                                                 ${bsDisplay > 0
                                                                     ? 'text-emerald-700 font-semibold bg-emerald-50/50 hover:bg-emerald-100 border border-emerald-200 hover:border-emerald-300'
                                                                     : 'text-gray-400 bg-transparent hover:bg-gray-50 border border-transparent hover:border-gray-200'}`}
@@ -650,7 +650,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                                 </td>
 
                                                 {/* Proses Sampling: clickable button */}
-                                                <td className="p-1">
+                                                <td className="p-1 border border-gray-200">
                                                     <button
                                                         onClick={() => {
                                                             setPsModal({ isOpen: true, tanggal: row.tanggal });
@@ -658,7 +658,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                                             setPsBatchKode(row.psBatchKode || '');
                                                             setPsError(null);
                                                         }}
-                                                        className={`w-full h-10 px-3 text-right font-mono text-base rounded-lg transition-all outline-none cursor-pointer
+                                                        className={`w-full h-9 px-3 text-right font-mono text-sm rounded-lg transition-all outline-none cursor-pointer
                                                             ${psDisplay > 0
                                                                 ? 'text-amber-700 font-semibold bg-amber-50/50 hover:bg-amber-100 border border-amber-200 hover:border-amber-300'
                                                                 : 'text-gray-400 bg-transparent hover:bg-gray-50 border border-transparent hover:border-gray-200'}`}
@@ -669,7 +669,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                                 </td>
 
                                                 {/* COA: clickable button */}
-                                                <td className="p-1">
+                                                <td className="p-1 border border-gray-200">
                                                     <button
                                                         onClick={() => {
                                                             setCoaModal({ isOpen: true, tanggal: row.tanggal });
@@ -677,7 +677,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                                             setCoaBatchKode(row.coaBatchKode || '');
                                                             setCoaError(null);
                                                         }}
-                                                        className={`w-full h-10 px-3 text-right font-mono text-base rounded-lg transition-all outline-none cursor-pointer
+                                                        className={`w-full h-9 px-3 text-right font-mono text-sm rounded-lg transition-all outline-none cursor-pointer
                                                             ${coa > 0
                                                                 ? 'text-blue-700 font-semibold bg-blue-50/50 hover:bg-blue-100 border border-blue-200 hover:border-blue-300'
                                                                 : 'text-gray-400 bg-transparent hover:bg-gray-50 border border-transparent hover:border-gray-200'}`}
@@ -688,24 +688,24 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                                 </td>
 
                                                 {/* Kumulatif Produksi (computed - read only) */}
-                                                <td className="px-4 py-3 text-right font-mono text-gray-700 tabular-nums bg-blue-50/10">
+                                                <td className="px-4 py-3 text-right font-mono text-gray-700 tabular-nums border border-gray-200">
                                                     {fmt(row.kumulatif)}
                                                     {dirty && <span className="text-xs text-amber-500 block">*</span>}
                                                 </td>
 
                                                 {/* Pengiriman Gudang (editable) */}
-                                                <td className="p-1">
+                                                <td className="p-1 border border-gray-200">
                                                     <InputCell value={pg} onChange={v => handleInputChange(row.tanggal, 'pg', v)} />
                                                 </td>
 
                                                 {/* Stok Akhir (computed - read only) */}
-                                                <td className="px-4 py-3 text-right font-mono font-semibold text-emerald-700 tabular-nums bg-emerald-50/10">
+                                                <td className="px-4 py-3 text-right font-mono font-semibold text-emerald-700 tabular-nums border border-gray-200">
                                                     {fmt(row.stokAkhir)}
                                                     {dirty && <span className="text-xs text-amber-500 block">*</span>}
                                                 </td>
 
                                                 {/* Keterangan */}
-                                                <td className="p-1">
+                                                <td className="p-1 border border-gray-200">
                                                     <input
                                                         type="text"
                                                         value={getTextValue(row, 'keterangan')}
@@ -716,7 +716,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                                 </td>
 
                                                 {/* Actions */}
-                                                <td className="px-4 py-3 text-center">
+                                                <td className="px-4 py-3 text-center border border-gray-200">
                                                     {dirty && (
                                                         <div className="flex items-center justify-center gap-2">
                                                             <button onClick={() => setConfirmModal({ isOpen: true, rowDate: row.tanggal })} className="p-1.5 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 transition-colors shadow-sm" title="Simpan"><CheckIcon /></button>
