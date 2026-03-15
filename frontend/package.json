@@ -58,5 +58,11 @@
     "tailwindcss": "^4.1.18",
     "typescript": "^5",
     "wrangler": "^4.73.0"
+  },
+  "pnpm": {
+    "ignoredBuiltDependencies": [
+      "sharp",
+      "unrs-resolver"
+    ]
   }
 }
