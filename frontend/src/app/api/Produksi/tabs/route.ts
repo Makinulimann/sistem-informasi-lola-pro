@@ -1,5 +1,9 @@
+export const dynamic = 'force-dynamic';
+// Using Node.js runtime for Prisma compatibility
+// Edge runtime now supported with Supabase!
+export const runtime = 'edge';
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { db } from '@/lib/supabase';
 
 export async function GET(request: Request) {
     try {
@@ -10,13 +14,14 @@ export async function GET(request: Request) {
             return NextResponse.json({ message: 'productSlug is required.' }, { status: 400 });
         }
 
-        const tabs = await prisma.produksiTabs.findMany({
-            where: { ProductSlug: productSlug },
-            orderBy: { Order: 'asc' },
-            select: { Id: true, Nama: true, Order: true }
-        });
+        const { data: tabs, error } = await db.from<any>('produksi_tabs').select('*').eq('product_slug', productSlug).execute();
 
-        return NextResponse.json(tabs);
+        if (error) {
+            console.error('Error fetching tabs:', error);
+            return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
+        }
+
+        return NextResponse.json(tabs || []);
     } catch (error) {
         console.error('Error fetching tabs:', error);
         return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
@@ -34,22 +39,25 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'ProductSlug dan Nama wajib diisi.' }, { status: 400 });
         }
 
-        const aggregate = await prisma.produksiTabs.aggregate({
-            where: { ProductSlug: productSlug },
-            _max: { Order: true }
-        });
+        // Get max order
+        const { data: existing } = await db.from<any>('produksi_tabs').select('order').eq('product_slug', productSlug).order('order', { ascending: false }).execute();
+        
+        const maxOrder = existing && existing.length > 0 ? existing[0].order : 0;
 
-        const maxOrder = aggregate._max.Order || 0;
+        const insertData = {
+            product_slug: productSlug,
+            nama: nama,
+            order: maxOrder + 1
+        };
 
-        const tab = await prisma.produksiTabs.create({
-            data: {
-                ProductSlug: productSlug,
-                Nama: nama.trim(),
-                Order: maxOrder + 1
-            }
-        });
+        const { data: tab, error } = await db.from<any>('produksi_tabs').insert(insertData);
 
-        return NextResponse.json({ Id: tab.Id, Nama: tab.Nama, Order: tab.Order });
+        if (error) {
+            console.error('Error creating tab:', error);
+            return NextResponse.json({ message: 'Failed to create tab' }, { status: 500 });
+        }
+
+        return NextResponse.json({ Id: tab?.id, Nama: tab?.nama, Order: tab?.order });
     } catch (error) {
         console.error('Error creating tab:', error);
         return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });

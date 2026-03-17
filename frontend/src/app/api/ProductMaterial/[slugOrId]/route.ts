@@ -1,5 +1,9 @@
+export const dynamic = 'force-dynamic';
+// Using Node.js runtime for Prisma compatibility
+// Edge runtime now supported with Supabase!
+export const runtime = 'edge';
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { db } from '@/lib/supabase';
 
 // GET /{productSlug}
 export async function GET(
@@ -11,27 +15,33 @@ export async function GET(
         const { searchParams } = new URL(request.url);
         const jenis = searchParams.get('jenis');
 
-        const whereClause: any = { ProductSlug: p.slugOrId };
+        // Fetch all product_materials and filter
+        const { data: allMaterials } = await db.from<any>('product_materials').select('*').execute();
+        const { data: allMasterItems } = await db.from<any>('master_items').select('*').execute();
+
+        // Create master items lookup
+        const masterItemsMap = new Map();
+        (allMasterItems || []).forEach((m: any) => masterItemsMap.set(m.id || m.Id, m));
+
+        // Filter by productSlug and optionally by jenis
+        let filtered = (allMaterials || []).filter((pm: any) => (pm.product_slug || pm.ProductSlug) === p.slugOrId);
         if (jenis) {
-            whereClause.Jenis = jenis;
+            filtered = filtered.filter((pm: any) => (pm.jenis || pm.Jenis) === jenis);
         }
 
-        const materials = await prisma.productMaterials.findMany({
-            where: whereClause,
-            include: {
-                MasterItems: true
-            }
-        });
-
-        const formatted = materials
-            .sort((a, b) => a.MasterItems.Nama.localeCompare(b.MasterItems.Nama))
-            .map(pm => ({
-                Id: pm.Id,
-                MasterItemId: pm.MasterItemId,
-                Nama: pm.MasterItems.Nama,
-                Jenis: pm.Jenis,
-                Satuan: pm.MasterItems.SatuanDefault
-            }));
+        // Sort by MasterItems.Nama and format
+        const formatted = filtered
+            .map((pm: any) => {
+                const masterItem = masterItemsMap.get(pm.master_item_id || pm.MasterItemId);
+                return {
+                    Id: pm.id || pm.Id,
+                    MasterItemId: pm.master_item_id || pm.MasterItemId,
+                    Nama: masterItem?.nama || masterItem?.Nama || '',
+                    Jenis: pm.jenis || pm.Jenis,
+                    Satuan: masterItem?.satuan_default || masterItem?.SatuanDefault || ''
+                };
+            })
+            .sort((a: any, b: any) => a.Nama.localeCompare(b.Nama));
 
         return NextResponse.json(formatted);
     } catch (error) {
@@ -53,15 +63,16 @@ export async function DELETE(
             return NextResponse.json({ message: 'Invalid ID' }, { status: 400 });
         }
 
-        const pm = await prisma.productMaterials.findUnique({
-            where: { Id: id }
-        });
+        const { data: pm } = await db.from<any>('product_materials').select('*').eq('id', id).single();
 
         if (!pm) return NextResponse.json({ message: 'Not Found' }, { status: 404 });
 
-        await prisma.productMaterials.delete({
-            where: { Id: id }
-        });
+        const { error } = await db.from<any>('product_materials').delete().eq('id', id);
+
+        if (error) {
+            console.error('Error unassigning material:', error);
+            return NextResponse.json({ message: 'Failed to delete' }, { status: 500 });
+        }
 
         return new NextResponse(null, { status: 204 });
     } catch (error) {

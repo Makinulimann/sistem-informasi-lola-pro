@@ -1,5 +1,9 @@
+export const dynamic = 'force-dynamic';
+// Using Node.js runtime for Prisma compatibility
+// Edge runtime now supported with Supabase!
+export const runtime = 'edge';
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { db } from '@/lib/supabase';
 
 export async function GET(request: Request) {
     try {
@@ -9,59 +13,66 @@ export async function GET(request: Request) {
         const search = searchParams.get('search');
         const page = parseInt(searchParams.get('page') || '1', 10);
         const limit = parseInt(searchParams.get('limit') || '10', 10);
-        const sortBy = searchParams.get('sortBy') || 'Tanggal';
+        const sortBy = searchParams.get('sortBy') || 'tanggal';
         const sortDesc = searchParams.get('sortDesc') !== 'false';
 
-        const whereClause: any = {};
+        // Get all data (Supabase REST has limited query capabilities)
+        const { data: list, error } = await db.from<any>('maintenances').select('*').execute();
 
+        if (error) {
+            console.error('Error fetching maintenance:', error);
+            return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
+        }
+
+        let filteredData = list || [];
+
+        // Filter by date
         if (bulan || tahun) {
             const y = tahun ? parseInt(tahun, 10) : new Date().getFullYear();
             const m = bulan ? parseInt(bulan, 10) : 1;
 
-            const start = new Date(Date.UTC(y, m - 1, 1));
-            const end = new Date(Date.UTC(bulan ? y : y + 1, bulan ? m : 0, 1));
-
-            whereClause.Tanggal = { gte: start, lt: end };
+            filteredData = filteredData.filter((item: any) => {
+                const itemDate = new Date(item.tanggal);
+                return itemDate.getFullYear() === y && (!bulan || itemDate.getMonth() + 1 === m);
+            });
         }
 
+        // Filter by search
         if (search) {
             const s = search.toLowerCase();
-            whereClause.OR = [
-                { Equipment: { contains: s, mode: 'insensitive' } },
-                { Area: { contains: s, mode: 'insensitive' } },
-                { Kegiatan: { contains: s, mode: 'insensitive' } },
-                { Keterangan: { contains: s, mode: 'insensitive' } }
-            ];
+            filteredData = filteredData.filter((item: any) =>
+                (item.equipment && item.equipment.toLowerCase().includes(s)) ||
+                (item.area && item.area.toLowerCase().includes(s)) ||
+                (item.kegiatan && item.kegiatan.toLowerCase().includes(s)) ||
+                (item.keterangan && item.keterangan.toLowerCase().includes(s))
+            );
         }
 
-        const total = await prisma.maintenances.count({ where: whereClause });
-
-        let orderByClause: any = {};
-        if (sortBy) {
-            const pascalSortBy = sortBy.charAt(0).toUpperCase() + sortBy.slice(1);
-            if (pascalSortBy === 'Tanggal') {
-                orderByClause = [
-                    { Tanggal: sortDesc ? 'desc' : 'asc' },
-                    { CreatedAt: sortDesc ? 'desc' : 'asc' }
-                ];
-            } else {
-                orderByClause[pascalSortBy] = sortDesc ? 'desc' : 'asc';
-            }
-        } else {
-            orderByClause = [
-                { Tanggal: 'desc' },
-                { CreatedAt: 'desc' }
-            ];
-        }
-
-        const list = await prisma.maintenances.findMany({
-            where: whereClause,
-            orderBy: orderByClause,
-            skip: (page - 1) * limit,
-            take: limit
+        // Sort
+        const sortDir = sortDesc ? -1 : 1;
+        filteredData.sort((a: any, b: any) => {
+            const aVal = a[sortBy];
+            const bVal = b[sortBy];
+            if (aVal < bVal) return -1 * sortDir;
+            if (aVal > bVal) return 1 * sortDir;
+            return 0;
         });
 
-        return NextResponse.json({ Data: list, Total: total });
+        // Paginate
+        const total = filteredData.length;
+        const paginatedData = filteredData.slice((page - 1) * limit, page * limit).map((m: any) => ({
+            Id: m.id,
+            ProductSlug: m.product_slug,
+            Equipment: m.equipment,
+            Area: m.area,
+            Tanggal: m.tanggal,
+            Kegiatan: m.kegiatan,
+            Keterangan: m.keterangan || '-',
+            CreatedAt: m.created_at,
+            UpdatedAt: m.updated_at
+        }));
+
+        return NextResponse.json({ Data: paginatedData, Total: total });
     } catch (error) {
         console.error('Error fetching maintenance:', error);
         return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
@@ -72,17 +83,21 @@ export async function POST(request: Request) {
     try {
         const body = await request.json();
 
-        const entity = await prisma.maintenances.create({
-            data: {
-                Tanggal: new Date(body.tanggal || body.Tanggal),
-                Equipment: body.equipment || body.Equipment,
-                Area: body.area || body.Area,
-                Kegiatan: body.kegiatan || body.Kegiatan,
-                Keterangan: body.keterangan || body.Keterangan || '',
-                Dokumentasi: body.dokumentasi || body.Dokumentasi || '',
-                CreatedAt: new Date()
-            }
-        });
+        const insertData = {
+            product_slug: body.productSlug || body.ProductSlug,
+            equipment: body.equipment || body.Equipment || '',
+            area: body.area || body.Area || '',
+            tanggal: body.tanggal || body.Tanggal || new Date().toISOString(),
+            kegiatan: body.kegiatan || body.Kegiatan || '',
+            keterangan: body.keterangan || body.Keterangan || ''
+        };
+
+        const { data: entity, error } = await db.from<any>('maintenances').insert(insertData);
+
+        if (error) {
+            console.error('Error creating maintenance:', error);
+            return NextResponse.json({ message: 'Failed to create maintenance' }, { status: 500 });
+        }
 
         return NextResponse.json(entity, { status: 201 });
     } catch (error) {

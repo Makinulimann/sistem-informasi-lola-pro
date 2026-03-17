@@ -1,5 +1,9 @@
+export const dynamic = 'force-dynamic';
+// Using Node.js runtime for Prisma compatibility
+// Edge runtime now supported with Supabase!
+export const runtime = 'edge';
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { db } from '@/lib/supabase';
 
 export async function PUT(
     request: Request,
@@ -15,26 +19,27 @@ export async function PUT(
             return NextResponse.json({ message: 'Bad Request' }, { status: 400 });
         }
 
-        const existing = await prisma.sidebarMenus.findUnique({
-            where: { Id: id }
-        });
+        const { data: existing, error: fetchError } = await db.from<any>('sidebar_menus').select('*').eq('id', id).single();
 
-        if (!existing) {
+        if (fetchError || !existing) {
             return NextResponse.json({ message: 'Not Found' }, { status: 404 });
         }
 
-        const updated = await prisma.sidebarMenus.update({
-            where: { Id: id },
-            data: {
-                Label: body.label || body.Label,
-                Icon: body.icon !== undefined ? body.icon : body.Icon,
-                Href: body.href !== undefined ? body.href : body.Href,
-                ParentId: body.parentId !== undefined ? body.parentId : body.ParentId,
-                Order: body.order !== undefined ? body.order : body.Order,
-                IsActive: body.isActive ?? body.IsActive,
-                RoleAccess: body.roleAccess || body.RoleAccess,
-            }
-        });
+        const updateData: any = {};
+        if (body.label !== undefined || body.Label !== undefined) updateData.label = body.label || body.Label;
+        if (body.icon !== undefined || body.Icon !== undefined) updateData.icon = body.icon || body.Icon;
+        if (body.href !== undefined || body.Href !== undefined) updateData.href = body.href || body.Href;
+        if (body.parentId !== undefined || body.ParentId !== undefined) updateData.parent_id = body.parentId || body.ParentId;
+        if (body.order !== undefined || body.Order !== undefined) updateData.order = body.order || body.Order;
+        if (body.isActive !== undefined || body.IsActive !== undefined) updateData.is_active = body.isActive ?? body.IsActive;
+        if (body.roleAccess !== undefined || body.RoleAccess !== undefined) updateData.role_access = body.roleAccess || body.RoleAccess;
+
+        const { data: updated, error: updateError } = await db.from<any>('sidebar_menus').update(updateData).eq('id', id);
+
+        if (updateError) {
+            console.error('Error updating menu:', updateError);
+            return NextResponse.json({ message: 'Failed to update' }, { status: 500 });
+        }
 
         return NextResponse.json(updated);
     } catch (error) {
@@ -51,32 +56,36 @@ export async function DELETE(
         const p = await params;
         const id = parseInt(p.id, 10);
 
-        const existing = await prisma.sidebarMenus.findUnique({
-            where: { Id: id }
-        });
+        const { data: existing, error: fetchError } = await db.from<any>('sidebar_menus').select('*').eq('id', id).single();
 
-        if (!existing) {
+        if (fetchError || !existing) {
             return NextResponse.json({ message: 'Not Found' }, { status: 404 });
         }
 
-        // Delete grandChildren then children (Cascading manually as per .NET logic)
-        const children = await prisma.sidebarMenus.findMany({
-            where: { ParentId: id }
-        });
-
-        for (const child of children) {
-            await prisma.sidebarMenus.deleteMany({
-                where: { ParentId: child.Id }
-            });
-            await prisma.sidebarMenus.delete({
-                where: { Id: child.Id }
-            });
+        // Delete children first (Cascading manually)
+        const { data: children } = await db.from<any>('sidebar_menus').select('*').eq('parent_id', id).execute();
+        
+        if (children && children.length > 0) {
+            for (const child of children) {
+                // Delete grandchildren first
+                const { data: grandchildren } = await db.from<any>('sidebar_menus').select('*').eq('parent_id', child.id).execute();
+                if (grandchildren && grandchildren.length > 0) {
+                    for (const grandchild of grandchildren) {
+                        await db.from<any>('sidebar_menus').delete().eq('id', grandchild.id);
+                    }
+                }
+                // Delete child
+                await db.from<any>('sidebar_menus').delete().eq('id', child.id);
+            }
         }
 
         // Delete self
-        await prisma.sidebarMenus.delete({
-            where: { Id: id }
-        });
+        const { error: deleteError } = await db.from<any>('sidebar_menus').delete().eq('id', id);
+
+        if (deleteError) {
+            console.error('Error deleting menu:', deleteError);
+            return NextResponse.json({ message: 'Failed to delete' }, { status: 500 });
+        }
 
         return new NextResponse(null, { status: 204 });
     } catch (error) {

@@ -1,12 +1,15 @@
+export const dynamic = 'force-dynamic';
+// Using Node.js runtime for Prisma compatibility
+// Edge runtime now supported with Supabase!
+export const runtime = 'edge';
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { db } from '@/lib/supabase';
 
 export async function POST(request: Request) {
     try {
         const body = await request.json();
         const { productSlug, tabId, tanggal, batchKode, coa } = body;
 
-        // Basic validation
         if (!productSlug || tabId === undefined || !tanggal || !batchKode) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
@@ -16,75 +19,67 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Invalid date format.' }, { status: 400 });
         }
 
-        // Find the ProduksiTab based on productSlug and tabId
-        const tab = await prisma.produksiTabs.findFirst({
-            where: {
-                ProductSlug: productSlug,
-                Id: tabId
-            }
-        });
+        // Find the ProduksiTab
+        const { data: tabs } = await db.from<any>('produksi_tabs').select('*').eq('product_slug', productSlug).execute();
+        const tab = (tabs || []).find((t: any) => t.id === tabId);
 
         if (!tab) {
             return NextResponse.json({ error: 'ProduksiTab not found.' }, { status: 404 });
         }
 
-        // 1. Fetch the target batch (to ensure it exists and has BS > 0)
-        const targetBatch = await prisma.produksis.findFirst({
-            where: {
-                ProduksiTabId: tab.Id,
-                BatchKode: batchKode,
-                BS: { gt: 0 }
-            }
-        });
+        // Fetch target batch
+        const { data: allProduksi } = await db.from<any>('produksis').select('*').execute();
+        const targetBatch = (allProduksi || []).find((p: any) => 
+            p.produksi_tab_id === tabId && p.batch_kode === batchKode && p.bs > 0
+        );
 
         if (!targetBatch) {
             return NextResponse.json({ error: `Kode Batch ${batchKode} tidak ditemukan atau belum ada produksi (BS).` }, { status: 404 });
         }
 
-        // 2. Validate COA value
         if (coa < 0) {
             return NextResponse.json({ error: 'Nilai COA tidak boleh negatif' }, { status: 400 });
         }
 
-        // Find or create the row for the *current* action date
         const utcOffset = 7 * 60 * 60 * 1000;
         const targetUtcDate = new Date(localDate.getTime() - utcOffset);
 
-        let existingRecord = await prisma.produksis.findFirst({
-            where: {
-                ProduksiTabId: tab.Id,
-                Tanggal: targetUtcDate,
-            }
+        let existingRecord = (allProduksi || []).find((p: any) => {
+            const pDate = new Date(p.tanggal);
+            return p.produksi_tab_id === tabId && pDate.getTime() === targetUtcDate.getTime();
         });
 
         if (existingRecord) {
-            // Update existing record for this date
-            await prisma.produksis.update({
-                where: { Id: existingRecord.Id },
-                data: {
-                    COA: coa,
-                    COABatchKode: batchKode // Note: saving the reference to the target batch
-                }
-            });
+            const { error: updateError } = await db.from<any>('produksis').update({
+                coa: coa,
+                coa_batch_kode: batchKode
+            }).eq('id', existingRecord.id);
+
+            if (updateError) {
+                console.error('Error updating COA:', updateError);
+                return NextResponse.json({ message: 'Failed to update' }, { status: 500 });
+            }
         } else {
-            // Create a new record for this date just to hold the COA
-            await prisma.produksis.create({
-                data: {
-                    ProductSlug: productSlug,
-                    ProduksiTabId: tab.Id,
-                    Tanggal: targetUtcDate,
-                    BS: 0,
-                    PS: 0,
-                    COA: coa,
-                    PG: 0,
-                    Kumulatif: 0,
-                    StokAkhir: 0,
-                    BatchKode: '',
-                    PSBatchKode: '',
-                    COABatchKode: batchKode, // Note: saving the reference
-                    Keterangan: ''
-                }
+            const { error: insertError } = await db.from<any>('produksis').insert({
+                product_slug: productSlug,
+                produksi_tab_id: tabId,
+                tanggal: targetUtcDate.toISOString(),
+                bs: 0,
+                ps: 0,
+                coa: coa,
+                pg: 0,
+                kumulatif: 0,
+                stok_akhir: 0,
+                batch_kode: '',
+                ps_batch_kode: '',
+                coa_batch_kode: batchKode,
+                keterangan: ''
             });
+
+            if (insertError) {
+                console.error('Error inserting COA:', insertError);
+                return NextResponse.json({ message: 'Failed to insert' }, { status: 500 });
+            }
         }
 
         return NextResponse.json({

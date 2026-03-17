@@ -1,13 +1,14 @@
+export const dynamic = 'force-dynamic';
+// Using Node.js runtime for Prisma compatibility
+// Edge runtime now supported with Supabase!
+export const runtime = 'edge';
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { db } from '@/lib/supabase';
 
 export async function GET() {
     try {
-        const list = await prisma.logbookLokasis.findMany({
-            where: { IsActive: true },
-            orderBy: { Nama: 'asc' }
-        });
-        return NextResponse.json(list);
+        const { data: list } = await db.from<any>('logbook_lokasis').select('*').execute();
+        return NextResponse.json(list || []);
     } catch (error) {
         console.error('Error fetching lokasi:', error);
         return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
@@ -17,12 +18,17 @@ export async function GET() {
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const entity = await prisma.logbookLokasis.create({
-            data: {
-                Nama: body.nama || body.Nama,
-                IsActive: body.isActive ?? body.IsActive ?? true // Read IsActive from body, defaulting to true if not provided
-            }
+        const { data: entity, error } = await db.from<any>('logbook_lokasis').insert({
+            nama: body.nama || body.nama,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
         });
+
+        if (error) {
+            console.error('Error creating lokasi:', error);
+            return NextResponse.json({ message: 'Failed to create' }, { status: 500 });
+        }
+
         return NextResponse.json(entity, { status: 201 });
     } catch (error) {
         console.error('Error creating lokasi:', error);

@@ -34,7 +34,7 @@ function AlertTriangleIcon() { return (<svg width="24" height="24" viewBox="0 0 
 function PencilIcon() { return (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" /></svg>); }
 
 /* ─── Types ─── */
-type TabKey = 'kegiatan-sampling' | 'hasil-analisa' | 'laporan-hasil-analisa';
+
 
 /* ─── Constants ─── */
 const BULAN_OPTIONS = [
@@ -56,11 +56,7 @@ function generateYearOptions() {
     return years;
 }
 
-const TABS: { key: TabKey; label: string }[] = [
-    { key: 'kegiatan-sampling', label: 'Kegiatan Sampling' },
-    { key: 'hasil-analisa', label: 'Hasil Analisa' },
-    { key: 'laporan-hasil-analisa', label: 'Laporan Hasil Analisa' },
-];
+
 
 /* ─── Helpers ─── */
 function fmt(n: number | null | undefined): string {
@@ -334,7 +330,6 @@ interface AnalisaPageProps {
 export function AnalisaPage({ productCategory, productName, productSlug }: AnalisaPageProps) {
     const slug = productSlug || 'petro-gladiator';
 
-    const [activeTab, setActiveTab] = useState<TabKey>('kegiatan-sampling');
     const [bulan, setBulan] = useState('');
     const [tahun, setTahun] = useState(getInitialYear());
     const [search, setSearch] = useState('');
@@ -368,12 +363,6 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
     useEffect(() => {
         fetchData();
     }, [fetchData]);
-
-    const handleTabChange = (key: TabKey) => {
-        setActiveTab(key);
-        setPage(1);
-        setSearch('');
-    };
 
     const handleSave = async (payload: SaveAnalisaRequest) => {
         if (editingData) {
@@ -411,16 +400,8 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
         setIsModalOpen(true);
     };
 
-    // Client-side search and filter
     const filteredData = useMemo(() => {
         let list = data;
-
-        // Optionally, define rules per tab if they differ in what they show.
-        // For now, Laporan Hasil Analisa shows all where Tgl Analisa is not null.
-        if (activeTab === 'laporan-hasil-analisa') {
-            // For exact match with mock behavior, we might show everything, but logically it's:
-            // list = list.filter(r => r.tanggalAnalisa !== null);
-        }
 
         if (search) {
             const s = search.toLowerCase();
@@ -432,7 +413,7 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
         }
 
         return list;
-    }, [data, search, activeTab]);
+    }, [data, search]);
 
     const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize));
     const paginatedSlice = filteredData.slice((page - 1) * pageSize, page * pageSize);
@@ -490,77 +471,28 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
             {/* Page Header */}
             <div>
                 <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-                    Analisa — {productName}
+                    Analisa {productName}
                 </h1>
                 <p className="text-sm text-gray-500 mt-1">
-                    Kelola kegiatan sampling, hasil analisa, dan laporan hasil analisa
+                    Kelola kegiatan sampling dan hasil analisa produk
                 </p>
             </div>
 
             {/* Main Content Card */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col min-h-[500px]">
 
-                {/* Tab Row + Actions */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-gray-100">
-                    {/* Tabs */}
-                    <div className="flex overflow-x-auto scrollbar-hide">
-                        {TABS.map((tab) => (
-                            <button
-                                key={tab.key}
-                                onClick={() => handleTabChange(tab.key)}
-                                className={`px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap flex items-center gap-2
-                                    ${activeTab === tab.key
-                                        ? 'text-emerald-700'
-                                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                                    }`}
-                            >
-                                {tab.label}
-                                <span className={`inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-bold transition-colors
-                                    ${activeTab === tab.key
-                                        ? 'bg-emerald-100 text-emerald-700'
-                                        : 'bg-gray-100 text-gray-500'
-                                    }`}>
-                                    {activeTab === tab.key ? filteredData.length : data.length}
-                                </span>
-                                {activeTab === tab.key && (
-                                    <span className="absolute bottom-0 left-0 w-full h-0.5 bg-emerald-600 rounded-t" />
-                                )}
-                            </button>
-                        ))}
-                    </div>
+                {/* Actions Only (Tabs removed) */}
+                <div className="flex items-center justify-between border-b border-gray-100 p-4 bg-gray-50/30">
+                    <div className="text-sm font-semibold text-gray-700"></div>
 
                     {/* Actions */}
-                    <div className="px-4 py-2 sm:py-0 flex items-center gap-2 shrink-0">
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <button className="inline-flex items-center gap-2 px-4 py-2 bg-white text-gray-700 text-sm font-medium rounded-lg border border-gray-200 hover:bg-gray-50 hover:text-gray-900 transition-colors shadow-sm">
-                                    <DownloadIcon />
-                                    Export
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-1 opacity-50">
-                                        <polyline points="6 9 12 15 18 9" />
-                                    </svg>
-                                </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48 bg-white">
-                                <DropdownMenuLabel>Pilih Format</DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem className="cursor-pointer">
-                                    <span className="mr-2">📊</span> Export to Excel
-                                </DropdownMenuItem>
-                                <DropdownMenuItem className="cursor-pointer">
-                                    <span className="mr-2">📄</span> Export to PDF
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-
-                        <button
-                            onClick={openAddModal}
-                            className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
-                        >
-                            <PlusIcon />
-                            Tambah Data
-                        </button>
-                    </div>
+                    <button
+                        onClick={openAddModal}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
+                    >
+                        <PlusIcon />
+                        Tambah Data
+                    </button>
                 </div>
 
                 {/* Filters Row */}
@@ -620,16 +552,11 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
                                     <thead>
                                         <tr className="bg-gray-50/80">
                                             <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-center w-16">No</th>
-                                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-left whitespace-nowrap">{activeTab === 'kegiatan-sampling' ? 'Tanggal Sampling' : 'Tanggal'}</th>
+                                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-left whitespace-nowrap">Tanggal Sampling</th>
                                             <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-left whitespace-nowrap">No. BAPC</th>
                                             <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-right whitespace-nowrap">Kuantum</th>
-                                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-left whitespace-nowrap">{activeTab === 'kegiatan-sampling' ? 'Lembaga Sampling' : 'Lembaga'}</th>
-                                            {activeTab === 'laporan-hasil-analisa' && (
-                                                <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-left whitespace-nowrap">Tgl. Analisa</th>
-                                            )}
-                                            {activeTab !== 'hasil-analisa' && (
-                                                <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-center whitespace-nowrap">Hasil Analisa</th>
-                                            )}
+                                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-left whitespace-nowrap">Lembaga Sampling</th>
+                                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-center whitespace-nowrap">Hasil Analisa</th>
                                             <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-center w-24">Aksi</th>
                                         </tr>
                                     </thead>
@@ -644,14 +571,7 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
                                                     <td className="px-4 py-3 text-gray-700 border border-gray-200">{row.noBAPC}</td>
                                                     <td className="px-4 py-3 text-right font-mono tabular-nums text-gray-700 border border-gray-200">{fmt(row.kuantum)}</td>
                                                     <td className="px-4 py-3 text-gray-700 border border-gray-200">{row.lembaga}</td>
-
-                                                    {activeTab === 'laporan-hasil-analisa' && (
-                                                        <td className="px-4 py-3 text-gray-700 border border-gray-200">{formatDateShort(row.tanggalAnalisa)}</td>
-                                                    )}
-
-                                                    {activeTab !== 'hasil-analisa' && (
-                                                        <td className="px-4 py-3 text-center border border-gray-200"><StatusBadge status={row.hasilAnalisa} /></td>
-                                                    )}
+                                                    <td className="px-4 py-3 text-center border border-gray-200"><StatusBadge status={row.hasilAnalisa} /></td>
 
                                                     <td className="px-4 py-3 text-center border border-gray-200">
                                                         <div className="flex items-center justify-center gap-1">
@@ -682,7 +602,7 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
                                                     <p className="text-sm font-semibold text-gray-800">{formatDateShort(row.tanggalSampling)}</p>
                                                     <p className="text-xs text-gray-500 font-mono mt-0.5">{row.noBAPC}</p>
                                                 </div>
-                                                {activeTab !== 'hasil-analisa' && <StatusBadge status={row.hasilAnalisa} />}
+                                                <StatusBadge status={row.hasilAnalisa} />
                                                 <div className="absolute top-2 right-2 flex gap-1 bg-white opacity-0 group-hover:opacity-100 transition-opacity rounded-md border border-gray-100 shadow-sm px-1 py-0.5">
                                                     <button onClick={() => openEditModal(row)} className="text-xs text-blue-600 px-2 py-1 hover:bg-blue-50 rounded">Edit</button>
                                                     <button onClick={() => setDeleteModal({ isOpen: true, id: row.id })} className="text-xs text-red-600 px-2 py-1 hover:bg-red-50 rounded">Hapus</button>
@@ -697,12 +617,6 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
                                                     <span className="text-[11px] text-gray-400 uppercase">Lembaga</span>
                                                     <p className="text-gray-700">{row.lembaga}</p>
                                                 </div>
-                                                {activeTab === 'laporan-hasil-analisa' && (
-                                                    <div className="col-span-2">
-                                                        <span className="text-[11px] text-gray-400 uppercase">Tgl. Analisa</span>
-                                                        <p className="text-gray-700">{formatDateShort(row.tanggalAnalisa)}</p>
-                                                    </div>
-                                                )}
                                             </div>
                                         </div>
                                     ))

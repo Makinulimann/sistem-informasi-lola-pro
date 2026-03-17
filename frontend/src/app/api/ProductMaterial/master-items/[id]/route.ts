@@ -1,5 +1,9 @@
+export const dynamic = 'force-dynamic';
+// Using Node.js runtime for Prisma compatibility
+// Edge runtime now supported with Supabase!
+export const runtime = 'edge';
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { db } from '@/lib/supabase';
 
 export async function PUT(
     request: Request,
@@ -10,35 +14,33 @@ export async function PUT(
         const id = parseInt(p.id, 10);
         const body = await request.json();
 
-        const item = await prisma.masterItems.findUnique({
-            where: { Id: id }
-        });
+        const { data: item } = await db.from<any>('master_items').select('*').eq('id', id).single();
 
         if (!item) return NextResponse.json({ message: 'Not Found' }, { status: 404 });
 
         const nama = body.nama || body.Nama;
-        if (nama !== item.Nama) {
-            const existing = await prisma.masterItems.findFirst({
-                where: {
-                    Nama: nama,
-                    OR: [
-                        { ScopeProductSlug: null },
-                        { ScopeProductSlug: item.ScopeProductSlug }
-                    ]
-                }
-            });
-            if (existing) {
+        const itemNama = item.nama || item.Nama;
+        if (nama !== itemNama) {
+            const { data: allItemsCheck } = await db.from<any>('master_items').select('*').execute();
+            const existing = (allItemsCheck || []).filter((it: any) =>
+                (it.nama || it.Nama || '').toLowerCase() === nama.toLowerCase()
+            );
+            if (existing && existing.length > 0) {
                 return NextResponse.json({ message: 'Item with this name already exists.' }, { status: 400 });
             }
         }
 
-        const updated = await prisma.masterItems.update({
-            where: { Id: id },
-            data: {
-                Nama: nama,
-                SatuanDefault: body.satuanDefault !== undefined ? body.satuanDefault : body.SatuanDefault
-            }
-        });
+        const { data: updated, error } = await db.from<any>('master_items').update({
+            nama: nama,
+            kategori: body.kategori || body.Kategori,
+            satuan_default: body.satuanDefault || body.SatuanDefault || 'Kg',
+            updated_at: new Date().toISOString()
+        }).eq('id', id);
+
+        if (error) {
+            console.error('Error updating master item:', error);
+            return NextResponse.json({ message: 'Failed to update' }, { status: 500 });
+        }
 
         return NextResponse.json(updated);
     } catch (error) {
@@ -55,14 +57,15 @@ export async function DELETE(
         const p = await params;
         const id = parseInt(p.id, 10);
 
-        const item = await prisma.masterItems.findUnique({
-            where: { Id: id }
-        });
+        const { data: item } = await db.from<any>('master_items').select('*').eq('id', id).single();
         if (!item) return NextResponse.json({ message: 'Not Found' }, { status: 404 });
 
-        await prisma.masterItems.delete({
-            where: { Id: id }
-        });
+        const { error } = await db.from<any>('master_items').delete().eq('id', id);
+
+        if (error) {
+            console.error('Error deleting master item:', error);
+            return NextResponse.json({ message: 'Failed to delete' }, { status: 500 });
+        }
 
         return new NextResponse(null, { status: 204 });
     } catch (error) {

@@ -2,15 +2,16 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactCompiler: false,
+  // Exclude Node.js packages from Edge bundle
+  serverExternalPackages: [
+    'bcryptjs',
+    '@prisma/client',
+    '@prisma/adapter-pg',
+    'pg',
+    'jose',
+  ],
   experimental: {
     optimizePackageImports: ['lucide-react', 'date-fns', 'recharts'],
-  },
-  outputFileTracingExcludes: {
-    '*': [
-      'node_modules/@vercel/og/dist/**',
-      'node_modules/next/dist/compiled/@vercel/og/**',
-      'node_modules/@prisma/engines/**',
-    ],
   },
 };
 

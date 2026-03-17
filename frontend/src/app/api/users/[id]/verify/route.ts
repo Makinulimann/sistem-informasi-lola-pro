@@ -1,5 +1,9 @@
+export const dynamic = 'force-dynamic';
+// Using Node.js runtime for Prisma compatibility
+// Edge runtime now supported with Supabase!
+export const runtime = 'edge';
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { db } from '@/lib/supabase';
 
 export async function POST(
     request: Request,
@@ -7,17 +11,16 @@ export async function POST(
 ) {
     try {
         const p = await params;
-        await prisma.users.update({
-            where: { Id: p.id },
-            data: {
-                IsVerified: true,
-                UpdatedAt: new Date()
-            }
-        });
+        const { error: updateError } = await db.from<any>('users').update({ is_verified: true }).eq('id', p.id);
+
+        if (updateError) {
+            console.error('Error verifying user:', updateError);
+            return NextResponse.json({ message: 'Failed to verify user' }, { status: 500 });
+        }
 
         return NextResponse.json({ message: 'Pengguna berhasil diverifikasi' });
     } catch (error: any) {
         console.error('Error verifying user:', error);
-        return NextResponse.json({ message: error.message }, { status: 400 });
+        return NextResponse.json({ message: error.message || 'Internal Server Error' }, { status: 400 });
     }
 }

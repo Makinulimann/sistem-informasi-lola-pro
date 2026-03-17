@@ -1,5 +1,9 @@
+export const dynamic = 'force-dynamic';
+// Using Node.js runtime for Prisma compatibility
+// Edge runtime now supported with Supabase!
+export const runtime = 'edge';
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { db } from '@/lib/supabase';
 
 export async function GET(request: Request) {
     try {
@@ -12,21 +16,33 @@ export async function GET(request: Request) {
             return NextResponse.json({ message: 'Product slug required' }, { status: 400 });
         }
 
-        const whereClause: any = { ProductSlug: slug };
-        if (bulan) whereClause.Bulan = parseInt(bulan);
-        if (tahun) whereClause.Tahun = parseInt(tahun);
+        // Build query based on filters
+        let query = `rkaps?product_slug=eq.${encodeURIComponent(slug)}&select=*`;
+        if (bulan) {
+            query += `&bulan=eq.${parseInt(bulan)}`;
+        }
+        if (tahun) {
+            query += `&tahun=eq.${parseInt(tahun)}`;
+        }
+        query += '&order=tahun.desc,bulan.desc';
 
-        const data = await prisma.rkaps.findMany({
-            where: whereClause,
-            orderBy: [{ Tahun: 'desc' }, { Bulan: 'desc' }],
-        });
+        const result = await db.from<any>('rkaps').select('*').execute();
 
-        const mappedData = data.map(d => ({
-            id: d.Id,
-            productSlug: d.ProductSlug,
-            bulan: d.Bulan,
-            tahun: d.Tahun,
-            target: d.Target,
+        // Filter manually since we can't do complex queries with the helper
+        let filteredData = result.data || [];
+        if (bulan) {
+            filteredData = filteredData.filter((d: any) => d.bulan === parseInt(bulan));
+        }
+        if (tahun) {
+            filteredData = filteredData.filter((d: any) => d.tahun === parseInt(tahun));
+        }
+
+        const mappedData = filteredData.map((d: any) => ({
+            id: d.id,
+            productSlug: d.product_slug,
+            bulan: d.bulan,
+            tahun: d.tahun,
+            target: d.target,
         }));
 
         return NextResponse.json({
@@ -51,23 +67,28 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'Missing required fields' }, { status: 400 });
         }
 
-        const created = await prisma.rkaps.create({
-            data: {
-                ProductSlug: productSlug,
-                Bulan: parseInt(bulan),
-                Tahun: parseInt(tahun),
-                Target: parseFloat(target),
-            }
-        });
+        const insertData = {
+            product_slug: productSlug,
+            bulan: parseInt(bulan),
+            tahun: parseInt(tahun),
+            target: parseFloat(target)
+        };
+
+        const { data: created, error: insertError } = await db.from<any>('rkaps').insert(insertData);
+
+        if (insertError) {
+            console.error('Error creating RKAP:', insertError);
+            return NextResponse.json({ message: 'Failed to create RKAP' }, { status: 500 });
+        }
 
         return NextResponse.json({
             message: 'Successfully created RKAP data',
             data: {
-                id: created.Id,
-                productSlug: created.ProductSlug,
-                bulan: created.Bulan,
-                tahun: created.Tahun,
-                target: created.Target,
+                id: created?.id,
+                productSlug: created?.product_slug,
+                bulan: created?.bulan,
+                tahun: created?.tahun,
+                target: created?.target,
             }
         });
     } catch (error) {

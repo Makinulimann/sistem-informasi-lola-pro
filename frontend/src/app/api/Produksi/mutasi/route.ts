@@ -1,5 +1,9 @@
+export const dynamic = 'force-dynamic';
+// Using Node.js runtime for Prisma compatibility
+// Edge runtime now supported with Supabase!
+export const runtime = 'edge';
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { db } from '@/lib/supabase';
 
 export async function GET(request: Request) {
     try {
@@ -20,20 +24,11 @@ export async function GET(request: Request) {
             return NextResponse.json({ message: 'Invalid date format.' }, { status: 400 });
         }
 
-        const utcOffset = 7 * 60 * 60 * 1000;
-        const targetUtc = new Date(localDate.getTime() - utcOffset);
+        const { data: relatedMutasi } = await db.from<any>('bahan_bakus').select('*').eq('product_slug', productSlug).execute();
 
-        const relatedMutasi = await prisma.bahanBakus.findMany({
-            where: {
-                ProductSlug: productSlug,
-                Tipe: 'Mutasi',
-                Tanggal: targetUtc
-            }
-        });
-
-        const mutasi = relatedMutasi
-            .filter(b => b.Keterangan?.toLowerCase().startsWith('produksi '))
-            .map(b => ({
+        const mutasi = (relatedMutasi || [])
+            .filter((b: any) => b.Keterangan && b.Keterangan.toLowerCase().startsWith('produksi '))
+            .map((b: any) => ({
                 NamaBahan: b.NamaBahan,
                 Kuantum: b.Kuantum,
                 Satuan: b.Satuan,

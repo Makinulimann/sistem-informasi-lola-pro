@@ -1,5 +1,9 @@
+export const dynamic = 'force-dynamic';
+// Using Node.js runtime for Prisma compatibility
+// Edge runtime now supported with Supabase!
+export const runtime = 'edge';
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { db } from '@/lib/supabase';
 
 export async function GET(request: Request) {
     try {
@@ -12,33 +16,40 @@ export async function GET(request: Request) {
             return NextResponse.json({ message: 'productSlug is required.' }, { status: 400 });
         }
 
-        let whereClause: any = { ProductSlug: productSlug };
+        const { data, error } = await db.from<any>('analisas').select('*').eq('product_slug', productSlug).execute();
+
+        if (error) {
+            console.error('Error fetching analisa:', error);
+            return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
+        }
+
+        let filteredData = data || [];
 
         if (bulanStr) {
-            whereClause.Bulan = parseInt(bulanStr, 10);
+            const bulan = parseInt(bulanStr, 10);
+            filteredData = filteredData.filter((item: any) => item.bulan === bulan);
         }
 
         if (tahunStr) {
-            whereClause.Tahun = parseInt(tahunStr, 10);
+            const tahun = parseInt(tahunStr, 10);
+            filteredData = filteredData.filter((item: any) => item.tahun === tahun);
         }
 
-        const data = await prisma.analisas.findMany({
-            where: whereClause,
-            orderBy: { TanggalSampling: 'asc' },
-        });
+        // Sort by tanggal_sampling
+        filteredData.sort((a: any, b: any) => new Date(a.tanggal_sampling).getTime() - new Date(b.tanggal_sampling).getTime());
 
         // Convert the property names to match the frontend expectations
-        const formattedData = data.map(item => ({
-            id: item.Id,
-            productSlug: item.ProductSlug,
-            bulan: item.Bulan,
-            tahun: item.Tahun,
-            tanggalSampling: item.TanggalSampling,
-            noBAPC: item.NoBAPC,
-            kuantum: item.Kuantum,
-            lembaga: item.Lembaga,
-            hasilAnalisa: item.HasilAnalisa,
-            tanggalAnalisa: item.TanggalAnalisa
+        const formattedData = filteredData.map((item: any) => ({
+            id: item.id,
+            productSlug: item.product_slug,
+            bulan: item.bulan,
+            tahun: item.tahun,
+            tanggalSampling: item.tanggal_sampling,
+            noBAPC: item.no_bapc,
+            kuantum: item.kuantum,
+            lembaga: item.lembaga,
+            hasilAnalisa: item.hasil_analisa,
+            tanggalAnalisa: item.tanggal_analisa
         }));
 
         return NextResponse.json({ data: formattedData });
@@ -60,21 +71,26 @@ export async function POST(request: Request) {
         const bulan = date.getMonth() + 1;
         const tahun = date.getFullYear();
 
-        const newAnalisa = await prisma.analisas.create({
-            data: {
-                ProductSlug: body.productSlug,
-                Bulan: bulan,
-                Tahun: tahun,
-                TanggalSampling: date,
-                NoBAPC: body.noBAPC,
-                Kuantum: parseFloat(body.kuantum),
-                Lembaga: body.lembaga,
-                HasilAnalisa: body.hasilAnalisa,
-                TanggalAnalisa: body.tanggalAnalisa ? new Date(body.tanggalAnalisa) : null,
-            }
-        });
+        const insertData = {
+            product_slug: body.productSlug,
+            bulan: bulan,
+            tahun: tahun,
+            tanggal_sampling: body.tanggalSampling,
+            no_bapc: body.noBAPC,
+            kuantum: parseFloat(body.kuantum),
+            lembaga: body.lembaga,
+            hasil_analisa: body.hasilAnalisa,
+            tanggal_analisa: body.tanggalAnalisa || new Date().toISOString()
+        };
 
-        return NextResponse.json({ success: true, data: { id: newAnalisa.Id } });
+        const { data: newAnalisa, error } = await db.from<any>('analisas').insert(insertData);
+
+        if (error) {
+            console.error('Error creating analisa:', error);
+            return NextResponse.json({ message: 'Failed to create analisa' }, { status: 500 });
+        }
+
+        return NextResponse.json({ success: true, data: { id: newAnalisa?.id } });
     } catch (error) {
         console.error('Error creating analisa:', error);
         return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });

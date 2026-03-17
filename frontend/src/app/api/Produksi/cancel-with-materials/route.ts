@@ -1,5 +1,9 @@
+export const dynamic = 'force-dynamic';
+// Using Node.js runtime for Prisma compatibility
+// Edge runtime now supported with Supabase!
+export const runtime = 'edge';
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { db } from '@/lib/supabase';
 
 export async function POST(request: Request) {
     try {
@@ -22,40 +26,27 @@ export async function POST(request: Request) {
         const targetUtc = new Date(localDate.getTime() - utcOffset);
 
         // 1. Reset produksi BS to 0
-        const record = await prisma.produksis.findFirst({
-            where: {
-                ProduksiTabId: tabId,
-                Tanggal: targetUtc
-            }
-        });
+        const { data: records } = await db.from<any>('produksis').select('*').eq('product_slug', productSlug).execute();
+        const record = (records || []).find((r: any) => 
+            r.produksi_tab_id === tabId && new Date(r.tanggal).getTime() === targetUtc.getTime()
+        );
 
         if (record) {
-            await prisma.produksis.update({
-                where: { Id: record.Id },
-                data: {
-                    BS: 0,
-                    Keterangan: ''
-                }
-            });
+            await db.from<any>('produksis').update({
+                bs: 0,
+                updated_at: new Date().toISOString()
+            }).eq('id', record.id);
         }
 
         // 2. Delete related Mutasi records for that product + date
-        const relatedMutasi = await prisma.bahanBakus.findMany({
-            where: {
-                ProductSlug: productSlug,
-                Tipe: 'Mutasi',
-                Tanggal: targetUtc
-            }
-        });
+        const { data: relatedBahanBaku } = await db.from<any>('bahan_bakus').select('*').eq('product_slug', productSlug).execute();
 
-        const toDeleteIds = relatedMutasi
-            .filter(b => b.Keterangan?.toLowerCase().startsWith('produksi '))
-            .map(b => b.Id);
+        const toDeleteIds = (relatedBahanBaku || [])
+            .filter((b: any) => b.Keterangan && b.Keterangan.toLowerCase().startsWith('produksi '))
+            .map((b: any) => b.Id);
 
-        if (toDeleteIds.length > 0) {
-            await prisma.bahanBakus.deleteMany({
-                where: { Id: { in: toDeleteIds } }
-            });
+        for (const id of toDeleteIds) {
+            await db.from<any>('bahan_bakus').delete().eq('id', id);
         }
 
         return NextResponse.json({

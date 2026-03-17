@@ -1,7 +1,12 @@
+export const dynamic = 'force-dynamic';
+// Using Node.js runtime for Prisma compatibility
+// Edge runtime now supported with Supabase!
+export const runtime = 'edge';
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { db } from '@/lib/supabase';
 
 function convertUnit(value: number, fromUnit: string, toUnit: string): number {
+    if (!fromUnit || !toUnit) return value;
     if (fromUnit.toLowerCase() === toUnit.toLowerCase()) return value;
 
     const normalize = (u: string) => {
@@ -82,73 +87,74 @@ export async function GET(request: Request) {
             return NextResponse.json({ message: 'productSlug is required' }, { status: 400 });
         }
 
-        const configuredMaterials = await prisma.productMaterials.findMany({
-            where: { ProductSlug: productSlug },
-            include: { MasterItems: true },
-            orderBy: [
-                { Jenis: 'asc' },
-                { MasterItems: { Nama: 'asc' } }
-            ]
-        });
+        // Calculate date range
+        const utcOffset = 7 * 60 * 60 * 1000;
+        const now = new Date();
+        const targetBulan = bulan ? parseInt(bulan, 10) : now.getMonth() + 1;
+        const targetTahun = tahun ? parseInt(tahun, 10) : now.getFullYear();
 
-        const configuredNames = configuredMaterials.map(pm => pm.MasterItems.Nama).filter(Boolean);
+        const periodStartUtc = new Date(targetTahun, targetBulan - 1, 1);
+        const periodEndUtc = new Date(targetTahun, targetBulan, 1);
 
         const hasPeriodFilter = !!(bulan || tahun);
-        let periodStartUtc = new Date(-8640000000000000); // Min Date
-        let periodEndUtc = new Date(8640000000000000);    // Max Date
 
-        if (bulan && tahun) {
-            const y = parseInt(tahun, 10);
-            const m = parseInt(bulan, 10);
-            const localStart = new Date(y, m - 1, 1);
-            const localEnd = new Date(y, m, 1); // Start of next month
-            periodStartUtc = new Date(localStart.getTime() - 7 * 60 * 60 * 1000);
-            periodEndUtc = new Date(localEnd.getTime() - 7 * 60 * 60 * 1000);
-        } else if (tahun) {
-            const y = parseInt(tahun, 10);
-            const localStart = new Date(y, 0, 1);
-            const localEnd = new Date(y + 1, 0, 1);
-            periodStartUtc = new Date(localStart.getTime() - 7 * 60 * 60 * 1000);
-            periodEndUtc = new Date(localEnd.getTime() - 7 * 60 * 60 * 1000);
-        }
+        // Fetch all data needed
+        const { data: allProductMaterials } = await db.from<any>('product_materials').select('*').execute();
+        const { data: allMasterItems } = await db.from<any>('master_items').select('*').execute();
+        const { data: allRecords } = await db.from<any>('bahan_bakus').select('*').execute();
 
-        const allRecords = await prisma.bahanBakus.findMany({
-            where: { NamaBahan: { in: configuredNames } }
-        });
+        // Build master items lookup
+        const masterItemsMap = new Map();
+        (allMasterItems || []).forEach((m: any) => masterItemsMap.set(m.id || m.Id, m));
 
-        const result = configuredMaterials.map(pm => {
-            const materialName = pm.MasterItems.Nama;
-            const satuan = pm.MasterItems.SatuanDefault || 'Kg';
+        // Filter product_materials by productSlug
+        const configuredMaterials = (allProductMaterials || []).filter((pm: any) => (pm.product_slug || pm.ProductSlug) === productSlug);
 
-            const materialRecords = allRecords.filter(r => r.NamaBahan.toLowerCase() === materialName.toLowerCase());
+        const result = configuredMaterials.map((pm: any) => {
+            const masterItemId = pm.master_item_id || pm.MasterItemId;
+            const masterItem = masterItemsMap.get(masterItemId);
+            const materialName = masterItem?.nama || masterItem?.Nama || '';
+            const satuan = masterItem?.satuan_default || masterItem?.SatuanDefault || 'Kg';
+
+            const materialRecords = (allRecords || []).filter((r: any) => {
+                const rNamaBahan = r.nama_bahan || r.NamaBahan;
+                return rNamaBahan && rNamaBahan.toLowerCase() === materialName.toLowerCase();
+            });
 
             const periodRecords = hasPeriodFilter
-                ? materialRecords.filter(r => new Date(r.Tanggal) >= periodStartUtc && new Date(r.Tanggal) < periodEndUtc)
+                ? materialRecords.filter((r: any) => {
+                    const rTanggal = r.tanggal || r.Tanggal;
+                    const rDate = new Date(rTanggal);
+                    return rDate >= periodStartUtc && rDate < periodEndUtc;
+                })
                 : materialRecords;
 
             const totalInPeriod = periodRecords
-                .filter(r => r.Tipe === 'Suplai')
-                .reduce((sum, r) => sum + convertUnit(r.Kuantum, r.Satuan, satuan), 0);
+                .filter((r: any) => (r.tipe || r.Tipe) === 'Suplai')
+                .reduce((sum: number, r: any) => sum + convertUnit(r.kuantum || r.Kuantum || 0, r.satuan || r.Satuan || 'Kg', satuan), 0);
 
             const totalOutPeriod = periodRecords
-                .filter(r => r.Tipe === 'Mutasi')
-                .reduce((sum, r) => sum + convertUnit(r.Kuantum, r.Satuan, satuan), 0);
+                .filter((r: any) => (r.tipe || r.Tipe) === 'Mutasi')
+                .reduce((sum: number, r: any) => sum + convertUnit(r.kuantum || r.Kuantum || 0, r.satuan || r.Satuan || 'Kg', satuan), 0);
 
             const cumulativeRecords = hasPeriodFilter
-                ? materialRecords.filter(r => new Date(r.Tanggal) < periodEndUtc)
+                ? materialRecords.filter((r: any) => {
+                    const rTanggal = r.tanggal || r.Tanggal;
+                    return new Date(rTanggal) < periodEndUtc;
+                })
                 : materialRecords;
 
             const totalInCumulative = cumulativeRecords
-                .filter(r => r.Tipe === 'Suplai')
-                .reduce((sum, r) => sum + convertUnit(r.Kuantum, r.Satuan, satuan), 0);
+                .filter((r: any) => (r.tipe || r.Tipe) === 'Suplai')
+                .reduce((sum: number, r: any) => sum + convertUnit(r.kuantum || r.Kuantum || 0, r.satuan || r.Satuan || 'Kg', satuan), 0);
 
             const totalOutCumulative = cumulativeRecords
-                .filter(r => r.Tipe === 'Mutasi')
-                .reduce((sum, r) => sum + convertUnit(r.Kuantum, r.Satuan, satuan), 0);
+                .filter((r: any) => (r.tipe || r.Tipe) === 'Mutasi')
+                .reduce((sum: number, r: any) => sum + convertUnit(r.kuantum || r.Kuantum || 0, r.satuan || r.Satuan || 'Kg', satuan), 0);
 
             return {
                 Nama: materialName,
-                Jenis: pm.Jenis,
+                Jenis: pm.jenis || pm.Jenis,
                 Satuan: satuan,
                 TotalIn: totalInPeriod,
                 TotalOut: totalOutPeriod,

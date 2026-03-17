@@ -1,0 +1,183 @@
+Database Inspection
+===================
+Found tables: AktivitasHarians, Analisas, BahanBakus, BalanceStokDetails, BalanceStoks, LogbookLokasis, LogbookPics, Maintenances, MasterItems, Materials, Perusahaans, ProductMaterials, ProduksiTabs, Produksis, Rkaps, SidebarMenus, Users, __EFMigrationsHistory, app_settings
+
+Table: "AktivitasHarians"
+  - Id (integer)
+  - Tanggal (timestamp with time zone)
+  - Pic (character varying)
+  - Lokasi (character varying)
+  - Deskripsi (character varying)
+  - Dokumentasi (character varying)
+  - CreatedAt (timestamp with time zone)
+  Count: 3
+
+Table: "Analisas"
+  - Id (integer)
+  - ProductSlug (character varying)
+  - Bulan (integer)
+  - Tahun (integer)
+  - TanggalSampling (timestamp with time zone)
+  - NoBAPC (character varying)
+  - Kuantum (double precision)
+  - Lembaga (character varying)
+  - HasilAnalisa (character varying)
+  - TanggalAnalisa (timestamp with time zone)
+  - CreatedAt (timestamp with time zone)
+  - UpdatedAt (timestamp with time zone)
+  Count: 1
+
+Table: "BahanBakus"
+  - Id (integer)
+  - Tipe (character varying)
+  - ProductSlug (character varying)
+  - PerusahaanId (integer)
+  - Tanggal (timestamp with time zone)
+  - Jenis (character varying)
+  - NamaBahan (character varying)
+  - Kuantum (double precision)
+  - Dokumen (character varying)
+  - Keterangan (character varying)
+  - Satuan (character varying)
+  Count: 20
+
+Table: "BalanceStokDetails"
+  - Id (integer)
+  - BalanceStokId (integer)
+  - MaterialId (integer)
+  - Out (double precision)
+  - In (double precision)
+  - StokAkhir (double precision)
+  Count: 0
+
+Table: "BalanceStoks"
+  - Id (integer)
+  - ProductSlug (character varying)
+  - PerusahaanId (integer)
+  - Tanggal (timestamp with time zone)
+  - Produksi (double precision)
+  Count: 0
+
+Table: "LogbookLokasis"
+  - Id (integer)
+  - Nama (character varying)
+  - IsActive (boolean)
+  Count: 2
+
+Table: "LogbookPics"
+  - Id (integer)
+  - Nama (character varying)
+  - IsActive (boolean)
+  Count: 23
+
+Table: "Maintenances"
+  - Id (integer)
+  - Tanggal (timestamp with time zone)
+  - Equipment (character varying)
+  - Area (character varying)
+  - Kegiatan (character varying)
+  - Keterangan (character varying)
+  - Dokumentasi (character varying)
+  - CreatedAt (timestamp with time zone)
+  Count: 3
+
+Table: "MasterItems"
+  - Id (integer)
+  - Nama (character varying)
+  - Kode (character varying)
+  - SatuanDefault (character varying)
+  - IsActive (boolean)
+  - ScopeProductSlug (character varying)
+  Count: 6
+
+Table: "Materials"
+  - Id (integer)
+  - ProductSlug (character varying)
+  - Nama (character varying)
+  - Order (integer)
+  - IsActive (boolean)
+  Count: 7
+
+Table: "Perusahaans"
+  - Id (integer)
+  - Nama (character varying)
+  - IsActive (boolean)
+  - CreatedAt (timestamp with time zone)
+  Count: 0
+
+Table: "ProductMaterials"
+  - Id (integer)
+  - ProductSlug (character varying)
+  - MasterItemId (integer)
+  - Jenis (character varying)
+  Count: 16
+
+Table: "ProduksiTabs"
+  - Id (integer)
+  - ProductSlug (character varying)
+  - Nama (character varying)
+  - Order (integer)
+  Count: 7
+
+Table: "Produksis"
+  - Id (integer)
+  - ProductSlug (character varying)
+  - ProduksiTabId (integer)
+  - Tanggal (timestamp with time zone)
+  - BS (double precision)
+  - PG (double precision)
+  - Kumulatif (double precision)
+  - StokAkhir (double precision)
+  - COA (double precision)
+  - Keterangan (character varying)
+  - PS (double precision)
+  - BatchKode (character varying)
+  - COABatchKode (character varying)
+  - PSBatchKode (character varying)
+  Count: 10
+
+Table: "Rkaps"
+  - Id (integer)
+  - ProductSlug (character varying)
+  - Bulan (integer)
+  - Tahun (integer)
+  - Target (double precision)
+  - CreatedAt (timestamp with time zone)
+  - UpdatedAt (timestamp with time zone)
+  Count: 0
+
+Table: "SidebarMenus"
+  - Id (integer)
+  - Label (character varying)
+  - Icon (character varying)
+  - Href (character varying)
+  - ParentId (integer)
+  - Order (integer)
+  - IsActive (boolean)
+  - RoleAccess (character varying)
+  Count: 27
+
+Table: "Users"
+  - Id (uuid)
+  - Email (character varying)
+  - PasswordHash (text)
+  - FullName (character varying)
+  - NoInduk (character varying)
+  - Role (text)
+  - IsVerified (boolean)
+  - RefreshToken (text)
+  - RefreshTokenExpiryTime (timestamp with time zone)
+  - CreatedAt (timestamp with time zone)
+  - UpdatedAt (timestamp with time zone)
+  Count: 2
+
+Table: "__EFMigrationsHistory"
+  - MigrationId (character varying)
+  - ProductVersion (character varying)
+  Count: 13
+
+Table: "app_settings"
+  - key (character varying)
+  - value (character varying)
+  - updated_at (timestamp with time zone)
+  Count: 1

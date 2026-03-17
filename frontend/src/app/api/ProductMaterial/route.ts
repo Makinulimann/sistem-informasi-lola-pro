@@ -1,5 +1,9 @@
+export const dynamic = 'force-dynamic';
+// Using Node.js runtime for Prisma compatibility
+// Edge runtime now supported with Supabase!
+export const runtime = 'edge';
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { db } from '@/lib/supabase';
 
 export async function POST(request: Request) {
     try {
@@ -9,25 +13,32 @@ export async function POST(request: Request) {
         const masterItemId = body.masterItemId || body.MasterItemId;
         const jenis = body.jenis || body.Jenis;
 
-        const exists = await prisma.productMaterials.findFirst({
-            where: {
-                ProductSlug: productSlug,
-                MasterItemId: masterItemId,
-                Jenis: jenis
-            }
-        });
+        // Check if exists - get all for this product and filter manually
+        const { data: allMaterials, error: checkError } = await db.from<any>('product_materials').select('*').eq('product_slug', productSlug).execute();
 
-        if (exists) {
-            return NextResponse.json({ message: 'Material already assigned to this product as ' + body.Jenis }, { status: 400 });
+        if (checkError) {
+            console.error('Error checking material:', checkError);
+            return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
         }
 
-        const pm = await prisma.productMaterials.create({
-            data: {
-                ProductSlug: productSlug,
-                MasterItemId: masterItemId,
-                Jenis: jenis
-            }
-        });
+        const exists = (allMaterials || []).filter((m: any) => m.master_item_id === masterItemId);
+
+        if (exists.length > 0) {
+            return NextResponse.json({ message: 'Material already assigned to this product as ' + jenis }, { status: 400 });
+        }
+
+        const insertData = {
+            product_slug: productSlug,
+            master_item_id: masterItemId,
+            jenis: jenis,
+        };
+
+        const { data: pm, error: insertError } = await db.from<any>('product_materials').insert(insertData);
+
+        if (insertError) {
+            console.error('Error assigning material:', insertError);
+            return NextResponse.json({ message: 'Failed to assign material' }, { status: 500 });
+        }
 
         return NextResponse.json(pm);
     } catch (error) {

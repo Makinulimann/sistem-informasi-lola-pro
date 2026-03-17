@@ -1,5 +1,9 @@
+export const dynamic = 'force-dynamic';
+// Using Node.js runtime for Prisma compatibility
+// Edge runtime now supported with Supabase!
+export const runtime = 'edge';
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { db } from '@/lib/supabase';
 
 export async function PUT(
     request: Request,
@@ -10,18 +14,22 @@ export async function PUT(
         const id = parseInt(p.id, 10);
         const body = await request.json();
 
-        const tab = await prisma.produksiTabs.findUnique({
-            where: { Id: id }
-        });
+        const { data: tab } = await db.from<any>('produksi_tabs').select('*').eq('id', id).single();
 
         if (!tab) return NextResponse.json({ message: 'Not Found' }, { status: 404 });
 
-        const updated = await prisma.produksiTabs.update({
-            where: { Id: id },
-            data: { Nama: (body.nama || body.Nama).trim() }
-        });
+        const { data: updated, error } = await db.from<any>('produksi_tabs').update({
+            Nama: body.nama || body.Nama,
+            Order: body.order || body.Order,
+            updated_at: new Date().toISOString()
+        }).eq('id', id);
 
-        return NextResponse.json({ Id: updated.Id, Nama: updated.Nama, Order: updated.Order });
+        if (error) {
+            console.error('Error renaming tab:', error);
+            return NextResponse.json({ message: 'Failed to update' }, { status: 500 });
+        }
+
+        return NextResponse.json({ Id: updated?.Id, Nama: updated?.Nama, Order: updated?.Order });
     } catch (error) {
         console.error('Error renaming tab:', error);
         return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
@@ -36,20 +44,19 @@ export async function DELETE(
         const p = await params;
         const id = parseInt(p.id, 10);
 
-        const tab = await prisma.produksiTabs.findUnique({
-            where: { Id: id }
-        });
+        const { data: tab } = await db.from<any>('produksi_tabs').select('*').eq('id', id).single();
 
         if (!tab) return NextResponse.json({ message: 'Not Found' }, { status: 404 });
 
-        // Cascading delete is actually handled by Prisma (onDelete: Cascade) but manual is safer
-        await prisma.produksis.deleteMany({
-            where: { ProduksiTabId: id }
-        });
+        // Cascading delete - delete related produksis first
+        await db.from<any>('produksis').delete().eq('produksi_tab_id', id);
 
-        await prisma.produksiTabs.delete({
-            where: { Id: id }
-        });
+        const { error } = await db.from<any>('produksi_tabs').delete().eq('id', id);
+
+        if (error) {
+            console.error('Error deleting tab:', error);
+            return NextResponse.json({ message: 'Failed to delete' }, { status: 500 });
+        }
 
         return new NextResponse(null, { status: 204 });
     } catch (error) {

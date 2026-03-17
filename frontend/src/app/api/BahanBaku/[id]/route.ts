@@ -1,5 +1,9 @@
+export const dynamic = 'force-dynamic';
+// Using Node.js runtime for Prisma compatibility
+// Edge runtime now supported with Supabase!
+export const runtime = 'edge';
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { db } from '@/lib/supabase';
 
 export async function PUT(
     request: Request,
@@ -10,26 +14,26 @@ export async function PUT(
         const id = parseInt(p.id, 10);
         const body = await request.json();
 
-        const entity = await prisma.bahanBakus.findUnique({
-            where: { Id: id }
-        });
+        const { data: entity, error: fetchError } = await db.from<any>('bahan_bakus').select('*').eq('id', id).single();
 
         if (!entity) return NextResponse.json({ message: 'Not Found' }, { status: 404 });
 
-        const updated = await prisma.bahanBakus.update({
-            where: { Id: id },
-            data: {
-                ProductSlug: body.productSlug || body.ProductSlug,
-                PerusahaanId: body.perusahaanId || body.PerusahaanId || null,
-                Tanggal: new Date(body.tanggal || body.Tanggal),
-                Jenis: body.jenis || body.Jenis,
-                NamaBahan: body.namaBahan || body.NamaBahan,
-                Kuantum: body.kuantum !== undefined ? body.kuantum : body.Kuantum,
-                Satuan: body.satuan || body.Satuan || 'Kg',
-                Dokumen: body.dokumen || body.Dokumen || '',
-                Keterangan: body.keterangan || body.Keterangan || ''
-            }
-        });
+        const { data: updated, error: updateError } = await db.from<any>('bahan_bakus').update({
+            product_slug: body.productSlug || body.ProductSlug,
+            perusahaan_id: body.perusahaanId || body.PerusahaanId || null,
+            tanggal: body.tanggal || body.Tanggal,
+            jenis: body.jenis || body.Jenis,
+            nama_bahan: body.namaBahan || body.NamaBahan,
+            kuantum: body.kuantum !== undefined ? body.kuantum : body.Kuantum,
+            satuan: body.satuan || body.Satuan || 'Kg',
+            dokumen: body.dokumen || body.Dokumen || '',
+            keterangan: body.keterangan || body.Keterangan || ''
+        }).eq('id', id);
+
+        if (updateError) {
+            console.error('Error updating bahanbaku:', updateError);
+            return NextResponse.json({ message: 'Failed to update' }, { status: 500 });
+        }
 
         return NextResponse.json(updated);
     } catch (error) {
@@ -46,15 +50,16 @@ export async function DELETE(
         const p = await params;
         const id = parseInt(p.id, 10);
 
-        const entity = await prisma.bahanBakus.findUnique({
-            where: { Id: id }
-        });
+        const { data: entity, error: fetchError } = await db.from<any>('bahan_bakus').select('*').eq('id', id).single();
 
         if (!entity) return NextResponse.json({ message: 'Not Found' }, { status: 404 });
 
-        await prisma.bahanBakus.delete({
-            where: { Id: id }
-        });
+        const { error: deleteError } = await db.from<any>('bahan_bakus').delete().eq('id', id);
+
+        if (deleteError) {
+            console.error('Error deleting bahanbaku:', deleteError);
+            return NextResponse.json({ message: 'Failed to delete' }, { status: 500 });
+        }
 
         return new NextResponse(null, { status: 204 });
     } catch (error) {

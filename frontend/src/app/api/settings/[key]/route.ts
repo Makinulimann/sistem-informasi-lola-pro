@@ -1,5 +1,9 @@
+export const dynamic = 'force-dynamic';
+// Using Node.js runtime for Prisma compatibility
+// Edge runtime now supported with Supabase!
+export const runtime = 'edge';
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { db } from '@/lib/supabase';
 
 export async function GET(
     request: Request,
@@ -7,9 +11,7 @@ export async function GET(
 ) {
     try {
         const p = await params;
-        const setting = await prisma.app_settings.findUnique({
-            where: { key: p.key }
-        });
+        const { data: setting } = await db.from<any>('app_settings').select('*').eq('key', p.key).single();
 
         if (!setting) {
             return NextResponse.json({ message: `Setting '${p.key}' not found.` }, { status: 404 });

@@ -16,9 +16,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { bahanBakuService, Perusahaan, BahanBaku, Material, BalanceStok, BalanceStokRow } from '@/lib/bahanBakuService';
-import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { PencilIcon, Trash2Icon as TrashIcon } from 'lucide-react';
 
 /* ─── Types ─── */
@@ -440,17 +437,18 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
         }
 
         if (dataToExport.length > 0) {
-            const ws = XLSX.utils.json_to_sheet(dataToExport);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, sheetName);
-            XLSX.writeFile(wb, filename);
+            import('xlsx').then((XLSX) => {
+                const ws = XLSX.utils.json_to_sheet(dataToExport);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, sheetName);
+                XLSX.writeFile(wb, filename);
+            });
         } else {
             alert('Tidak ada data untuk diekspor.');
         }
     };
 
     const handleExportPDF = () => {
-        const doc = new jsPDF();
         let headers: string[] = [];
         let dataRows: any[][] = [];
         let title = '';
@@ -495,30 +493,39 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
         }
 
         if (dataRows.length > 0) {
-            doc.text(title, 14, 15);
-            autoTable(doc, {
-                startY: 20,
-                head: [headers],
-                body: dataRows,
-                theme: 'grid',
-                styles: {
-                    font: 'helvetica',
-                    fontSize: 8,
-                    cellPadding: 2,
-                    halign: 'left',
-                },
-                headStyles: {
-                    fillColor: [23, 162, 184], // A nice blue color
-                    textColor: [255, 255, 255],
-                    fontStyle: 'bold',
-                },
-                columnStyles: {
-                    3: { halign: 'right' }, // Pemasukan
-                    4: { halign: 'right' }, // Pengeluaran
-                    5: { halign: 'right' }, // Stok Akhir
-                }
+            Promise.all([
+                import('jspdf'),
+                import('jspdf-autotable')
+            ]).then(([jsPDFModule, autoTableModule]) => {
+                const jsPDF = jsPDFModule.default;
+                const autoTable = autoTableModule.default;
+
+                const doc = new jsPDF();
+                doc.text(title, 14, 15);
+                autoTable(doc, {
+                    startY: 20,
+                    head: [headers],
+                    body: dataRows,
+                    theme: 'grid',
+                    styles: {
+                        font: 'helvetica',
+                        fontSize: 8,
+                        cellPadding: 2,
+                        halign: 'left',
+                    },
+                    headStyles: {
+                        fillColor: [23, 162, 184], // A nice blue color
+                        textColor: [255, 255, 255],
+                        fontStyle: 'bold',
+                    },
+                    columnStyles: {
+                        3: { halign: 'right' }, // Pemasukan
+                        4: { halign: 'right' }, // Pengeluaran
+                        5: { halign: 'right' }, // Stok Akhir
+                    }
+                });
+                doc.save(`${title.replace(/\s/g, '_')}_${format(new Date(), 'yyyyMMdd_HHmmss')}.pdf`);
             });
-            doc.save(`${title.replace(/\s/g, '_')}_${format(new Date(), 'yyyyMMdd_HHmmss')}.pdf`);
         } else {
             alert('Tidak ada data untuk diekspor.');
         }

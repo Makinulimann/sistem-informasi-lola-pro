@@ -1,5 +1,9 @@
+export const dynamic = 'force-dynamic';
+// Using Node.js runtime for Prisma compatibility
+// Edge runtime now supported with Supabase!
+export const runtime = 'edge';
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { db } from '@/lib/supabase';
 
 export async function GET(request: Request) {
     try {
@@ -19,35 +23,39 @@ export async function GET(request: Request) {
         const startUtc = new Date(localStart.getTime() - utcOffset);
         const endUtc = new Date(localEnd.getTime() - utcOffset);
 
-        // Fetch records within date range first to get all distinct areas/equipment efficiently
-        const baseQuery = await prisma.maintenances.findMany({
-            where: { Tanggal: { gte: startUtc, lt: endUtc } }
+        // Fetch all records
+        const { data: baseQuery } = await db.from<any>('maintenances').select('*').execute();
+
+        const allAreas = [...new Set((baseQuery || []).map((m: any) => m.area || m.Area))].filter(Boolean).sort();
+        const allEquipments = [...new Set((baseQuery || []).map((m: any) => m.equipment || m.Equipment))].filter(Boolean).sort();
+
+        // Apply date range and filters
+        let filteredRecords = (baseQuery || []).filter((m: any) => {
+            const mTanggal = m.tanggal || m.Tanggal;
+            const mDate = new Date(mTanggal);
+            return mDate >= startUtc && mDate < endUtc;
         });
 
-        const allAreas = [...new Set(baseQuery.map(m => m.Area))].sort();
-        const allEquipments = [...new Set(baseQuery.map(m => m.Equipment))].sort();
-
-        // Now apply area/equipment filters
-        let filteredRecords = baseQuery;
         if (area) {
-            filteredRecords = filteredRecords.filter(m => m.Area === area);
+            filteredRecords = filteredRecords.filter((m: any) => (m.area || m.Area) === area);
         }
         if (equipment) {
-            filteredRecords = filteredRecords.filter(m => m.Equipment === equipment);
+            filteredRecords = filteredRecords.filter((m: any) => (m.equipment || m.Equipment) === equipment);
         }
 
         const byAreaDict: { [key: string]: number } = {};
         const byEquipmentDict: { [key: string]: number } = {};
         const byDayDict: { [key: string]: number } = {};
 
-        filteredRecords.forEach(m => {
-            // Group Area
-            byAreaDict[m.Area] = (byAreaDict[m.Area] || 0) + 1;
-            // Group Equipment
-            byEquipmentDict[m.Equipment] = (byEquipmentDict[m.Equipment] || 0) + 1;
+        filteredRecords.forEach((m: any) => {
+            const mArea = m.area || m.Area || 'Unknown';
+            const mEquipment = m.equipment || m.Equipment || 'Unknown';
+            const mTanggal = m.tanggal || m.Tanggal;
 
-            // Group Day (must convert to local time first)
-            const localDate = new Date(new Date(m.Tanggal).getTime() + utcOffset);
+            byAreaDict[mArea] = (byAreaDict[mArea] || 0) + 1;
+            byEquipmentDict[mEquipment] = (byEquipmentDict[mEquipment] || 0) + 1;
+
+            const localDate = new Date(new Date(mTanggal).getTime() + utcOffset);
             const dayStr = String(localDate.getUTCDate()).padStart(2, '0');
             byDayDict[dayStr] = (byDayDict[dayStr] || 0) + 1;
         });
@@ -67,7 +75,7 @@ export async function GET(request: Request) {
         return NextResponse.json({
             bulan: targetBulan,
             tahun: targetTahun,
-            totalKegiatan: filteredRecords.length,
+            totalActivities: filteredRecords.length,
             areas: allAreas,
             equipments: allEquipments,
             byArea,

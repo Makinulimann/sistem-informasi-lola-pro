@@ -339,7 +339,7 @@ export function RKAPPage({ productCategory, productName, productSlug }: RKAPPage
             {/* Page Header */}
             <div>
                 <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-                    RKAP — {productName}
+                    RKAP {productName}
                 </h1>
                 <p className="text-sm text-gray-500 mt-1">
                     Kelola data Rencana Kerja dan Anggaran Perusahaan

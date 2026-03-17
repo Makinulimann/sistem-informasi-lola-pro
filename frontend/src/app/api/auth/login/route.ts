@@ -1,7 +1,17 @@
+export const dynamic = 'force-dynamic';
+// Using Edge runtime with Supabase Auth (secure, no bcrypt needed)
+export const runtime = 'edge';
+
+export const preferredRegion = 'sin1';
+
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
-import bcrypt from 'bcryptjs';
+import { createClient } from '@supabase/supabase-js';
 import { signToken } from '@/lib/auth';
+
+// Create Supabase client for Auth (Edge-compatible)
+const supabaseUrl = 'https://wtnnvlibowwffgtjzoou.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind0bm52bGlib3d3ZmZndGp6b291Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzODM2MzgsImV4cCI6MjA4ODk1OTYzOH0.XxR1BNfFpVhId1nOSMfmvxvcVPi5SBE3JQG-BZJIvwU';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export async function POST(request: Request) {
     try {
@@ -14,50 +24,62 @@ export async function POST(request: Request) {
             );
         }
 
-        // Find user
-        const user = await prisma.users.findUnique({
-            where: { Email: email }
+        // Sign in with Supabase Auth (Edge-compatible, secure)
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+            email,
+            password,
         });
 
-        if (!user) {
+        if (authError || !authData.user) {
             return NextResponse.json(
                 { message: 'Email atau password salah.' },
                 { status: 401 }
             );
         }
 
-        if (!user.IsVerified) {
+        // Get user metadata from our users table using direct REST call
+        const usersResponse = await fetch(
+            `${supabaseUrl}/rest/v1/users?email=eq.${encodeURIComponent(email)}&limit=1`,
+            {
+                headers: {
+                    'apikey': supabaseAnonKey,
+                    'Authorization': `Bearer ${supabaseAnonKey}`,
+                },
+            }
+        );
+        const users = await usersResponse.json();
+        
+        if (!usersResponse.ok || !users || users.length === 0) {
+            return NextResponse.json(
+                { message: 'User tidak ditemukan di sistem. Silakan register terlebih dahulu.' },
+                { status: 401 }
+            );
+        }
+
+        const user = users[0];
+
+        if (!user.is_verified) {
             return NextResponse.json(
                 { message: 'Akun belum diverifikasi. Silakan hubungi administrator.' },
                 { status: 403 }
             );
         }
 
-        // Verify Password
-        const passwordValid = await bcrypt.compare(password, user.PasswordHash);
-        if (!passwordValid) {
-            return NextResponse.json(
-                { message: 'Email atau password salah.' },
-                { status: 401 }
-            );
-        }
-
-        // Generate token matching the exact payload expectations
+        // Generate token
         const token = await signToken({
-            sub: user.Id,
-            email: user.Email,
-            name: user.FullName,
-            role: user.Role,
+            sub: user.id,
+            email: user.email,
+            name: user.full_name,
+            role: user.role,
         });
 
-        // We no longer strictly need to update RefreshToken in DB unless the client specifically asks for it, but for compatibility we mimic the endpoint shape:
         return NextResponse.json({
             accessToken: token,
             user: {
-                id: user.Id,
-                email: user.Email,
-                fullName: user.FullName,
-                role: user.Role
+                id: user.id,
+                email: user.email,
+                fullName: user.full_name,
+                role: user.role
             }
         });
 

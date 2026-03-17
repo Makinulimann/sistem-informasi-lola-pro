@@ -1,9 +1,6 @@
 ﻿'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import {
@@ -327,93 +324,103 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
         });
 
         const wsData = [...headerRows, th1, th2, ...dataRows];
-        const ws = XLSX.utils.aoa_to_sheet(wsData);
 
-        const startRow = headerRows.length;
-        if (!ws['!merges']) ws['!merges'] = [];
-        ws['!merges'].push(
-            { s: { r: startRow, c: 0 }, e: { r: startRow + 1, c: 0 } },
-            { s: { r: startRow, c: 1 }, e: { r: startRow, c: 3 } },
-            { s: { r: startRow, c: 4 }, e: { r: startRow + 1, c: 4 } },
-            { s: { r: startRow, c: 5 }, e: { r: startRow + 1, c: 5 } },
-            { s: { r: startRow, c: 6 }, e: { r: startRow + 1, c: 6 } },
-            { s: { r: startRow, c: 7 }, e: { r: startRow + 1, c: 7 } }
-        );
+        // Dynamically import XLSX
+        import('xlsx').then((XLSX) => {
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
 
-        ws['!cols'] = [
-            { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 12 },
-            { wch: 18 }, { wch: 18 }, { wch: 14 }, { wch: 30 },
-        ];
+            const startRow = headerRows.length;
+            if (!ws['!merges']) ws['!merges'] = [];
+            ws['!merges'].push(
+                { s: { r: startRow, c: 0 }, e: { r: startRow + 1, c: 0 } },
+                { s: { r: startRow, c: 1 }, e: { r: startRow, c: 3 } },
+                { s: { r: startRow, c: 4 }, e: { r: startRow + 1, c: 4 } },
+                { s: { r: startRow, c: 5 }, e: { r: startRow + 1, c: 5 } },
+                { s: { r: startRow, c: 6 }, e: { r: startRow + 1, c: 6 } },
+                { s: { r: startRow, c: 7 }, e: { r: startRow + 1, c: 7 } }
+            );
 
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Data Produksi");
-        XLSX.writeFile(wb, `Produksi_${fullProductName.replace(/\s+/g, '_')}_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+            ws['!cols'] = [
+                { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 12 },
+                { wch: 18 }, { wch: 18 }, { wch: 14 }, { wch: 30 },
+            ];
+
+            const wb = XLSX.utils.book_new();
+        });
     };
 
     const handleExportPDF = () => {
-        const doc = new jsPDF({ orientation: 'landscape' });
-        const activeTabName = tabs.find(t => t.id === activeTabId)?.nama || '';
-        const fullProductName = `${productName} ${activeTabName}`.trim();
-        const exportDate = format(new Date(), 'EEEE, dd MMMM yyyy', { locale: id });
-        const period = `${BULAN_NAMES[bulan]} ${tahun}`;
+        Promise.all([
+            import('jspdf'),
+            import('jspdf-autotable')
+        ]).then(([jsPDFModule, autoTableModule]) => {
+            const jsPDF = jsPDFModule.default;
+            const autoTable = autoTableModule.default;
 
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.text(fullProductName, 14, 15);
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
-        doc.text(`Tanggal Export: ${exportDate}`, 14, 22);
-        doc.text(`Periode Data: ${period}`, 14, 27);
+            const doc = new jsPDF({ orientation: 'landscape' });
+            const activeTabName = tabs.find(t => t.id === activeTabId)?.nama || '';
+            const fullProductName = `${productName} ${activeTabName}`.trim();
+            const exportDate = format(new Date(), 'EEEE, dd MMMM yyyy', { locale: id });
+            const period = `${BULAN_NAMES[bulan]} ${tahun}`;
 
-        const tableRows = filtered.map(row => {
-            const bs = getRawValue(row, 'bs');
-            const ps = getRawValue(row, 'ps');
-            const coa = getRawValue(row, 'coa');
-            const pg = getRawValue(row, 'pg');
-            return [
-                formatDateShort(row.tanggal),
-                fmt(Math.max(0, bs - coa)),
-                fmt(Math.max(0, ps - coa)),
-                fmt(coa),
-                fmt(row.kumulatif),
-                fmt(pg),
-                fmt(row.stokAkhir),
-                row.keterangan || '-'
-            ];
-        });
+            doc.setFontSize(14);
+            doc.setFont('helvetica', 'bold');
+            doc.text(fullProductName, 14, 15);
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            doc.text(`Tanggal Export: ${exportDate}`, 14, 22);
+            doc.text(`Periode Data: ${period}`, 14, 27);
 
-        autoTable(doc, {
-            head: [
-                [
-                    { content: 'Tanggal', rowSpan: 2, styles: { valign: 'middle', halign: 'center' } },
-                    { content: 'Produksi', colSpan: 3, styles: { halign: 'center', fillColor: [16, 185, 129] } },
-                    { content: 'Kumulatif Produksi', rowSpan: 2, styles: { valign: 'middle', halign: 'right' } },
-                    { content: 'Peng. Gudang', rowSpan: 2, styles: { valign: 'middle', halign: 'right' } },
-                    { content: 'Stok Akhir', rowSpan: 2, styles: { valign: 'middle', halign: 'right' } },
-                    { content: 'Keterangan', rowSpan: 2, styles: { valign: 'middle', halign: 'left' } }
+            const tableRows = filtered.map(row => {
+                const bs = getRawValue(row, 'bs');
+                const ps = getRawValue(row, 'ps');
+                const coa = getRawValue(row, 'coa');
+                const pg = getRawValue(row, 'pg');
+                return [
+                    formatDateShort(row.tanggal),
+                    fmt(Math.max(0, bs - coa)),
+                    fmt(Math.max(0, ps - coa)),
+                    fmt(coa),
+                    fmt(row.kumulatif),
+                    fmt(pg),
+                    fmt(row.stokAkhir),
+                    row.keterangan || '-'
+                ];
+            });
+
+            autoTable(doc, {
+                head: [
+                    [
+                        { content: 'Tanggal', rowSpan: 2, styles: { valign: 'middle', halign: 'center' } },
+                        { content: 'Produksi', colSpan: 3, styles: { halign: 'center', fillColor: [16, 185, 129] } },
+                        { content: 'Kumulatif Produksi', rowSpan: 2, styles: { valign: 'middle', halign: 'right' } },
+                        { content: 'Peng. Gudang', rowSpan: 2, styles: { valign: 'middle', halign: 'right' } },
+                        { content: 'Stok Akhir', rowSpan: 2, styles: { valign: 'middle', halign: 'right' } },
+                        { content: 'Keterangan', rowSpan: 2, styles: { valign: 'middle', halign: 'left' } }
+                    ],
+                    [
+                        { content: 'Belum Sampling', styles: { halign: 'right', fontSize: 8 } },
+                        { content: 'Proses Sampling', styles: { halign: 'right', fontSize: 8 } },
+                        { content: 'COA', styles: { halign: 'right', fontSize: 8 } }
+                    ]
                 ],
-                [
-                    { content: 'Belum Sampling', styles: { halign: 'right', fontSize: 8 } },
-                    { content: 'Proses Sampling', styles: { halign: 'right', fontSize: 8 } },
-                    { content: 'COA', styles: { halign: 'right', fontSize: 8 } }
-                ]
-            ],
-            body: tableRows,
-            startY: 35,
-            theme: 'grid',
-            headStyles: { fillColor: [16, 185, 129], textColor: 255, lineColor: 200, lineWidth: 0.1 },
-            styles: { fontSize: 9, cellPadding: 2 },
-            columnStyles: {
-                1: { halign: 'right' },
-                2: { halign: 'right' },
-                3: { halign: 'right' },
-                4: { halign: 'right' },
-                5: { halign: 'right' },
-                6: { halign: 'right' },
-            }
-        });
+                body: tableRows,
+                startY: 35,
+                theme: 'grid',
+                headStyles: { fillColor: [16, 185, 129], textColor: 255, lineColor: 200, lineWidth: 0.1 },
+                styles: { fontSize: 9, cellPadding: 2 },
+                columnStyles: {
+                    1: { halign: 'right' },
+                    2: { halign: 'right' },
+                    3: { halign: 'right' },
+                    4: { halign: 'right' },
+                    5: { halign: 'right' },
+                    6: { halign: 'right' },
+                }
+            });
 
-        doc.save(`Produksi_${fullProductName.replace(/\s+/g, '_')}_${format(new Date(), 'yyyyMMdd')}.pdf`);
+            doc.save(`Produksi_${fullProductName.replace(/\s+/g, '_')}_${format(new Date(), 'yyyyMMdd')}.pdf`);
+        });
     };
 
     // ─── Helpers ───

@@ -1,5 +1,9 @@
+export const dynamic = 'force-dynamic';
+// Using Node.js runtime for Prisma compatibility
+// Edge runtime now supported with Supabase!
+export const runtime = 'edge';
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { db } from '@/lib/supabase';
 
 export async function GET(request: Request) {
     try {
@@ -27,15 +31,21 @@ export async function GET(request: Request) {
         const startUtc = new Date(localStart.getTime() - utcOffset);
         const endUtc = new Date(localEnd.getTime() - utcOffset);
 
-        // Fetch ALL data for batch WIP calculation across time
-        const allRecords: any[] = await prisma.$queryRaw`
-            SELECT * FROM "Produksis" 
-            WHERE "ProductSlug" = ${productSlug} 
-            AND "ProduksiTabId" = ${tabId}
-        `;
+        // Fetch data from Supabase
+        const { data: allRecords, error } = await db.from<any>('produksis').select('*').execute();
+
+        if (error) {
+            console.error('Error fetching produksi:', error);
+            return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
+        }
+
+        // Filter for this product and tab
+        const filteredRecords = (allRecords || []).filter((r: any) => 
+            r.product_slug === productSlug && r.produksi_tab_id === tabId
+        );
 
         // Filter for this month's grid display
-        const dbRecords = allRecords.filter(r => new Date(r.Tanggal) >= startUtc && new Date(r.Tanggal) < endUtc);
+        const dbRecords = filteredRecords.filter(r => new Date(r.tanggal) >= startUtc && new Date(r.tanggal) < endUtc);
 
         const daysInMonth = new Date(tahun, bulan, 0).getDate();
         const fullList = [];
@@ -46,20 +56,20 @@ export async function GET(request: Request) {
         for (let day = 1; day <= daysInMonth; day++) {
             const date = new Date(tahun, bulan - 1, day);
 
-            const match = dbRecords.find(r => {
-                const localD = new Date(new Date(r.Tanggal).getTime() + utcOffset);
+            const match = dbRecords.find((r: any) => {
+                const localD = new Date(new Date(r.tanggal).getTime() + utcOffset);
                 return localD.getDate() === date.getDate() && localD.getMonth() === date.getMonth();
             });
 
-            const bs = match?.BS ?? 0;
-            const ps = match?.PS ?? 0;
-            const coa = match?.COA ?? 0;
-            const pg = match?.PG ?? 0;
-            const ket = match?.Keterangan ?? "";
-            const id = match?.Id ?? 0;
-            const batchKode = match?.BatchKode ?? "";
-            const psBatchKode = match?.PSBatchKode ?? "";
-            const coaBatchKode = match?.COABatchKode ?? "";
+            const bs = match?.bs ?? 0;
+            const ps = match?.ps ?? 0;
+            const coa = match?.coa ?? 0;
+            const pg = match?.pg ?? 0;
+            const ket = match?.keterangan ?? "";
+            const id = match?.id ?? 0;
+            const batchKode = match?.batch_kode ?? "";
+            const psBatchKode = match?.ps_batch_kode ?? "";
+            const coaBatchKode = match?.coa_batch_kode ?? "";
 
             runningKumulatif += bs;
             runningStok += (bs - pg);
@@ -93,18 +103,18 @@ export async function GET(request: Request) {
 
         // --- Calculate Batch WIP available globally ---
         const batchMap: { [kode: string]: { bs: number, ps: number, coa: number } } = {};
-        for (const r of allRecords) {
-            if (r.BatchKode && r.BS > 0) {
-                if (!batchMap[r.BatchKode]) batchMap[r.BatchKode] = { bs: 0, ps: 0, coa: 0 };
-                batchMap[r.BatchKode].bs += r.BS;
+        for (const r of filteredRecords) {
+            if (r.batch_kode && r.bs > 0) {
+                if (!batchMap[r.batch_kode]) batchMap[r.batch_kode] = { bs: 0, ps: 0, coa: 0 };
+                batchMap[r.batch_kode].bs += r.bs;
             }
-            if (r.PSBatchKode && r.PS > 0) {
-                if (!batchMap[r.PSBatchKode]) batchMap[r.PSBatchKode] = { bs: 0, ps: 0, coa: 0 };
-                batchMap[r.PSBatchKode].ps += r.PS;
+            if (r.ps_batch_kode && r.ps > 0) {
+                if (!batchMap[r.ps_batch_kode]) batchMap[r.ps_batch_kode] = { bs: 0, ps: 0, coa: 0 };
+                batchMap[r.ps_batch_kode].ps += r.ps;
             }
-            if (r.COABatchKode && r.COA > 0) {
-                if (!batchMap[r.COABatchKode]) batchMap[r.COABatchKode] = { bs: 0, ps: 0, coa: 0 };
-                batchMap[r.COABatchKode].coa += r.COA;
+            if (r.coa_batch_kode && r.coa > 0) {
+                if (!batchMap[r.coa_batch_kode]) batchMap[r.coa_batch_kode] = { bs: 0, ps: 0, coa: 0 };
+                batchMap[r.coa_batch_kode].coa += r.coa;
             }
         }
 
@@ -154,37 +164,54 @@ export async function POST(request: Request) {
         const utcOffset = 7 * 60 * 60 * 1000;
         const targetUtc = new Date(localDate.getTime() - utcOffset);
 
-        // Upsert equivalent since we might not have a unique index on (TabId, Tanggal)
-        const existingArr: any[] = await prisma.$queryRaw`
-            SELECT * FROM "Produksis"
-            WHERE "ProduksiTabId" = ${tabId} AND "Tanggal" = ${targetUtc}
-            LIMIT 1
-        `;
-        const existing = existingArr[0];
+        // Check for existing record
+        const { data: existingArr } = await db.from<any>('produksis').select('*').eq('produksi_tab_id', tabId).execute();
+        const existing = (existingArr || []).find((r: any) => {
+            const existingDate = new Date(r.tanggal);
+            return existingDate.getTime() === targetUtc.getTime();
+        });
 
         if (existing) {
-            await prisma.$executeRaw`
-                UPDATE "Produksis" SET
-                    "BS" = ${bsValue},
-                    "PS" = ${psValue},
-                    "COA" = ${coaValue},
-                    "PG" = ${pgValue},
-                    "Keterangan" = ${ketValue},
-                    "BatchKode" = ${batchKodeValue},
-                    "PSBatchKode" = ${psBatchKodeValue || existing.PSBatchKode},
-                    "COABatchKode" = ${coaBatchKodeValue || existing.COABatchKode},
-                    "Kumulatif" = 0,
-                    "StokAkhir" = 0
-                WHERE "Id" = ${existing.Id}
-            `;
+            // Update existing
+            const { error: updateError } = await db.from<any>('produksis').update({
+                bs: bsValue,
+                ps: psValue,
+                coa: coaValue,
+                pg: pgValue,
+                keterangan: ketValue,
+                batch_kode: batchKodeValue,
+                ps_batch_kode: psBatchKodeValue || existing.ps_batch_kode,
+                coa_batch_kode: coaBatchKodeValue || existing.coa_batch_kode,
+                kumulatif: 0,
+                stok_akhir: 0
+            }).eq('id', existing.id);
+
+            if (updateError) {
+                console.error('Error updating produksi:', updateError);
+                return NextResponse.json({ message: 'Failed to update' }, { status: 500 });
+            }
         } else {
-            await prisma.$executeRaw`
-                INSERT INTO "Produksis" (
-                    "ProductSlug", "ProduksiTabId", "Tanggal", "BS", "PS", "COA", "PG", "Keterangan", "BatchKode", "PSBatchKode", "COABatchKode", "Kumulatif", "StokAkhir"
-                ) VALUES (
-                    ${productSlug}, ${tabId}, ${targetUtc}, ${bsValue}, ${psValue}, ${coaValue}, ${pgValue}, ${ketValue}, ${batchKodeValue}, ${psBatchKodeValue}, ${coaBatchKodeValue}, 0, 0
-                )
-            `;
+            // Insert new
+            const { error: insertError } = await db.from<any>('produksis').insert({
+                product_slug: productSlug,
+                produksi_tab_id: tabId,
+                tanggal: targetUtc.toISOString(),
+                bs: bsValue,
+                ps: psValue,
+                coa: coaValue,
+                pg: pgValue,
+                keterangan: ketValue,
+                batch_kode: batchKodeValue,
+                ps_batch_kode: psBatchKodeValue,
+                coa_batch_kode: coaBatchKodeValue,
+                kumulatif: 0,
+                stok_akhir: 0
+            });
+
+            if (insertError) {
+                console.error('Error inserting produksi:', insertError);
+                return NextResponse.json({ message: 'Failed to insert' }, { status: 500 });
+            }
         }
 
         return NextResponse.json({ success: true });

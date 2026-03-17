@@ -1,5 +1,9 @@
+export const dynamic = 'force-dynamic';
+// Using Node.js runtime for Prisma compatibility
+// Edge runtime now supported with Supabase!
+export const runtime = 'edge';
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { db } from '@/lib/supabase';
 
 export async function GET(request: Request) {
     try {
@@ -9,58 +13,55 @@ export async function GET(request: Request) {
         const search = searchParams.get('search');
         const page = parseInt(searchParams.get('page') || '1', 10);
         const limit = parseInt(searchParams.get('limit') || '10', 10);
-        const sortBy = searchParams.get('sortBy') || 'Tanggal';
+        const sortBy = searchParams.get('sortBy') || 'tanggal';
         const sortDesc = searchParams.get('sortDesc') !== 'false';
 
-        const whereClause: any = {};
+        // Get all data (Supabase REST has limited query capabilities)
+        const { data: list, error } = await db.from<any>('aktivitas_harians').select('*').execute();
 
+        if (error) {
+            console.error('Error fetching aktivitas:', error);
+            return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
+        }
+
+        let filteredData = list || [];
+
+        // Filter by date
         if (bulan || tahun) {
             const y = tahun ? parseInt(tahun, 10) : new Date().getFullYear();
             const m = bulan ? parseInt(bulan, 10) : 1;
-
-            const start = new Date(Date.UTC(y, m - 1, 1));
-            const end = new Date(Date.UTC(bulan ? y : y + 1, bulan ? m : 0, 1));
-
-            whereClause.Tanggal = { gte: start, lt: end };
+            
+            filteredData = filteredData.filter((item: any) => {
+                const itemDate = new Date(item.tanggal);
+                return itemDate.getFullYear() === y && (!bulan || itemDate.getMonth() + 1 === m);
+            });
         }
 
+        // Filter by search
         if (search) {
             const s = search.toLowerCase();
-            whereClause.OR = [
-                { Pic: { contains: s, mode: 'insensitive' } },
-                { Lokasi: { contains: s, mode: 'insensitive' } },
-                { Deskripsi: { contains: s, mode: 'insensitive' } }
-            ];
+            filteredData = filteredData.filter((item: any) => 
+                (item.pic && item.pic.toLowerCase().includes(s)) ||
+                (item.lokasi && item.lokasi.toLowerCase().includes(s)) ||
+                (item.deskripsi && item.deskripsi.toLowerCase().includes(s))
+            );
         }
 
-        const total = await prisma.aktivitasHarians.count({ where: whereClause });
-
-        let orderByClause: any = {};
-        if (sortBy) {
-            const pascalSortBy = sortBy.charAt(0).toUpperCase() + sortBy.slice(1);
-            if (pascalSortBy === 'Tanggal') {
-                orderByClause = [
-                    { Tanggal: sortDesc ? 'desc' : 'asc' },
-                    { CreatedAt: sortDesc ? 'desc' : 'asc' }
-                ];
-            } else {
-                orderByClause[pascalSortBy] = sortDesc ? 'desc' : 'asc';
-            }
-        } else {
-            orderByClause = [
-                { Tanggal: 'desc' },
-                { CreatedAt: 'desc' }
-            ];
-        }
-
-        const list = await prisma.aktivitasHarians.findMany({
-            where: whereClause,
-            orderBy: orderByClause,
-            skip: (page - 1) * limit,
-            take: limit
+        // Sort
+        const sortDir = sortDesc ? -1 : 1;
+        filteredData.sort((a: any, b: any) => {
+            const aVal = a[sortBy];
+            const bVal = b[sortBy];
+            if (aVal < bVal) return -1 * sortDir;
+            if (aVal > bVal) return 1 * sortDir;
+            return 0;
         });
 
-        return NextResponse.json({ Data: list, Total: total });
+        // Paginate
+        const total = filteredData.length;
+        const paginatedData = filteredData.slice((page - 1) * limit, page * limit);
+
+        return NextResponse.json({ Data: paginatedData, Total: total });
     } catch (error) {
         console.error('Error fetching aktivitas harian:', error);
         return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
@@ -71,16 +72,20 @@ export async function POST(request: Request) {
     try {
         const body = await request.json();
 
-        const entity = await prisma.aktivitasHarians.create({
-            data: {
-                Tanggal: new Date(body.tanggal || body.Tanggal),
-                Pic: body.pic || body.Pic,
-                Lokasi: body.lokasi || body.Lokasi,
-                Deskripsi: body.deskripsi || body.Deskripsi,
-                Dokumentasi: body.dokumentasi || body.Dokumentasi || '',
-                CreatedAt: new Date()
-            }
-        });
+        const insertData = {
+            product_slug: body.productSlug || body.ProductSlug,
+            pic: body.pic || body.Pic || '',
+            lokasi: body.lokasi || body.Lokasi || '',
+            tanggal: body.tanggal || body.Tanggal || new Date().toISOString(),
+            deskripsi: body.deskripsi || body.Deskripsi || '',
+        };
+
+        const { data: entity, error } = await db.from<any>('aktivitas_harians').insert(insertData);
+
+        if (error) {
+            console.error('Error creating aktivitas:', error);
+            return NextResponse.json({ message: 'Failed to create' }, { status: 500 });
+        }
 
         return NextResponse.json(entity, { status: 201 });
     } catch (error) {

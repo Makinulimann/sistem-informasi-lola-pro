@@ -1,39 +1,39 @@
+export const dynamic = 'force-dynamic';
+// Using Node.js runtime for Prisma compatibility
+// Edge runtime now supported with Supabase!
+export const runtime = 'edge';
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { db } from '@/lib/supabase';
 
 export async function GET() {
     try {
-        const allMenus = await prisma.sidebarMenus.findMany({
-            where: { IsActive: true },
-            orderBy: { Order: 'asc' }
-        });
+        const { data: allMenus } = await db.from<any>('sidebar_menus').select('*').execute();
 
-        const topLevel = allMenus.filter(m => m.ParentId === null);
+        const topLevel = (allMenus || []).filter((m: any) => (m.parent_id === null || m.ParentId === null));
 
-        // In Prisma, we might not have a direct children mapping populated if not included, but we have all flat records.
         const categories: any[] = [];
 
         for (const top of topLevel) {
-            const children = allMenus.filter(m => m.ParentId === top.Id);
+            const children = (allMenus || []).filter((m: any) => (m.parent_id || m.ParentId) === (top.id || top.Id));
 
-            const hasProducts = children.some(c => allMenus.some(s => s.ParentId === c.Id));
+            const hasProducts = children.some((c: any) => (allMenus || []).some((s: any) => (s.parent_id || s.ParentId) === (c.id || c.Id)));
             if (!hasProducts) continue;
 
-            const grandchildren = children.flatMap(c => allMenus.filter(s => s.ParentId === c.Id));
-            const firstGrandChild = grandchildren.find(m => m.Href !== '#');
+            const grandchildren = children.flatMap((c: any) => (allMenus || []).filter((s: any) => (s.parent_id || s.ParentId) === (c.id || c.Id)));
+            const firstGrandChild = grandchildren.find((m: any) => (m.href || m.Href) !== '#');
 
             let categorySlug = null;
             if (firstGrandChild) {
-                // e.g., "/dashboard/phonska/phonska-1" => [ "dashboard", "phonska", "phonska-1" ]
-                const parts = firstGrandChild.Href.split('/').filter(s => s);
+                const href = firstGrandChild.href || firstGrandChild.Href;
+                const parts = href.split('/').filter((s: string) => s);
                 if (parts.length >= 2) categorySlug = parts[1];
             }
 
             if (categorySlug) {
                 categories.push({
                     slug: categorySlug,
-                    label: top.Label,
-                    icon: top.Icon,
+                    label: top.label || top.Label,
+                    icon: top.icon || top.Icon,
                     productCount: children.length
                 });
             }

@@ -1,5 +1,9 @@
+export const dynamic = 'force-dynamic';
+// Using Node.js runtime for Prisma compatibility
+// Edge runtime now supported with Supabase!
+export const runtime = 'edge';
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { db } from '@/lib/supabase';
 
 function titleCase(s: string) {
     return s.split('-')
@@ -95,14 +99,16 @@ export async function GET(request: Request) {
         const categorySlug = category.toLowerCase();
 
         // 1. Discover products
-        const allMenus = await prisma.sidebarMenus.findMany({
-            where: { IsActive: true, Href: { not: '#' } }
-        });
+        const { data: allMenus } = await db.from<any>('sidebar_menus').select('*').execute();
 
-        const productSlugs = [...new Set(allMenus
-            .filter(m => m.Href && m.Href.includes(`/dashboard/${categorySlug}/`))
-            .map(m => {
-                const parts = m.Href!.split('/').filter(s => s);
+        const productSlugs = [...new Set((allMenus || [])
+            .filter((m: any) => {
+                const href = m.href || m.Href;
+                return href && href.includes(`/dashboard/${categorySlug}/`);
+            })
+            .map((m: any) => {
+                const href = m.href || m.Href;
+                const parts = href.split('/').filter((s: string) => s);
                 return parts.length >= 3 ? parts[2] : null;
             })
             .filter(Boolean)
@@ -119,12 +125,15 @@ export async function GET(request: Request) {
 
         // 2. Product labels
         const productLabels: { [key: string]: string } = {};
-        for (const menu of allMenus) {
+        for (const menu of allMenus || []) {
+            const href = menu.href || menu.Href;
+            const parentId = menu.parent_id || menu.ParentId;
+
             for (const slug of productSlugs) {
-                if (menu.Href && menu.Href.includes(`/${slug}/`)) {
-                    const parent = allMenus.find(m => m.Id === menu.ParentId);
+                if (href && href.includes(`/${slug}/`)) {
+                    const parent = (allMenus || []).find((m: any) => (m.id || m.Id) === parentId);
                     if (parent && !productLabels[slug]) {
-                        productLabels[slug] = parent.Label;
+                        productLabels[slug] = parent.label || parent.Label;
                     }
                 }
             }
@@ -137,116 +146,135 @@ export async function GET(request: Request) {
         const startUtc = new Date(localStart.getTime() - utcOffset);
         const endUtc = new Date(localEnd.getTime() - utcOffset);
 
-        // Fetch all materials at once for these products to minimize queries? Just loop is fine
+        // Fetch all materials
+        const { data: allProductMaterials } = await db.from<any>('product_materials').select('*').execute();
+
+        // Fetch all master items
+        const { data: allMasterItems } = await db.from<any>('master_items').select('*').execute();
+        const masterItemsMap = new Map();
+        (allMasterItems || []).forEach((m: any) => masterItemsMap.set(m.id || m.Id, m));
+
+        // Fetch all bahan_bakus
+        const { data: allBahanBaku } = await db.from<any>('bahan_bakus').select('*').execute();
+
+        // Fetch all produksi_tabs
+        const { data: allTabs } = await db.from<any>('produksi_tabs').select('*').execute();
+
+        // Fetch all produksis
+        const { data: allProduksi } = await db.from<any>('produksis').select('*').execute();
+
         const results = [];
 
         for (const slug of productSlugs) {
-            const configuredMaterials = await prisma.productMaterials.findMany({
-                where: { ProductSlug: slug },
-                include: { MasterItems: true },
-                orderBy: [
-                    { Jenis: 'asc' },
-                    { MasterItems: { Nama: 'asc' } }
-                ]
-            });
+            const configuredMaterials = (allProductMaterials || []).filter((pm: any) => (pm.product_slug || pm.ProductSlug) === slug);
 
-            const configuredNames = configuredMaterials.map(pm => pm.MasterItems.Nama).filter(Boolean);
+            // Join with master items
+            const materialSummary = configuredMaterials.map((pm: any) => {
+                const masterItemId = pm.master_item_id || pm.MasterItemId;
+                const masterItem = masterItemsMap.get(masterItemId);
+                const name = masterItem?.nama || masterItem?.Nama || '';
+                const satuan = masterItem?.satuan_default || masterItem?.SatuanDefault || 'Kg';
+                const jenis = pm.jenis || pm.Jenis;
 
-            const materialRecords = configuredNames.length > 0
-                ? await prisma.bahanBakus.findMany({
-                    where: { NamaBahan: { in: configuredNames } }
-                }) : [];
+                const records = (allBahanBaku || []).filter((r: any) => {
+                    const rNamaBahan = r.nama_bahan || r.NamaBahan;
+                    return rNamaBahan && rNamaBahan.toLowerCase() === name.toLowerCase();
+                });
 
-            const materialSummary = configuredMaterials.map(pm => {
-                const name = pm.MasterItems.Nama;
-                const satuan = pm.MasterItems.SatuanDefault || 'Kg';
-                const records = materialRecords.filter(r => r.NamaBahan.toLowerCase() === name.toLowerCase());
-
-                const periodRecords = records.filter(r => new Date(r.Tanggal) >= startUtc && new Date(r.Tanggal) < endUtc);
+                const periodRecords = records.filter((r: any) => {
+                    const rTanggal = r.tanggal || r.Tanggal;
+                    return new Date(rTanggal) >= startUtc && new Date(rTanggal) < endUtc;
+                });
 
                 const totalIn = periodRecords
-                    .filter(r => r.Tipe === 'Suplai')
-                    .reduce((sum, r) => sum + convertUnit(r.Kuantum, r.Satuan, satuan), 0);
+                    .filter((r: any) => (r.tipe || r.Tipe) === 'Suplai')
+                    .reduce((sum: number, r: any) => sum + convertUnit(r.kuantum || r.Kuantum, r.satuan || r.Satuan, satuan), 0);
                 const totalOut = periodRecords
-                    .filter(r => r.Tipe === 'Mutasi')
-                    .reduce((sum, r) => sum + convertUnit(r.Kuantum, r.Satuan, satuan), 0);
+                    .filter((r: any) => (r.tipe || r.Tipe) === 'Mutasi')
+                    .reduce((sum: number, r: any) => sum + convertUnit(r.kuantum || r.Kuantum, r.satuan || r.Satuan, satuan), 0);
 
                 const cumIn = records
-                    .filter(r => new Date(r.Tanggal) < endUtc && r.Tipe === 'Suplai')
-                    .reduce((sum, r) => sum + convertUnit(r.Kuantum, r.Satuan, satuan), 0);
+                    .filter((r: any) => {
+                        const rTanggal = r.tanggal || r.Tanggal;
+                        return new Date(rTanggal) < endUtc && (r.tipe || r.Tipe) === 'Suplai';
+                    })
+                    .reduce((sum: number, r: any) => sum + convertUnit(r.kuantum || r.Kuantum, r.satuan || r.Satuan, satuan), 0);
                 const cumOut = records
-                    .filter(r => new Date(r.Tanggal) < endUtc && r.Tipe === 'Mutasi')
-                    .reduce((sum, r) => sum + convertUnit(r.Kuantum, r.Satuan, satuan), 0);
+                    .filter((r: any) => {
+                        const rTanggal = r.tanggal || r.Tanggal;
+                        return new Date(rTanggal) < endUtc && (r.tipe || r.Tipe) === 'Mutasi';
+                    })
+                    .reduce((sum: number, r: any) => sum + convertUnit(r.kuantum || r.Kuantum, r.satuan || r.Satuan, satuan), 0);
 
                 return {
                     nama: name,
-                    jenis: pm.Jenis,
+                    jenis: jenis,
                     satuan,
                     suplai: totalIn,
                     mutasi: totalOut,
                     stok: cumIn - cumOut
-                }
+                };
             });
 
-            // Production summary
-            const tabs = await prisma.produksiTabs.findMany({
-                where: { ProductSlug: slug }
-            });
+            const tabs = (allTabs || []).filter((t: any) => (t.product_slug || t.ProductSlug) === slug);
 
-            const produksiRecords = await prisma.produksis.findMany({
-                where: {
-                    ProductSlug: slug
-                }
-            });
+            const produksiRecords = (allProduksi || []).filter((p: any) => (p.product_slug || p.ProductSlug) === slug);
 
             // Split into this month vs all time
-            const monthlyRecords = produksiRecords.filter(r =>
-                new Date(r.Tanggal) >= startUtc && new Date(r.Tanggal) < endUtc
-            );
+            const monthlyRecords = produksiRecords.filter((r: any) => {
+                const rTanggal = r.tanggal || r.Tanggal;
+                return new Date(rTanggal) >= startUtc && new Date(rTanggal) < endUtc;
+            });
 
             let totalBS = 0, totalPS = 0, totalCOA = 0, totalPG = 0;
             let totalBelumSampling = 0, totalProsesSampling = 0;
 
-            const tabSummaries = tabs.map(tab => {
-                const tabAllRecords = produksiRecords.filter(r => r.ProduksiTabId === tab.Id);
-                const tabMonthlyRecords = monthlyRecords.filter(r => r.ProduksiTabId === tab.Id);
+            const tabSummaries = tabs.map((tab: any) => {
+                const tabId = tab.id || tab.Id;
+                const tabAllRecords = produksiRecords.filter((r: any) => (r.produksi_tab_id || r.ProduksiTabId) === tabId);
+                const tabMonthlyRecords = monthlyRecords.filter((r: any) => (r.produksi_tab_id || r.ProduksiTabId) === tabId);
 
                 // --- 1. Monthly totals (BS, PG, COA) ---
                 const groupedMonthly: { [key: string]: any } = {};
                 for (const r of tabMonthlyRecords) {
-                    const localD = new Date(new Date(r.Tanggal).getTime() + utcOffset);
+                    const rTanggal = r.tanggal || r.Tanggal;
+                    const localD = new Date(new Date(rTanggal).getTime() + utcOffset);
                     const key = localD.toISOString().split('T')[0];
                     if (!groupedMonthly[key]) {
                         groupedMonthly[key] = r;
                     }
                 }
                 const dedupedMonthly: any[] = Object.values(groupedMonthly);
-                const bs = dedupedMonthly.reduce((s, r) => s + r.BS, 0);
-                const pg = dedupedMonthly.reduce((s, r) => s + r.PG, 0);
-                const coa = dedupedMonthly.reduce((s, r) => s + r.COA, 0);
+                const bs = dedupedMonthly.reduce((s: number, r: any) => s + (r.bs || r.BS || 0), 0);
+                const pg = dedupedMonthly.reduce((s: number, r: any) => s + (r.pg || r.PG || 0), 0);
+                const coa = dedupedMonthly.reduce((s: number, r: any) => s + (r.coa || r.COA || 0), 0);
 
                 totalBS += bs;
                 totalPG += pg;
                 totalCOA += coa;
 
-                // --- 2. Global Batch Balances (Belum Sampling, Proses Sampling) ---
-                // We calculate this across ALL time to show the true WIP balance
+                // --- 2. Global Batch Balances ---
                 const batchMap: { [kode: string]: { bs: number, ps: number, coa: number } } = {};
                 for (const r of tabAllRecords) {
-                    // BS adds to a batch
-                    if (r.BatchKode && r.BS > 0) {
-                        if (!batchMap[r.BatchKode]) batchMap[r.BatchKode] = { bs: 0, ps: 0, coa: 0 };
-                        batchMap[r.BatchKode].bs += r.BS;
+                    const batchKode = r.BatchKode || r.batch_kode;
+                    const psBatchKode = r.PSBatchKode || r.ps_batch_kode;
+                    const coaBatchKode = r.COABatchKode || r.coa_batch_kode;
+
+                    const rBS = r.bs || r.BS || 0;
+                    const rPS = r.ps || r.PS || 0;
+                    const rCOA = r.coa || r.COA || 0;
+
+                    if (batchKode && rBS > 0) {
+                        if (!batchMap[batchKode]) batchMap[batchKode] = { bs: 0, ps: 0, coa: 0 };
+                        batchMap[batchKode].bs += rBS;
                     }
-                    // PS adds to a batch
-                    if (r.PSBatchKode && r.PS > 0) {
-                        if (!batchMap[r.PSBatchKode]) batchMap[r.PSBatchKode] = { bs: 0, ps: 0, coa: 0 };
-                        batchMap[r.PSBatchKode].ps += r.PS;
+                    if (psBatchKode && rPS > 0) {
+                        if (!batchMap[psBatchKode]) batchMap[psBatchKode] = { bs: 0, ps: 0, coa: 0 };
+                        batchMap[psBatchKode].ps += rPS;
                     }
-                    // COA adds to a batch
-                    if (r.COABatchKode && r.COA > 0) {
-                        if (!batchMap[r.COABatchKode]) batchMap[r.COABatchKode] = { bs: 0, ps: 0, coa: 0 };
-                        batchMap[r.COABatchKode].coa += r.COA;
+                    if (coaBatchKode && rCOA > 0) {
+                        if (!batchMap[coaBatchKode]) batchMap[coaBatchKode] = { bs: 0, ps: 0, coa: 0 };
+                        batchMap[coaBatchKode].coa += rCOA;
                     }
                 }
 
@@ -263,7 +291,7 @@ export async function GET(request: Request) {
                 totalProsesSampling += tabProsesSampling;
 
                 return {
-                    tabName: tab.Nama,
+                    tabName: tab.nama || tab.Nama,
                     totalProduksi: bs,
                     belumSampling: tabBelumSampling,
                     prosesSampling: tabProsesSampling,

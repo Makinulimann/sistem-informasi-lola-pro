@@ -1,5 +1,9 @@
+export const dynamic = 'force-dynamic';
+// Using Node.js runtime for Prisma compatibility
+// Edge runtime now supported with Supabase!
+export const runtime = 'edge';
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { db } from '@/lib/supabase';
 
 export async function POST(request: Request) {
     try {
@@ -26,60 +30,45 @@ export async function POST(request: Request) {
         const targetUtc = new Date(localDate.getTime() - utcOffset);
 
         // 1. Upsert Produksi
-        const existing = await prisma.produksis.findFirst({
-            where: {
-                ProduksiTabId: tabId,
-                Tanggal: targetUtc
-            }
-        });
-
-        let limitBS = body.BS;
+        const { data: records } = await db.from<any>('produksis').select('*').eq('product_slug', productSlug).execute();
+        const existing = (records || []).find((r: any) => 
+            r.produksi_tab_id === tabId && new Date(r.tanggal).getTime() === targetUtc.getTime()
+        );
 
         if (existing) {
-            await prisma.produksis.update({
-                where: { Id: existing.Id },
-                data: {
-                    BS: bsValue,
-                    Keterangan: ketValue,
-                    BatchKode: batchKodeValue
-                }
-            });
+            await db.from<any>('produksis').update({
+                bs: bsValue,
+                batch_kode: batchKodeValue,
+                keterangan: ketValue,
+                updated_at: new Date().toISOString()
+            }).eq('id', existing.id);
         } else {
-            await prisma.produksis.create({
-                data: {
-                    ProductSlug: productSlug,
-                    ProduksiTabId: tabId,
-                    Tanggal: targetUtc,
-                    BS: bsValue,
-                    PS: 0,
-                    COA: 0,
-                    PG: 0,
-                    Keterangan: ketValue,
-                    BatchKode: batchKodeValue,
-                    Kumulatif: 0,
-                    StokAkhir: 0
-                }
+            await db.from<any>('produksis').insert({
+                product_slug: productSlug,
+                produksi_tab_id: tabId,
+                tanggal: targetUtc.toISOString(),
+                bs: bsValue,
+                pg: 0,
+                kumulatif: 0,
+                stok_akhir: 0,
+                coa: 0,
+                ps: 0,
+                batch_kode: batchKodeValue,
+                ps_batch_kode: '',
+                coa_batch_kode: '',
+                keterangan: ketValue
             });
         }
 
         // 2. Delete existing Mutasi
-        // Prisma deleteMany on multi-condition LIKE
-        const produksisKeteranganLike = await prisma.bahanBakus.findMany({
-            where: {
-                ProductSlug: productSlug,
-                Tipe: 'Mutasi',
-                Tanggal: targetUtc,
-            }
-        });
+        const { data: relatedBahanBaku } = await db.from<any>('bahan_bakus').select('*').eq('product_slug', productSlug).execute();
 
-        const toDeleteIds = produksisKeteranganLike
-            .filter(b => b.Keterangan?.toLowerCase().startsWith('produksi '))
-            .map(b => b.Id);
+        const toDeleteIds = (relatedBahanBaku || [])
+            .filter((b: any) => b.Keterangan && b.Keterangan.toLowerCase().startsWith('produksi '))
+            .map((b: any) => b.Id);
 
-        if (toDeleteIds.length > 0) {
-            await prisma.bahanBakus.deleteMany({
-                where: { Id: { in: toDeleteIds } }
-            });
+        for (const id of toDeleteIds) {
+            await db.from<any>('bahan_bakus').delete().eq('id', id);
         }
 
         // 3. Create new Mutasi
@@ -93,7 +82,7 @@ export async function POST(request: Request) {
                 .map((mat: any) => ({
                     Tipe: 'Mutasi',
                     ProductSlug: productSlug,
-                    Tanggal: targetUtc,
+                    Tanggal: targetUtc.toISOString(),
                     Jenis: mat.jenis || mat.Jenis,
                     NamaBahan: mat.namaBahan || mat.NamaBahan,
                     Kuantum: mat.kuantum || mat.Kuantum,
@@ -102,17 +91,17 @@ export async function POST(request: Request) {
                     Keterangan: `produksi ${productLabel} sejumlah ${bsFormatted}`
                 }));
 
-            if (toCreate.length > 0) {
-                await prisma.bahanBakus.createMany({ data: toCreate });
-
-                // Populate response shape
-                mutasiRecords.push(...toCreate.map((c: any) => ({
-                    NamaBahan: c.NamaBahan,
-                    Kuantum: c.Kuantum,
-                    Satuan: c.Satuan,
-                    Jenis: c.Jenis
-                })));
+            // Insert records one by one (Supabase REST doesn't support bulk insert)
+            for (const record of toCreate) {
+                await db.from<any>('bahan_bakus').insert(record);
             }
+
+            mutasiRecords.push(...toCreate.map((c: any) => ({
+                NamaBahan: c.NamaBahan,
+                Kuantum: c.Kuantum,
+                Satuan: c.Satuan,
+                Jenis: c.Jenis
+            })));
         }
 
         return NextResponse.json({
