@@ -1,3 +1,4 @@
+'use client';
 import dynamic from 'next/dynamic';
 const MaintenancePage = dynamic(() => import('@/components/dashboard/MaintenancePage').then(mod => mod.MaintenancePage), { ssr: false });
 

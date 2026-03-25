@@ -1,3 +1,4 @@
+'use client';
 import dynamic from 'next/dynamic';
 const ProduksiPage = dynamic(() => import('@/components/dashboard/ProduksiPage').then(mod => mod.ProduksiPage), { ssr: false });
 
