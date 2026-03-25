@@ -408,7 +408,7 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
                 Dokumen: row.dokumen,
                 Keterangan: row.keterangan,
             }));
-            filename = `Suplai_Data_${format(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`;
+            filename = `Suplai_Data_${format(new Date(), 'yyyyMMdd_HHmmss')}.csv`;
             sheetName = 'Data Suplai';
         } else if (activeTab === 'mutasi') {
             dataToExport = mutasiData.map(row => ({
@@ -421,7 +421,7 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
                 Dokumen: row.dokumen,
                 Keterangan: row.keterangan,
             }));
-            filename = `Mutasi_Data_${format(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`;
+            filename = `Mutasi_Data_${format(new Date(), 'yyyyMMdd_HHmmss')}.csv`;
             sheetName = 'Data Mutasi';
         } else if (activeTab === 'balance-stok') {
             dataToExport = balanceStokRows.map(row => ({
@@ -432,16 +432,13 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
                 'Pengeluaran': row.totalOut,
                 'Stok Akhir': row.stok,
             }));
-            filename = `Balance_Stok_Data_${format(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`;
+            filename = `Balance_Stok_Data_${format(new Date(), 'yyyyMMdd_HHmmss')}.csv`;
             sheetName = 'Balance Stok';
         }
 
         if (dataToExport.length > 0) {
-            import('xlsx').then((XLSX) => {
-                const ws = XLSX.utils.json_to_sheet(dataToExport);
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, sheetName);
-                XLSX.writeFile(wb, filename);
+            import('@/lib/export-utils').then(({ downloadCSV }) => {
+                downloadCSV(dataToExport, filename);
             });
         } else {
             alert('Tidak ada data untuk diekspor.');
@@ -449,82 +446,82 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
     };
 
     const handleExportPDF = () => {
-        let headers: string[] = [];
-        let dataRows: any[][] = [];
+        let columns: { key: string, label: string }[] = [];
+        let dataRows: any[] = [];
         let title = '';
 
         if (activeTab === 'suplai') {
             title = 'Data Suplai Bahan Baku';
-            headers = ['No.', 'Tanggal', 'Jenis', 'Nama Bahan', 'Kuantum', 'Satuan', 'Dokumen', 'Keterangan'];
-            dataRows = suplaiData.map(row => [
-                row.no,
-                format(new Date(row.tanggal), 'dd/MM/yyyy'),
-                row.jenis,
-                row.namaBahan,
-                fmtInteger(row.kuantum),
-                row.satuan,
-                row.dokumen || '-',
-                row.keterangan || '-',
-            ]);
+            columns = [
+                { key: 'no', label: 'No.' },
+                { key: 'tanggal', label: 'Tanggal' },
+                { key: 'jenis', label: 'Jenis' },
+                { key: 'namaBahan', label: 'Nama Bahan' },
+                { key: 'kuantum', label: 'Kuantum' },
+                { key: 'satuan', label: 'Satuan' },
+                { key: 'dokumen', label: 'Dokumen' },
+                { key: 'keterangan', label: 'Keterangan' }
+            ];
+            dataRows = suplaiData.map(row => ({
+                no: row.no,
+                tanggal: format(new Date(row.tanggal), 'dd/MM/yyyy'),
+                jenis: row.jenis,
+                namaBahan: row.namaBahan,
+                kuantum: fmtInteger(row.kuantum),
+                satuan: row.satuan,
+                dokumen: row.dokumen || '-',
+                keterangan: row.keterangan || '-',
+            }));
         } else if (activeTab === 'mutasi') {
             title = 'Data Mutasi Bahan Baku';
-            headers = ['No.', 'Tanggal', 'Jenis', 'Nama Bahan', 'Kuantum', 'Satuan', 'Dokumen', 'Keterangan'];
-            dataRows = mutasiData.map(row => [
-                row.no,
-                format(new Date(row.tanggal), 'dd/MM/yyyy'),
-                row.jenis,
-                row.namaBahan,
-                fmtInteger(row.kuantum),
-                row.satuan,
-                row.dokumen || '-',
-                row.keterangan || '-',
-            ]);
+            columns = [
+                { key: 'no', label: 'No.' },
+                { key: 'tanggal', label: 'Tanggal' },
+                { key: 'jenis', label: 'Jenis' },
+                { key: 'namaBahan', label: 'Nama Bahan' },
+                { key: 'kuantum', label: 'Kuantum' },
+                { key: 'satuan', label: 'Satuan' },
+                { key: 'dokumen', label: 'Dokumen' },
+                { key: 'keterangan', label: 'Keterangan' }
+            ];
+            dataRows = mutasiData.map(row => ({
+                no: row.no,
+                tanggal: format(new Date(row.tanggal), 'dd/MM/yyyy'),
+                jenis: row.jenis,
+                namaBahan: row.namaBahan,
+                kuantum: fmtInteger(row.kuantum),
+                satuan: row.satuan,
+                dokumen: row.dokumen || '-',
+                keterangan: row.keterangan || '-',
+            }));
         } else if (activeTab === 'balance-stok') {
             title = 'Balance Stok Bahan Baku';
-            headers = ['Nama Bahan', 'Jenis', 'Satuan', 'Pemasukan', 'Pengeluaran', 'Stok Akhir'];
-            dataRows = balanceStokRows.map(row => [
-                row.nama,
-                row.jenis === 'Baku' ? 'Bahan Baku' : 'Bahan Penolong',
-                row.satuan,
-                fmtInteger(row.totalIn),
-                fmtInteger(row.totalOut),
-                fmtInteger(row.stok),
-            ]);
+            columns = [
+                { key: 'nama', label: 'Nama Bahan' },
+                { key: 'jenis', label: 'Jenis' },
+                { key: 'satuan', label: 'Satuan' },
+                { key: 'in', label: 'Pemasukan' },
+                { key: 'out', label: 'Pengeluaran' },
+                { key: 'stok', label: 'Stok Akhir' }
+            ];
+            dataRows = balanceStokRows.map(row => ({
+                nama: row.nama,
+                jenis: row.jenis === 'Baku' ? 'Bahan Baku' : 'Bahan Penolong',
+                satuan: row.satuan,
+                in: fmtInteger(row.totalIn),
+                out: fmtInteger(row.totalOut),
+                stok: fmtInteger(row.stok),
+            }));
         }
 
         if (dataRows.length > 0) {
-            Promise.all([
-                import('jspdf'),
-                import('jspdf-autotable')
-            ]).then(([jsPDFModule, autoTableModule]) => {
-                const jsPDF = jsPDFModule.default;
-                const autoTable = autoTableModule.default;
-
-                const doc = new jsPDF();
-                doc.text(title, 14, 15);
-                autoTable(doc, {
-                    startY: 20,
-                    head: [headers],
-                    body: dataRows,
-                    theme: 'grid',
-                    styles: {
-                        font: 'helvetica',
-                        fontSize: 8,
-                        cellPadding: 2,
-                        halign: 'left',
-                    },
-                    headStyles: {
-                        fillColor: [23, 162, 184], // A nice blue color
-                        textColor: [255, 255, 255],
-                        fontStyle: 'bold',
-                    },
-                    columnStyles: {
-                        3: { halign: 'right' }, // Pemasukan
-                        4: { halign: 'right' }, // Pengeluaran
-                        5: { halign: 'right' }, // Stok Akhir
-                    }
+            import('@/lib/export-utils').then(({ printTable }) => {
+                printTable({
+                    title: title,
+                    date: format(new Date(), 'EEEE, dd MMMM yyyy HH:mm:ss', { locale: id }),
+                    columns: columns,
+                    data: dataRows
                 });
-                doc.save(`${title.replace(/\s/g, '_')}_${format(new Date(), 'yyyyMMdd_HHmmss')}.pdf`);
             });
         } else {
             alert('Tidak ada data untuk diekspor.');
