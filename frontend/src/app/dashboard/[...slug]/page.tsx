@@ -2,18 +2,20 @@
 
 export const runtime = 'edge';
 import { use } from 'react';
-import { BahanBakuPage } from '@/components/dashboard/BahanBakuPage';
-import { ProduksiPage } from '@/components/dashboard/ProduksiPage';
-import { AnalisaPage } from '@/components/dashboard/AnalisaPage';
-import { RKAPPage } from '@/components/dashboard/RKAPPage';
-import { CategoryDashboardPage } from '@/components/dashboard/CategoryDashboardPage';
+import dynamic from 'next/dynamic';
+
+const BahanBakuPage = dynamic(() => import('@/components/dashboard/BahanBakuPage').then(mod => mod.BahanBakuPage), { ssr: false });
+const ProduksiPage = dynamic(() => import('@/components/dashboard/ProduksiPage').then(mod => mod.ProduksiPage), { ssr: false });
+const AnalisaPage = dynamic(() => import('@/components/dashboard/AnalisaPage').then(mod => mod.AnalisaPage), { ssr: false });
+const RKAPPage = dynamic(() => import('@/components/dashboard/RKAPPage').then(mod => mod.RKAPPage), { ssr: false });
+const CategoryDashboardPage = dynamic(() => import('@/components/dashboard/CategoryDashboardPage').then(mod => mod.CategoryDashboardPage), { ssr: false });
 
 interface PageProps {
     params: Promise<{ slug: string[] }>;
 }
 
 // Map of known page types to their components
-const PAGE_COMPONENT_MAP: Record<string, React.ComponentType<{ productCategory: string; productName: string; productSlug: string }>> = {
+const PAGE_COMPONENT_MAP: Record<string, React.ComponentType<any>> = {
     'bahan-baku': BahanBakuPage,
     'produksi': ProduksiPage,
     'analisa': AnalisaPage,

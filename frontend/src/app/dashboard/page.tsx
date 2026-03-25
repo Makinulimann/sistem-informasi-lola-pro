@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
-import { CategoryDashboardPage } from '@/components/dashboard/CategoryDashboardPage';
+import dynamic from 'next/dynamic';
+const CategoryDashboardPage = dynamic(() => import('@/components/dashboard/CategoryDashboardPage').then(mod => mod.CategoryDashboardPage), { ssr: false });
 
 /* ─── Types ─── */
 interface CategoryInfo {

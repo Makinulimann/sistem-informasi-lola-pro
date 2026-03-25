@@ -1,4 +1,5 @@
-import { AnalisaPage } from '@/components/dashboard/AnalisaPage';
+import dynamic from 'next/dynamic';
+const AnalisaPage = dynamic(() => import('@/components/dashboard/AnalisaPage').then(mod => mod.AnalisaPage), { ssr: false });
 
 export default function PetroGladiatorAnalisaPage() {
     return (

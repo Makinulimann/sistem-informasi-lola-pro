@@ -1,4 +1,5 @@
-import { BahanBakuPage } from '@/components/dashboard/BahanBakuPage';
+import dynamic from 'next/dynamic';
+const BahanBakuPage = dynamic(() => import('@/components/dashboard/BahanBakuPage').then(mod => mod.BahanBakuPage), { ssr: false });
 
 export default function PetroGladiatorBahanBakuPage() {
     return (
