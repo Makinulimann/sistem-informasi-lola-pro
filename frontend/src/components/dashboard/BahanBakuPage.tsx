@@ -270,7 +270,7 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
                 setMutasiData(data.map((item, idx) => ({
                     id: item.id,
                     no: idx + 1,
-                    tanggal: format(new Date(item.tanggal), 'dd/MM/yyyy'),
+                    tanggal: format(new Date(item.tanggal), 'yyyy-MM-dd'),
                     jenis: item.jenis,
                     namaBahan: item.namaBahan,
                     kuantum: item.kuantum,
@@ -981,7 +981,7 @@ function MutasiTable({ data, search, onEdit, onDelete }: { data: MutasiRow[]; se
                             sortedData.map((row) => (
                                 <tr key={row.id} className="hover:bg-emerald-50/10 transition-colors">
                                     <td className="px-4 py-3 text-gray-700 font-medium text-center border border-gray-200">{row.no}</td>
-                                    <td className="px-4 py-3 text-gray-700 border border-gray-200">{row.tanggal}</td>
+                                    <td className="px-4 py-3 text-gray-700 border border-gray-200">{format(new Date(row.tanggal), 'dd/MM/yyyy')}</td>
                                     <td className="px-4 py-3 border border-gray-200">
                                         <span className={cn(
                                             "inline-flex px-2 py-0.5 text-[11px] font-medium rounded-full border",

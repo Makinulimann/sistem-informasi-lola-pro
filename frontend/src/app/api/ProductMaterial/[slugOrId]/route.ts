@@ -29,19 +29,19 @@ export async function GET(
             filtered = filtered.filter((pm: any) => (pm.jenis || pm.Jenis) === jenis);
         }
 
-        // Sort by MasterItems.Nama and format
+        // Sort by MasterItems.nama and format
         const formatted = filtered
             .map((pm: any) => {
                 const masterItem = masterItemsMap.get(pm.master_item_id || pm.MasterItemId);
                 return {
-                    Id: pm.id || pm.Id,
-                    MasterItemId: pm.master_item_id || pm.MasterItemId,
-                    Nama: masterItem?.nama || masterItem?.Nama || '',
-                    Jenis: pm.jenis || pm.Jenis,
-                    Satuan: masterItem?.satuan_default || masterItem?.SatuanDefault || ''
+                    id: pm.id || pm.Id,
+                    masterItemId: pm.master_item_id || pm.MasterItemId,
+                    nama: masterItem?.nama || masterItem?.Nama || '',
+                    jenis: pm.jenis || pm.Jenis,
+                    satuan: masterItem?.satuan_default || masterItem?.SatuanDefault || ''
                 };
             })
-            .sort((a: any, b: any) => a.Nama.localeCompare(b.Nama));
+            .sort((a: any, b: any) => a.nama.localeCompare(b.nama));
 
         return NextResponse.json(formatted);
     } catch (error) {
