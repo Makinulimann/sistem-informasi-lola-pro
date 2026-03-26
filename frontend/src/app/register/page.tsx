@@ -4,7 +4,6 @@ import { useState, useRef, useEffect, type FormEvent } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import gsap from 'gsap';
 
 /* ─── Icons ─── */
 
@@ -91,67 +90,12 @@ export default function RegisterPage() {
     const [success, setSuccess] = useState<string | null>(null);
     const router = useRouter();
 
-    // Refs for GSAP
-    const containerRef = useRef<HTMLDivElement>(null);
-    const leftPanelRef = useRef<HTMLDivElement>(null);
-    const rightPanelRef = useRef<HTMLDivElement>(null);
-    const logosRef = useRef<HTMLDivElement>(null);
-    const headingRef = useRef<HTMLDivElement>(null);
-    const formRef = useRef<HTMLFormElement>(null);
-    const brandingRef = useRef<HTMLDivElement>(null);
-    const errorRef = useRef<HTMLDivElement>(null);
-
     useEffect(() => {
         // Check if already logged in
         if (auth.isAuthenticated()) {
             router.replace('/dashboard');
             return;
         }
-
-        const ctx = gsap.context(() => {
-            const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
-
-            tl.fromTo(leftPanelRef.current,
-                { x: -80, opacity: 0 },
-                { x: 0, opacity: 1, duration: 1 }
-            );
-
-            tl.fromTo(brandingRef.current,
-                { y: 40, opacity: 0 },
-                { y: 0, opacity: 1, duration: 0.8 },
-                '-=0.4'
-            );
-
-            tl.fromTo(rightPanelRef.current,
-                { x: 60, opacity: 0 },
-                { x: 0, opacity: 1, duration: 0.8 },
-                '-=0.6'
-            );
-
-            if (logosRef.current) {
-                tl.fromTo(logosRef.current.children,
-                    { y: -20, opacity: 0, scale: 0.9 },
-                    { y: 0, opacity: 1, scale: 1, duration: 0.5, stagger: 0.12 },
-                    '-=0.4'
-                );
-            }
-
-            tl.fromTo(headingRef.current,
-                { y: 20, opacity: 0 },
-                { y: 0, opacity: 1, duration: 0.5 },
-                '-=0.3'
-            );
-
-            if (formRef.current) {
-                tl.fromTo(formRef.current.children,
-                    { y: 25, opacity: 0 },
-                    { y: 0, opacity: 1, duration: 0.4, stagger: 0.06 },
-                    '-=0.2'
-                );
-            }
-        }, containerRef);
-
-        return () => ctx.revert();
     }, []);
 
     /* ─── Password strength ─── */
@@ -205,30 +149,17 @@ export default function RegisterPage() {
             } else {
                 setError('Terjadi kesalahan saat registrasi.');
             }
-            // Shake animation for error
-            if (formRef.current) {
-                gsap.fromTo(formRef.current,
-                    { x: -5 },
-                    {
-                        x: 5, duration: 0.1, repeat: 3, yoyo: true, ease: 'power1.inOut', onComplete: () => {
-                            gsap.to(formRef.current, { x: 0, duration: 0.1 });
-                        }
-                    }
-                );
-            }
         } finally {
             setIsLoading(false);
         }
     };
 
     return (
-        <div ref={containerRef} className="min-h-screen flex flex-col lg:flex-row bg-gray-50">
+        <div className="min-h-screen flex flex-col lg:flex-row bg-gray-50">
 
             {/* ── Left Panel ── */}
             <div
-                ref={leftPanelRef}
                 className="relative w-full lg:w-[50%] xl:w-[55%] min-h-[200px] lg:min-h-screen overflow-hidden"
-                style={{ opacity: 0 }}
             >
                 <Image
                     src="/images/bg-petro.jpeg"
@@ -242,9 +173,7 @@ export default function RegisterPage() {
 
                 {/* Branding */}
                 <div
-                    ref={brandingRef}
                     className="absolute bottom-8 left-8 lg:bottom-12 lg:left-12 z-10"
-                    style={{ opacity: 0 }}
                 >
                     <div className="flex items-center gap-3 mb-3">
                         <h1 className="text-white text-2xl lg:text-3xl font-bold tracking-tight">SIPPro</h1>
@@ -273,14 +202,12 @@ export default function RegisterPage() {
 
             {/* ── Right Panel: Register Form ── */}
             <div
-                ref={rightPanelRef}
                 className="flex-1 flex items-center justify-center px-6 py-8 lg:px-10 lg:py-0 overflow-y-auto"
-                style={{ opacity: 0 }}
             >
                 <div className="w-full max-w-md space-y-6">
 
                     {/* Logos */}
-                    <div ref={logosRef} className="flex items-center justify-center gap-4 flex-wrap">
+                    <div className="flex items-center justify-center gap-4 flex-wrap">
                         <Image src="/images/danantara.png" alt="Danantara Indonesia" width={110} height={35} className="object-contain h-8 w-auto" />
                         <span className="hidden sm:block w-px h-7 bg-gray-200" />
                         <Image src="/images/logo-PG.png" alt="Petrokimia Gresik" width={110} height={35} className="object-contain h-8 w-auto" />
@@ -289,7 +216,7 @@ export default function RegisterPage() {
                     </div>
 
                     {/* Heading */}
-                    <div ref={headingRef} className="text-center" style={{ opacity: 0 }}>
+                    <div className="text-center">
                         <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
                             Buat Akun Baru
                         </h2>
@@ -299,7 +226,7 @@ export default function RegisterPage() {
                     </div>
 
                     {error && (
-                        <div ref={errorRef} className="p-4 rounded-xl bg-red-50 border border-red-100 text-red-600 text-sm animate-in fade-in slide-in-from-top-2 duration-300 mb-4">
+                        <div className="p-4 rounded-xl bg-red-50 border border-red-100 text-red-600 text-sm animate-in fade-in slide-in-from-top-2 duration-300 mb-4">
                             <div className="flex items-center gap-2">
                                 <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -319,7 +246,7 @@ export default function RegisterPage() {
                     )}
 
                     {/* Form */}
-                    <form ref={formRef} className="space-y-4" onSubmit={handleSubmit}>
+                    <form className="space-y-4" onSubmit={handleSubmit}>
 
                         {/* Full Name */}
                         <div>
