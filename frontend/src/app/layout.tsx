@@ -13,6 +13,9 @@ const montserrat = Montserrat({
 export const metadata: Metadata = {
   title: 'SIPPro',
   description: 'SIPPro Web Application',
+  icons: {
+    icon: '/images/logo-PG.png',
+  },
 };
 
 export default function RootLayout({
