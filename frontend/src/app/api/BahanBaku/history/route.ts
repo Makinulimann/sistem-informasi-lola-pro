@@ -22,11 +22,13 @@ export async function GET(request: Request) {
         const { data: allRecords } = await db.from<any>('bahan_bakus').select('*').execute();
 
         let filtered = (allRecords || []).filter((r: any) => {
-            return r.Tipe === tipe && r.NamaBahan === namaBahan;
+            const rTipe = r.tipe || r.Tipe;
+            const rNamaBahan = r.nama_bahan || r.NamaBahan;
+            return rTipe === tipe && rNamaBahan === namaBahan;
         });
 
         if (productSlug) {
-            filtered = filtered.filter((r: any) => r.ProductSlug === productSlug);
+            filtered = filtered.filter((r: any) => (r.product_slug || r.ProductSlug) === productSlug);
         }
 
         if (bulan || tahun) {
@@ -36,13 +38,13 @@ export async function GET(request: Request) {
             const end = new Date(Date.UTC(bulan ? y : y + 1, bulan ? m : 0, 1));
 
             filtered = filtered.filter((r: any) => {
-                const rDate = new Date(r.Tanggal);
+                const rDate = new Date(r.tanggal || r.Tanggal);
                 return rDate >= start && rDate < end;
             });
         }
 
         // Sort by Tanggal descending
-        filtered.sort((a: any, b: any) => new Date(b.Tanggal).getTime() - new Date(a.Tanggal).getTime());
+        filtered.sort((a: any, b: any) => new Date(b.tanggal || b.Tanggal).getTime() - new Date(a.tanggal || a.Tanggal).getTime());
 
         return NextResponse.json(filtered);
     } catch (error) {

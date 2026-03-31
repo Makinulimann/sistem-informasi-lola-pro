@@ -42,8 +42,11 @@ export async function POST(request: Request) {
         const { data: relatedBahanBaku } = await db.from<any>('bahan_bakus').select('*').eq('product_slug', productSlug).execute();
 
         const toDeleteIds = (relatedBahanBaku || [])
-            .filter((b: any) => b.Keterangan && b.Keterangan.toLowerCase().startsWith('produksi '))
-            .map((b: any) => b.Id);
+            .filter((b: any) => {
+                const ket = b.keterangan || b.Keterangan;
+                return ket && ket.toLowerCase().startsWith('produksi ');
+            })
+            .map((b: any) => b.id || b.Id);
 
         for (const id of toDeleteIds) {
             await db.from<any>('bahan_bakus').delete().eq('id', id);

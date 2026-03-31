@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { format } from 'date-fns';
@@ -828,7 +828,13 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                 onClick={async () => {
                                     const val = Number(psValue);
                                     if (!psBatchKode.trim()) { setPsError('Kode Batch wajib diisi'); return; }
-                                    if (!psValue || val < 0) { setPsError('Jumlah harus valid'); return; }
+                                    if (!psValue || val <= 0) { setPsError('Jumlah harus valid'); return; }
+
+                                    const selectedBatch = psAvailableBatches.find(b => b.kode === psBatchKode);
+                                    if (selectedBatch && val > selectedBatch.bsWip) {
+                                        setPsError(`Jumlah melebihi batas (Maks. ${fmt(selectedBatch.bsWip)})`);
+                                        return;
+                                    }
 
                                     setPsSaving(true);
                                     try {
@@ -921,7 +927,13 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                 onClick={async () => {
                                     const val = Number(coaValue);
                                     if (!coaBatchKode.trim()) { setCoaError('Kode Batch wajib diisi'); return; }
-                                    if (!coaValue || val < 0) { setCoaError('Jumlah harus valid'); return; }
+                                    if (!coaValue || val <= 0) { setCoaError('Jumlah harus valid'); return; }
+
+                                    const selectedBatch = coaAvailableBatches.find(b => b.kode === coaBatchKode);
+                                    if (selectedBatch && val > selectedBatch.coaWip) {
+                                        setCoaError(`Jumlah melebihi batas (Maks. ${fmt(selectedBatch.coaWip)})`);
+                                        return;
+                                    }
 
                                     setCoaSaving(true);
                                     try {
