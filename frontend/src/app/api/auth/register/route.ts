@@ -1,13 +1,11 @@
 export const dynamic = 'force-dynamic';
-export const runtime = 'edge';
 export const preferredRegion = 'sin1';
 
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import bcrypt from 'bcryptjs';
 
 const supabaseUrl = 'https://wtnnvlibowwffgtjzoou.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind0bm52bGlib3d3ZmZndGp6b291Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzODM2MzgsImV4cCI6MjA4ODk1OTYzOH0.XxR1BNfFpVhId1nOSMfmvxvcVPi5SBE3JQG-BZJIvwU';
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export async function POST(request: Request) {
     try {
@@ -46,22 +44,12 @@ export async function POST(request: Request) {
             );
         }
 
-        // 2. Register user in Supabase Auth
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-            email,
-            password,
-        });
+        // 2. Hash password with bcryptjs
+        const salt = await bcrypt.genSalt(10);
+        const passwordHash = await bcrypt.hash(password, salt);
+        const userId = crypto.randomUUID();
 
-        if (authError || !authData.user) {
-            return NextResponse.json(
-                { message: authError?.message || 'Gagal mendaftar akun.' },
-                { status: 400 }
-            );
-        }
-
-        const userId = authData.user.id;
-
-        // 3. Create user in public.users table
+        // 3. Create user in public.users table directly
         const insertResponse = await fetch(
             `${supabaseUrl}/rest/v1/users`,
             {
@@ -75,7 +63,7 @@ export async function POST(request: Request) {
                 body: JSON.stringify({
                     id: userId,
                     email,
-                    password_hash: '', // Using Supabase Auth
+                    password_hash: passwordHash,
                     full_name: fullName,
                     no_induk: noInduk,
                     role: 'user', // Default role
@@ -87,7 +75,6 @@ export async function POST(request: Request) {
         if (!insertResponse.ok) {
             const err = await insertResponse.text();
             console.error('Insert user error:', err);
-            // Optionally, delete the created auth user here if insert fails
             return NextResponse.json(
                 { message: 'Berhasil membuat akun, tapi gagal menyimpan profil.' },
                 { status: 500 }

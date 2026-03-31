@@ -1,17 +1,12 @@
 export const dynamic = 'force-dynamic';
-// Using Edge runtime with Supabase Auth (secure, no bcrypt needed)
-export const runtime = 'edge';
-
 export const preferredRegion = 'sin1';
 
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import bcrypt from 'bcryptjs';
 import { signToken } from '@/lib/auth';
 
-// Create Supabase client for Auth (Edge-compatible)
 const supabaseUrl = 'https://wtnnvlibowwffgtjzoou.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind0bm52bGlib3d3ZmZndGp6b291Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzODM2MzgsImV4cCI6MjA4ODk1OTYzOH0.XxR1BNfFpVhId1nOSMfmvxvcVPi5SBE3JQG-BZJIvwU';
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export async function POST(request: Request) {
     try {
@@ -21,19 +16,6 @@ export async function POST(request: Request) {
             return NextResponse.json(
                 { message: 'Email dan Password wajib diisi.' },
                 { status: 400 }
-            );
-        }
-
-        // Sign in with Supabase Auth (Edge-compatible, secure)
-        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-        });
-
-        if (authError || !authData.user) {
-            return NextResponse.json(
-                { message: 'Email atau password salah.' },
-                { status: 401 }
             );
         }
 
@@ -57,6 +39,24 @@ export async function POST(request: Request) {
         }
 
         const user = users[0];
+
+        // Ensure we have a password hash to compare against
+        if (!user.password_hash) {
+            return NextResponse.json(
+                { message: 'Akun ini belum memiliki password hash. Silakan hubungi admin.' },
+                { status: 401 }
+            );
+        }
+
+        // Verify password with bcryptjs
+        const isMatch = await bcrypt.compare(password, user.password_hash);
+
+        if (!isMatch) {
+            return NextResponse.json(
+                { message: 'Email atau password salah.' },
+                { status: 401 }
+            );
+        }
 
         if (!user.is_verified) {
             return NextResponse.json(
