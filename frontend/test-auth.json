@@ -1,0 +1,15 @@
+[
+  {
+    "id": "2fe5d677-1e96-4458-943e-053225e5bd61",
+    "email": "admin@mail.com",
+    "password_hash": "$2a$10$supabase_auth_managed",
+    "full_name": "Administrator",
+    "no_induk": "ADMIN001",
+    "role": "Admin",
+    "is_verified": true,
+    "refresh_token": null,
+    "refresh_token_expiry_time": null,
+    "created_at": "2026-03-17T01:14:14.639+00:00",
+    "updated_at": "2026-03-17T01:14:14.651+00:00"
+  }
+]
