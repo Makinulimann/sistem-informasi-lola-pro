@@ -181,22 +181,6 @@ export default function RegisterPage() {
                     <p className="text-white/70 text-sm lg:text-base max-w-xs leading-relaxed">
                         Sistem Informasi Pengelolaan Produk
                     </p>
-
-                    {/* Benefits list */}
-                    <div className="mt-6 space-y-2.5 hidden lg:block">
-                        {[
-                            'Kelola data produksi',
-                            'Monitoring stok & bahan baku',
-                            'Laporan analisa & ekspor data',
-                        ].map((text) => (
-                            <div key={text} className="flex items-center gap-2.5">
-                                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-500/80 flex items-center justify-center text-white">
-                                    <CheckIcon />
-                                </span>
-                                <span className="text-white/80 text-sm">{text}</span>
-                            </div>
-                        ))}
-                    </div>
                 </div>
             </div>
 
