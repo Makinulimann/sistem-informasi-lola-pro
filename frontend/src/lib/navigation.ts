@@ -33,6 +33,7 @@ export const navigation: NavSection[] = [
     {
         label: 'Portal Admin',
         icon: 'users',
+        roleAccess: 'Admin',
         children: [
             { label: 'Manajemen User', href: '/dashboard/admin/users' },
             { label: 'Manajemen Sidebar', href: '/dashboard/admin/sidebar' },

@@ -232,7 +232,7 @@ function AnalisaFormModal({ isOpen, onClose, onSave, initialData, productSlug }:
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <label className="text-sm font-medium text-gray-700">No. BAPC</label>
+                            <label className="text-sm font-medium text-gray-700">Batch</label>
                             <input
                                 type="text"
                                 required

@@ -64,8 +64,11 @@ export async function POST(request: Request) {
         const { data: relatedBahanBaku } = await db.from<any>('bahan_bakus').select('*').eq('product_slug', productSlug).execute();
 
         const toDeleteIds = (relatedBahanBaku || [])
-            .filter((b: any) => b.Keterangan && b.Keterangan.toLowerCase().startsWith('produksi '))
-            .map((b: any) => b.Id);
+            .filter((b: any) => {
+                const ket = b.keterangan || b.Keterangan;
+                return ket && ket.toLowerCase().startsWith('produksi ');
+            })
+            .map((b: any) => b.id || b.Id);
 
         for (const id of toDeleteIds) {
             await db.from<any>('bahan_bakus').delete().eq('id', id);
@@ -80,27 +83,30 @@ export async function POST(request: Request) {
             const toCreate = materialsArray
                 .filter((mat: any) => (mat.kuantum || mat.Kuantum) > 0)
                 .map((mat: any) => ({
-                    Tipe: 'Mutasi',
-                    ProductSlug: productSlug,
-                    Tanggal: targetUtc.toISOString(),
-                    Jenis: mat.jenis || mat.Jenis,
-                    NamaBahan: mat.namaBahan || mat.NamaBahan,
-                    Kuantum: mat.kuantum || mat.Kuantum,
-                    Satuan: mat.satuan || mat.Satuan || 'Kg',
-                    Dokumen: '',
-                    Keterangan: `produksi ${productLabel} sejumlah ${bsFormatted}`
+                    tipe: 'Mutasi',
+                    product_slug: productSlug,
+                    tanggal: targetUtc.toISOString(),
+                    jenis: mat.jenis || mat.Jenis || '',
+                    nama_bahan: mat.namaBahan || mat.NamaBahan || '',
+                    kuantum: mat.kuantum || mat.Kuantum || 0,
+                    satuan: mat.satuan || mat.Satuan || 'Kg',
+                    dokumen: '',
+                    keterangan: `produksi ${productLabel} sejumlah ${bsFormatted}`
                 }));
 
-            // Insert records one by one (Supabase REST doesn't support bulk insert)
+            // Insert records one by one and log errors if any
             for (const record of toCreate) {
-                await db.from<any>('bahan_bakus').insert(record);
+                const result = await db.from<any>('bahan_bakus').insert(record);
+                if (result.error) {
+                    console.error('Failed to insert Mutasi record:', result.error);
+                }
             }
 
             mutasiRecords.push(...toCreate.map((c: any) => ({
-                NamaBahan: c.NamaBahan,
-                Kuantum: c.Kuantum,
-                Satuan: c.Satuan,
-                Jenis: c.Jenis
+                NamaBahan: c.nama_bahan,
+                Kuantum: c.kuantum,
+                Satuan: c.satuan,
+                Jenis: c.jenis
             })));
         }
 

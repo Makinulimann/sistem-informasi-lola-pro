@@ -271,10 +271,11 @@ export function Sidebar({
                 if (items && items.length > 0) {
                     // Map API response to NavSection structure
                     const mapped: NavSection[] = items.map((item: any) => {
+                        const strictRoleAccess = item.label === 'Portal Admin' ? 'Admin' : item.roleAccess;
                         const section: NavSection = {
                             label: item.label,
                             icon: item.icon || 'package',
-                            roleAccess: item.roleAccess,
+                            roleAccess: strictRoleAccess,
                         };
 
                         if (item.children && item.children.length > 0) {
