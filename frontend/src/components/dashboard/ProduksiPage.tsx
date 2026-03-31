@@ -581,6 +581,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                                                     : 'text-gray-400 bg-transparent hover:bg-gray-50 border border-transparent hover:border-gray-200'}`}
                                                             title="Klik untuk input produksi & bahan"
                                                         >
+                                                            {bsDisplay > 0 ? fmt(bsDisplay) : '0'}
                                                         </button>
                                                     </div>
                                                 </td>
