@@ -581,19 +581,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                                                     : 'text-gray-400 bg-transparent hover:bg-gray-50 border border-transparent hover:border-gray-200'}`}
                                                             title="Klik untuk input produksi & bahan"
                                                         >
-                                                            {bsDisplay > 0 ? fmt(bsDisplay) : '0'}
                                                         </button>
-                                                        {bs > 0 && (
-                                                            <button
-                                                                onClick={() => setCancelConfirm({ isOpen: true, tanggal: row.tanggal })}
-                                                                className="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-md text-red-400 hover:text-red-600 hover:bg-red-50 transition-all"
-                                                                title="Batalkan pengisian produksi"
-                                                            >
-                                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                                    <path d="M3 6h18" /><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" /><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
-                                                                </svg>
-                                                            </button>
-                                                        )}
                                                     </div>
                                                 </td>
 
@@ -665,12 +653,20 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
 
                                                 {/* Actions */}
                                                 <td className="px-4 py-3 text-center border border-gray-200">
-                                                    {dirty && (
+                                                    {dirty ? (
                                                         <div className="flex items-center justify-center gap-2">
                                                             <button onClick={() => setConfirmModal({ isOpen: true, rowDate: row.tanggal })} className="p-1.5 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 transition-colors shadow-sm" title="Simpan"><CheckIcon /></button>
                                                             <button onClick={() => handleCancelRow(row.tanggal)} className="p-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors shadow-sm" title="Batal"><XIcon /></button>
                                                         </div>
-                                                    )}
+                                                    ) : (bs > 0 || ps > 0 || coa > 0 || pg > 0 || getTextValue(row, 'keterangan')) ? (
+                                                        <button 
+                                                            onClick={() => setCancelConfirm({ isOpen: true, tanggal: row.tanggal })}
+                                                            className="flex items-center justify-center w-8 h-8 mx-auto text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                            title="Hapus Seluruh Data Produksi Hari Ini"
+                                                        >
+                                                            <TrashIcon />
+                                                        </button>
+                                                    ) : null}
                                                 </td>
                                             </tr>
                                         );
@@ -721,10 +717,10 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                     <path d="M3 6h18" /><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" /><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
                                 </svg>
                             </div>
-                            <h3 className="text-lg font-bold text-gray-900">Batalkan Pengisian?</h3>
+                            <h3 className="text-lg font-bold text-gray-900">Hapus Data Produksi?</h3>
                         </div>
                         <p className="text-sm text-gray-600 mb-5">
-                            Data produksi akan di-reset ke 0 dan semua mutasi bahan yang terkait akan dihapus. Stok bahan akan dikembalikan.
+                            Data produksi hari ini (Belum Sampling, Proses Sampling, COA) akan dihapus secara keseluruhan. Mutasi bahan akan dihapus dan otomatis stok bahan dikembalikan.
                         </p>
                         <div className="flex justify-end gap-3">
                             <button
@@ -756,7 +752,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                         Menghapus...
                                     </>
                                 ) : (
-                                    'Ya, Batalkan'
+                                    'Ya, Hapus'
                                 )}
                             </button>
                         </div>

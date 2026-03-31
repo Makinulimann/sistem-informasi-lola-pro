@@ -25,17 +25,14 @@ export async function POST(request: Request) {
         const utcOffset = 7 * 60 * 60 * 1000;
         const targetUtc = new Date(localDate.getTime() - utcOffset);
 
-        // 1. Reset produksi BS to 0
+        // 1. Delete from produksis completely
         const { data: records } = await db.from<any>('produksis').select('*').eq('product_slug', productSlug).execute();
         const record = (records || []).find((r: any) => 
             r.produksi_tab_id === tabId && new Date(r.tanggal).getTime() === targetUtc.getTime()
         );
 
         if (record) {
-            await db.from<any>('produksis').update({
-                bs: 0,
-                updated_at: new Date().toISOString()
-            }).eq('id', record.id);
+            await db.from<any>('produksis').delete().eq('id', record.id);
         }
 
         // 2. Delete related Mutasi records for that product + date
@@ -44,7 +41,10 @@ export async function POST(request: Request) {
         const toDeleteIds = (relatedBahanBaku || [])
             .filter((b: any) => {
                 const ket = b.keterangan || b.Keterangan;
-                return ket && ket.toLowerCase().startsWith('produksi ');
+                const rDate = new Date(b.tanggal || b.Tanggal);
+                const isSameDate = rDate.getTime() === targetUtc.getTime();
+                
+                return ket && ket.toLowerCase().startsWith('produksi ') && isSameDate;
             })
             .map((b: any) => b.id || b.Id);
 
