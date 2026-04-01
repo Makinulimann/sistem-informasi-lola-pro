@@ -724,44 +724,6 @@ export function CategoryDashboardPage({
                     <p className="text-sm text-gray-400">Tidak ada produk yang terdaftar untuk kategori ini.</p>
                 </div>
             )}
-
-            {/* ═══ BENTO – Quick Access ═══ */}
-            {!globalLoading && (matData?.products.length || 0) > 0 && (
-                <div>
-                    <h2 className="text-sm font-semibold text-gray-800 mb-3">Akses Cepat</h2>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                        {/* Product links (filter out non-product slugs) */}
-                        {matData?.products
-                            .filter(p => !['aktivitas-harian', 'maintenance'].includes(p.slug))
-                            .map((product, idx) => {
-                                const gradients = [
-                                    'from-emerald-500 to-teal-600',
-                                    'from-blue-500 to-indigo-600',
-                                    'from-violet-500 to-purple-600',
-                                    'from-amber-500 to-orange-600',
-                                    'from-rose-500 to-pink-600',
-                                    'from-cyan-500 to-teal-600',
-                                ];
-                                const hoverColors = ['hover:border-emerald-300', 'hover:border-blue-300', 'hover:border-violet-300', 'hover:border-amber-300', 'hover:border-rose-300', 'hover:border-cyan-300'];
-                                return (
-                                    <a
-                                        key={product.slug}
-                                        href={`/dashboard/${categorySlug}/${product.slug}/produksi`}
-                                        className={`group block rounded-xl border border-gray-200 bg-white p-4 ${hoverColors[idx % hoverColors.length]} transition-all duration-200`}
-                                    >
-                                        <div className="flex items-center gap-2.5 mb-1.5">
-                                            <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${gradients[idx % gradients.length]} flex items-center justify-center text-white text-xs font-bold`}>
-                                                {product.label.charAt(0)}
-                                            </div>
-                                            <h3 className="text-sm font-semibold text-gray-800 group-hover:text-gray-900 transition-colors truncate">{product.label}</h3>
-                                        </div>
-                                        <p className="text-[11px] text-gray-400 group-hover:text-gray-500">Lihat detail →</p>
-                                    </a>
-                                );
-                            })}
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
