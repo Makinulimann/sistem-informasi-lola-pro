@@ -168,7 +168,7 @@ export function BelumSamplingModal({
         if (isOpen) {
             setStep(0);
             setBsValue(currentBs > 0 ? String(currentBs) : '');
-            setBsSatuan(unitFamily[0]);
+            setBsSatuan(isLiquid ? 'Liter' : 'Kg');
             setBatchKode(currentBatchKode || '');
             setKeterangan('');
             setMaterials([]);
@@ -300,13 +300,16 @@ export function BelumSamplingModal({
                 jenis: m.jenis === 'Bahan Baku' ? 'Baku' : 'Penolong',
             }));
 
+            const baseUnitForProduct = isLiquid ? 'Liter' : 'Kg';
+            const convertedBs = convertUnit(Number(bsValue), bsSatuan, baseUnitForProduct);
+
             await saveProduksiWithMaterials({
                 productSlug,
                 productFullName,
                 tabId,
                 tanggal,
-                bs: Number(bsValue),
-                bsSatuan: bsSatuan,
+                bs: convertedBs,
+                bsSatuan: baseUnitForProduct,
                 keterangan: keterangan || undefined,
                 batchKode: batchKode.trim(),
                 materials: materialsPayload,
