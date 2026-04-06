@@ -284,7 +284,7 @@ export async function GET(request: Request) {
 
                 for (const kode in batchMap) {
                     const b = batchMap[kode];
-                    tabBelumSampling += Math.max(0, b.bs - b.coa);
+                    tabBelumSampling += Math.max(0, b.bs - b.ps);
                     tabProsesSampling += Math.max(0, b.ps - b.coa);
                 }
 

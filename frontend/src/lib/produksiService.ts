@@ -24,6 +24,9 @@ export interface ProduksiRow {
 export interface ProduksiSummary {
     totalProduksi: number;
     totalKeluar: number;
+    totalPs: number;
+    totalCoa: number;
+    totalBelumSampling: number;
     kumulatif: number;
     stokAkhir: number;
 }

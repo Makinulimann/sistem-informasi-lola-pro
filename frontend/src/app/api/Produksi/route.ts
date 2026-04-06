@@ -94,13 +94,6 @@ export async function GET(request: Request) {
             });
         }
 
-        const summary = {
-            totalProduksi: fullList.reduce((sum, x) => sum + x.bs, 0),
-            totalKeluar: fullList.reduce((sum, x) => sum + x.pg, 0),
-            kumulatif: runningKumulatif,
-            stokAkhir: runningStok
-        };
-
         // --- Calculate Batch WIP available globally ---
         const batchMap: { [kode: string]: { bs: number, ps: number, coa: number } } = {};
         for (const r of filteredRecords) {
@@ -117,6 +110,25 @@ export async function GET(request: Request) {
                 batchMap[r.coa_batch_kode].coa += r.coa;
             }
         }
+
+        let globalBelumSampling = 0;
+        let globalProsesSampling = 0;
+
+        for (const kode in batchMap) {
+            const b = batchMap[kode];
+            globalBelumSampling += Math.max(0, b.bs - b.ps);
+            globalProsesSampling += Math.max(0, b.ps - b.coa);
+        }
+
+        const summary = {
+            totalProduksi: fullList.reduce((sum, x) => sum + x.bs, 0),
+            totalKeluar: fullList.reduce((sum, x) => sum + x.pg, 0),
+            totalPs: globalProsesSampling,
+            totalCoa: fullList.reduce((sum, x) => sum + x.coa, 0),
+            totalBelumSampling: globalBelumSampling,
+            kumulatif: runningKumulatif,
+            stokAkhir: runningStok
+        };
 
         const availableBatches = [];
         for (const kode in batchMap) {

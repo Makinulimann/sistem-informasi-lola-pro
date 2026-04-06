@@ -91,7 +91,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
 
     // Data
     const [data, setData] = useState<ProduksiRow[]>([]);
-    const [summary, setSummary] = useState<ProduksiSummary>({ totalProduksi: 0, totalKeluar: 0, kumulatif: 0, stokAkhir: 0 });
+    const [summary, setSummary] = useState<ProduksiSummary>({ totalProduksi: 0, totalKeluar: 0, totalPs: 0, totalCoa: 0, totalBelumSampling: 0, kumulatif: 0, stokAkhir: 0 });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -173,7 +173,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
             console.error('Failed to load produksi data:', err);
             setError(`Gagal memuat data: ${err instanceof Error ? err.message : 'Error tidak diketahui'}`);
             setData([]);
-            setSummary({ totalProduksi: 0, totalKeluar: 0, kumulatif: 0, stokAkhir: 0 });
+            setSummary({ totalProduksi: 0, totalKeluar: 0, totalPs: 0, totalCoa: 0, totalBelumSampling: 0, kumulatif: 0, stokAkhir: 0 });
             setAvailableBatches([]);
         } finally {
             setLoading(false);
@@ -417,11 +417,13 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
             </div>
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 <SummaryCard label="Periode" value={periodLabel} icon={<CalendarSmallIcon />} color="emerald" />
-                <SummaryCard label="Total Produksi" value={fmt(summary.totalProduksi)} icon={<FactoryIcon />} color="blue" />
-                <SummaryCard label="Kumulatif" value={fmt(summary.kumulatif)} icon={<TrendUpIcon />} color="amber" />
-                <SummaryCard label="Stok Akhir" value={fmt(summary.stokAkhir)} icon={<PackageIcon />} color="violet" />
+                <SummaryCard label="Produksi" value={fmt(summary.totalProduksi)} icon={<FactoryIcon />} color="blue" />
+                <SummaryCard label="Belum Sampling" value={fmt(summary.totalBelumSampling)} icon={<TrendUpIcon />} color="amber" />
+                <SummaryCard label="Proses Sampling" value={fmt(summary.totalPs)} icon={<PlusIcon />} color="orange" />
+                <SummaryCard label="COA" value={fmt(summary.totalCoa)} icon={<CheckIcon />} color="cyan" />
+                <SummaryCard label="Pengiriman" value={fmt(summary.totalKeluar)} icon={<PackageIcon />} color="violet" />
             </div>
 
             {/* Error Alert */}
@@ -1045,6 +1047,8 @@ function SummaryCard({ label, value, icon, color }: { label: string; value: stri
         blue: { bg: 'bg-blue-50', iconBg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-100' },
         amber: { bg: 'bg-amber-50', iconBg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-100' },
         violet: { bg: 'bg-violet-50', iconBg: 'bg-violet-100', text: 'text-violet-700', border: 'border-violet-100' },
+        orange: { bg: 'bg-orange-50', iconBg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-100' },
+        cyan: { bg: 'bg-cyan-50', iconBg: 'bg-cyan-100', text: 'text-cyan-700', border: 'border-cyan-100' },
     };
     const c = COLOR_MAP[color] ?? COLOR_MAP.emerald;
     return (
