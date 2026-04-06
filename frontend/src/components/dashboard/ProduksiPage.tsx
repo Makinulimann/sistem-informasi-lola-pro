@@ -105,7 +105,17 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
     const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; rowDate: string | null }>({ isOpen: false, rowDate: null });
 
     // Cancel produksi
-    const [cancelConfirm, setCancelConfirm] = useState<{ isOpen: boolean; tanggal: string }>({ isOpen: false, tanggal: '' });
+    const [cancelConfirm, setCancelConfirm] = useState<{ 
+        isOpen: boolean; 
+        tanggal: string; 
+        availableFields: { bs: boolean, ps: boolean, coa: boolean, pg: boolean };
+        selectedFields: { bs: boolean, ps: boolean, coa: boolean, pg: boolean };
+    }>({ 
+        isOpen: false, 
+        tanggal: '',
+        availableFields: { bs: false, ps: false, coa: false, pg: false },
+        selectedFields: { bs: false, ps: false, coa: false, pg: false }
+    });
     const [cancelLoading, setCancelLoading] = useState(false);
 
     // PS/COA Modal
@@ -261,7 +271,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
             fetchTabs();
         } catch (err) {
             console.error(err);
-            alert('Gagal menambah tab');
+            alert('Gagal menambah jenis');
         }
     };
 
@@ -273,19 +283,19 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
             fetchTabs();
         } catch (err) {
             console.error(err);
-            alert('Gagal mengubah nama tab');
+            alert('Gagal mengubah nama jenis');
         }
     };
 
     const handleDeleteTab = async (tabId: number) => {
-        if (!confirm('Hapus tab ini beserta seluruh datanya?')) return;
+        if (!confirm('Hapus jenis ini beserta seluruh datanya?')) return;
         try {
             await deleteTabApi(tabId);
             if (activeTabId === tabId) setActiveTabId(null);
             fetchTabs();
         } catch (err) {
             console.error(err);
-            alert('Gagal menghapus tab');
+            alert('Gagal menghapus jenis');
         }
     };
 
@@ -446,7 +456,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                         <button
                             onClick={() => setShowTabConfig(!showTabConfig)}
                             className={`p-2.5 rounded-lg transition-colors ${showTabConfig ? 'bg-emerald-100 text-emerald-700' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
-                            title="Konfigurasi Tab"
+                            title="Konfigurasi Jenis"
                         >
                             <SettingsIcon />
                         </button>
@@ -468,7 +478,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                 {showTabConfig && (
                     <div className="border-b border-gray-100 bg-gray-50/70 p-6">
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-base font-semibold text-gray-700">Konfigurasi Tab</h3>
+                            <h3 className="text-base font-semibold text-gray-700">Konfigurasi Jenis</h3>
                             <button onClick={() => setShowTabConfig(false)} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-white"><XIcon /></button>
                         </div>
                         <div className="space-y-3 mb-4">
@@ -491,7 +501,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                             ))}
                         </div>
                         <div className="flex items-center gap-3">
-                            <input value={newTabName} onChange={e => setNewTabName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleAddTab(); }} className="flex-1 text-base px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 shadow-sm" placeholder="Nama tab baru..." />
+                            <input value={newTabName} onChange={e => setNewTabName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleAddTab(); }} className="flex-1 text-base px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 shadow-sm" placeholder="Nama jenis baru..." />
                             <button onClick={handleAddTab} disabled={!newTabName.trim()} className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-base font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm">
                                 <PlusIcon /> Tambah
                             </button>
@@ -526,43 +536,46 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm border-collapse border border-gray-200">
                             <thead>
-                                {/* Row 1: Group headers */}
+                                {/* Row 1: Flat headers */}
                                 <tr className="bg-gray-50/80">
-                                    <th rowSpan={2} className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 sticky left-0 bg-gray-50/80 z-10 text-left w-32">Tanggal</th>
-                                    <th colSpan={3} className="px-4 py-3 font-semibold text-gray-700 text-center border border-gray-200 bg-gray-50/80">Produksi</th>
-                                    <th rowSpan={2} className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-right w-32">Kumulatif Produksi</th>
-                                    <th rowSpan={2} className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-center w-32">Pengiriman Gudang</th>
-                                    <th rowSpan={2} className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-right w-28">Stok Akhir</th>
-                                    <th rowSpan={2} className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-left w-44">Keterangan</th>
-                                    <th rowSpan={2} className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-center w-20">Aksi</th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 sticky left-0 bg-gray-50/80 z-10 text-left w-32">Tanggal</th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-right w-28">Produksi</th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-right w-28">Belum Sampling</th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-right w-28">Proses Sampling</th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-right w-20">COA</th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-right w-32">Kumulatif Produksi</th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-center w-32">Pengiriman Gudang</th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-right w-28">Stok Akhir</th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-left w-44">Keterangan</th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-center w-20">Aksi</th>
                                 </tr>
-                                {/* Row 2: Sub-headers under Produksi */}
-                                <tr className="bg-gray-50/80">
-                                    <th className="px-3 py-2.5 font-medium text-gray-600 text-center text-[11px] uppercase tracking-wider border border-gray-200 w-28">Belum Sampling</th>
-                                    <th className="px-3 py-2.5 font-medium text-gray-600 text-center text-[11px] uppercase tracking-wider border border-gray-200 w-28">Proses Sampling</th>
-                                    <th className="px-3 py-2.5 font-medium text-gray-600 text-center text-[11px] uppercase tracking-wider border border-gray-200 w-20">COA</th>
-                                </tr>
+
                             </thead>
                             <tbody className="bg-white">
                                 {filtered.length === 0 ? (
                                     <tr><td colSpan={9} className="p-12 text-center text-gray-400 text-sm border border-gray-200">Tidak ada data.</td></tr>
                                 ) : (
-                                    filtered.map(row => {
-                                        const highlight = isToday(row.tanggal);
-                                        const dirty = isRowDirty(row.tanggal);
+                                    (() => {
+                                        let runningBs = 0;
+                                        return filtered.map(row => {
+                                            const highlight = isToday(row.tanggal);
+                                            const dirty = isRowDirty(row.tanggal);
 
-                                        // Raw values (from original or dirty)
-                                        const bs = getRawValue(row, 'bs');
-                                        const ps = getRawValue(row, 'ps');
-                                        const coa = getRawValue(row, 'coa');
-                                        const pg = getRawValue(row, 'pg');
+                                            // Raw values (from original or dirty)
+                                            const bs = getRawValue(row, 'bs');
+                                            const ps = getRawValue(row, 'ps');
+                                            const coa = getRawValue(row, 'coa');
+                                            const pg = getRawValue(row, 'pg');
 
-                                        // Cascading display values
-                                        const coaDisplay = coa;
-                                        const psDisplay = Math.max(0, ps - coa);
-                                        const bsDisplay = Math.max(0, bs - coa);
+                                            // Accumulate Belum Sampling
+                                            runningBs += (bs - ps);
 
-                                        return (
+                                            // Cascading display values
+                                            const coaDisplay = coa;
+                                            const psDisplay = ps;
+                                            const bsDisplay = Math.max(0, runningBs);
+
+                                            return (
                                             <tr key={row.tanggal} className={`${highlight ? 'bg-amber-50/50' : 'hover:bg-emerald-50/10'} transition-colors`}>
                                                 {/* Tanggal */}
                                                 <td className={`px-4 py-3 font-medium sticky left-0 z-10 border border-gray-200 ${highlight ? 'text-amber-700 bg-amber-50/90' : 'text-gray-700 bg-white'}`}>
@@ -570,20 +583,25 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                                 </td>
 
                                                 {/* ── Produksi Group ── */}
-                                                {/* Belum Sampling: clickable cell → opens modal */}
+                                                {/* Produksi: clickable cell → opens modal for daily production input */}
                                                 <td className="p-1 border border-gray-200">
                                                     <div className="flex items-center gap-0.5">
                                                         <button
                                                             onClick={() => setBsModal({ isOpen: true, tanggal: row.tanggal, currentBs: bs })}
                                                             className={`flex-1 h-9 px-3 text-right font-mono text-sm rounded-lg transition-all outline-none cursor-pointer
-                                                                ${bsDisplay > 0
+                                                                ${bs > 0
                                                                     ? 'text-emerald-700 font-semibold bg-emerald-50/50 hover:bg-emerald-100 border border-emerald-200 hover:border-emerald-300'
                                                                     : 'text-gray-400 bg-transparent hover:bg-gray-50 border border-transparent hover:border-gray-200'}`}
                                                             title="Klik untuk input produksi & bahan"
                                                         >
-                                                            {bsDisplay > 0 ? fmt(bsDisplay) : '0'}
+                                                            {bs > 0 ? fmt(bs) : '0'}
                                                         </button>
                                                     </div>
+                                                </td>
+
+                                                {/* Belum Sampling: read-only text cell */}
+                                                <td className="px-4 py-3 text-right font-mono text-gray-700 border border-gray-200">
+                                                    {bsDisplay > 0 ? fmt(bsDisplay) : '0'}
                                                 </td>
 
                                                 {/* Proses Sampling: clickable button */}
@@ -661,9 +679,14 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                                         </div>
                                                     ) : (bs > 0 || ps > 0 || coa > 0 || pg > 0 || getTextValue(row, 'keterangan')) ? (
                                                         <button 
-                                                            onClick={() => setCancelConfirm({ isOpen: true, tanggal: row.tanggal })}
+                                                            onClick={() => setCancelConfirm({ 
+                                                                isOpen: true, 
+                                                                tanggal: row.tanggal,
+                                                                availableFields: { bs: bs > 0, ps: ps > 0, coa: coa > 0, pg: pg > 0 },
+                                                                selectedFields: { bs: bs > 0, ps: ps > 0, coa: coa > 0, pg: pg > 0 }
+                                                            })}
                                                             className="flex items-center justify-center w-8 h-8 mx-auto text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                            title="Hapus Seluruh Data Produksi Hari Ini"
+                                                            title="Hapus Data Produksi Pada Hari Ini"
                                                         >
                                                             <TrashIcon />
                                                         </button>
@@ -671,7 +694,8 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                                 </td>
                                             </tr>
                                         );
-                                    })
+                                        });
+                                    })()
                                 )}
                             </tbody>
                         </table>
@@ -718,25 +742,62 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                     <path d="M3 6h18" /><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" /><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
                                 </svg>
                             </div>
-                            <h3 className="text-lg font-bold text-gray-900">Hapus Data Produksi?</h3>
+                            <h3 className="text-lg font-bold text-gray-900">Hapus Data?</h3>
                         </div>
-                        <p className="text-sm text-gray-600 mb-5">
-                            Data produksi hari ini (Belum Sampling, Proses Sampling, COA) akan dihapus secara keseluruhan. Mutasi bahan akan dihapus dan otomatis stok bahan dikembalikan.
+                        <p className="text-sm text-gray-600 mb-4">
+                            Pilih data yang ingin Anda hapus (dikosongkan) pada tanggal ini:
                         </p>
+                        <div className="space-y-2 mb-6 text-sm text-gray-700 bg-gray-50 border border-gray-100 rounded-xl p-4">
+                            {cancelConfirm.availableFields.bs && (
+                                <label className="flex items-center gap-3 cursor-pointer p-0.5">
+                                    <input type="checkbox" checked={cancelConfirm.selectedFields.bs} onChange={e => setCancelConfirm(prev => ({...prev, selectedFields: {...prev.selectedFields, bs: e.target.checked}}))} className="w-4 h-4 rounded text-red-600 bg-white border-gray-300 focus:ring-red-500" />
+                                    <span>Produksi (beserta Mutasi)</span>
+                                </label>
+                            )}
+                            {cancelConfirm.availableFields.ps && (
+                                <label className="flex items-center gap-3 cursor-pointer p-0.5">
+                                    <input type="checkbox" checked={cancelConfirm.selectedFields.ps} onChange={e => setCancelConfirm(prev => ({...prev, selectedFields: {...prev.selectedFields, ps: e.target.checked}}))} className="w-4 h-4 rounded text-red-600 bg-white border-gray-300 focus:ring-red-500" />
+                                    <span>Proses Sampling</span>
+                                </label>
+                            )}
+                            {cancelConfirm.availableFields.coa && (
+                                <label className="flex items-center gap-3 cursor-pointer p-0.5">
+                                    <input type="checkbox" checked={cancelConfirm.selectedFields.coa} onChange={e => setCancelConfirm(prev => ({...prev, selectedFields: {...prev.selectedFields, coa: e.target.checked}}))} className="w-4 h-4 rounded text-red-600 bg-white border-gray-300 focus:ring-red-500" />
+                                    <span>COA</span>
+                                </label>
+                            )}
+                            {cancelConfirm.availableFields.pg && (
+                                <label className="flex items-center gap-3 cursor-pointer p-0.5">
+                                    <input type="checkbox" checked={cancelConfirm.selectedFields.pg} onChange={e => setCancelConfirm(prev => ({...prev, selectedFields: {...prev.selectedFields, pg: e.target.checked}}))} className="w-4 h-4 rounded text-red-600 bg-white border-gray-300 focus:ring-red-500" />
+                                    <span>Pengiriman Gudang</span>
+                                </label>
+                            )}
+                            
+                            {(!cancelConfirm.availableFields.bs && !cancelConfirm.availableFields.ps && !cancelConfirm.availableFields.coa && !cancelConfirm.availableFields.pg) && (
+                                <p className="text-gray-400 italic text-center">Hanya keterangan yang akan ikut terhapus karena kolom lainnya kosong.</p>
+                            )}
+                        </div>
                         <div className="flex justify-end gap-3">
                             <button
-                                onClick={() => setCancelConfirm({ isOpen: false, tanggal: '' })}
+                                onClick={() => setCancelConfirm({ isOpen: false, tanggal: '', availableFields: {bs:false,ps:false,coa:false,pg:false}, selectedFields: {bs:false,ps:false,coa:false,pg:false} })}
                                 disabled={cancelLoading}
                                 className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition-colors"
                             >
-                                Tidak
+                                Batal
                             </button>
                             <button
                                 onClick={async () => {
                                     setCancelLoading(true);
                                     try {
-                                        await cancelProduksiWithMaterials(slug, activeTabId || 0, cancelConfirm.tanggal);
-                                        setCancelConfirm({ isOpen: false, tanggal: '' });
+                                        const fieldsToDelete: string[] = [];
+                                        if (cancelConfirm.selectedFields.bs) fieldsToDelete.push('bs');
+                                        if (cancelConfirm.selectedFields.ps) fieldsToDelete.push('ps');
+                                        if (cancelConfirm.selectedFields.coa) fieldsToDelete.push('coa');
+                                        if (cancelConfirm.selectedFields.pg) fieldsToDelete.push('pg');
+
+                                        const productFullName = `${productName} ${tabs.find(t => t.id === activeTabId)?.nama || ''}`.trim();
+                                        await cancelProduksiWithMaterials(slug, activeTabId || 0, cancelConfirm.tanggal, fieldsToDelete, productFullName);
+                                        setCancelConfirm({ isOpen: false, tanggal: '', availableFields: {bs:false,ps:false,coa:false,pg:false}, selectedFields: {bs:false,ps:false,coa:false,pg:false} });
                                         fetchData();
                                     } catch (err) {
                                         console.error('Cancel failed:', err);
@@ -744,7 +805,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                         setCancelLoading(false);
                                     }
                                 }}
-                                disabled={cancelLoading}
+                                disabled={cancelLoading || (!cancelConfirm.selectedFields.bs && !cancelConfirm.selectedFields.ps && !cancelConfirm.selectedFields.coa && !cancelConfirm.selectedFields.pg && Object.values(cancelConfirm.availableFields).some(v => v))}
                                 className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg font-medium shadow-sm transition-colors disabled:opacity-50"
                             >
                                 {cancelLoading ? (
@@ -753,7 +814,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                         Menghapus...
                                     </>
                                 ) : (
-                                    'Ya, Hapus'
+                                    'Hapus Terpilih'
                                 )}
                             </button>
                         </div>

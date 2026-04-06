@@ -59,7 +59,7 @@ const PRODUCT_IMAGES: Record<string, string> = {
     'petro-gladiator': '/images/petro-gladiator.png',
     'bio-fertil': '/images/bio-fertil.png',
     'petro-fish': '/images/petro-fish.png',
-    'phonska-oca': '/images/ponska-ocha.png',
+    'phonska-oca': '/images/phonska-oca-plus.png',
 };
 
 function fmt(n?: number | null): string {
@@ -88,6 +88,10 @@ export function CategoryDashboardPage({
     const [prodTahun, setProdTahun] = useState(now.getFullYear());
     const [chartBulan, setChartBulan] = useState(now.getMonth() + 1);
     const [chartTahun, setChartTahun] = useState(now.getFullYear());
+    
+    // Unit Filters
+    const [padatUnit, setPadatUnit] = useState('Kg');
+    const [cairUnit, setCairUnit] = useState('Liter');
 
     const [matData, setMatData] = useState<CategorySummaryResponse | null>(null);
     const [prodData, setProdData] = useState<CategorySummaryResponse | null>(null);
@@ -182,7 +186,7 @@ export function CategoryDashboardPage({
 
     // Aggregate stats
     const stats = useMemo(() => {
-        const totalProducts = matData?.products.length || prodData?.products.length || 0;
+        const totalProducts = (prodData || matData)?.products.reduce((acc, p) => acc + (p.production.tabs.length || 0), 0) || 0;
         const uniqueMaterials = new Set<string>();
         matData?.products.forEach(p => p.materials.forEach(m => uniqueMaterials.add(m.nama)));
         const totalMaterials = uniqueMaterials.size;
@@ -199,19 +203,52 @@ export function CategoryDashboardPage({
     }, [matData, prodData]);
 
     // Chart data: Production per product (uses independent chartData)
-    const productionChartData = useMemo(() => {
-        if (!chartData) return [];
+    const { productionChartDataPadat, productionChartDataCair } = useMemo(() => {
+        if (!chartData) return { productionChartDataPadat: [], productionChartDataCair: [] };
         const NON_PRODUCT_SLUGS = ['aktivitas-harian', 'maintenance'];
-        return chartData.products
+        
+        const padatData: any[] = [];
+        const cairData: any[] = [];
+
+        chartData.products
             .filter(p => !NON_PRODUCT_SLUGS.includes(p.slug))
-            .map(p => ({
-                name: p.label.length > 12 ? p.label.substring(0, 12) + '…' : p.label,
-                fullName: p.label,
-                produksi: p.production.totalProduksi || 0,
-                pengiriman: p.production.totalPengiriman || 0,
-                stokAkhir: p.production.stokAkhir || 0,
-            }));
-    }, [chartData]);
+            .forEach(p => {
+                let padatBs = 0; let padatPg = 0;
+                let cairBs = 0; let cairPg = 0;
+
+                (p.production.tabs || []).forEach(t => {
+                    const fullName = `${p.label} ${t.tabName}`.toLowerCase();
+                    const isCair = fullName.includes('cair') || fullName.includes('liquid');
+                    if (isCair) {
+                        cairBs += t.totalProduksi || 0;
+                        cairPg += t.pengirimanGudang || 0;
+                    } else {
+                        padatBs += t.totalProduksi || 0;
+                        padatPg += t.pengirimanGudang || 0;
+                    }
+                });
+
+                if (padatBs > 0 || padatPg > 0) {
+                    padatData.push({
+                        name: p.label.length > 12 ? p.label.substring(0, 12) + '…' : p.label,
+                        fullName: p.label,
+                        produksi: convertValue(padatBs, 'Kg', padatUnit),
+                        pengiriman: convertValue(padatPg, 'Kg', padatUnit),
+                    });
+                }
+                
+                if (cairBs > 0 || cairPg > 0) {
+                    cairData.push({
+                        name: p.label.length > 12 ? p.label.substring(0, 12) + '…' : p.label,
+                        fullName: p.label,
+                        produksi: convertValue(cairBs, 'Liter', cairUnit),
+                        pengiriman: convertValue(cairPg, 'Liter', cairUnit),
+                    });
+                }
+            });
+
+        return { productionChartDataPadat: padatData, productionChartDataCair: cairData };
+    }, [chartData, padatUnit, cairUnit]);
 
     // Chart data: Material balance per unique material (each shown independently)
     const materialBalanceData = useMemo(() => {
@@ -381,7 +418,7 @@ export function CategoryDashboardPage({
                         <table className="w-full text-sm border-collapse">
                             <thead>
                                 <tr className="bg-gray-50/80">
-                                    {['Produk', 'Tab', 'Total Produksi', 'Belum Sampling', 'Proses Sampling', 'COA', 'Pengiriman Gudang'].map(h => (
+                                    {['Produk', 'Jenis', 'Total Produksi', 'Belum Sampling', 'Proses Sampling', 'COA', 'Pengiriman Gudang'].map(h => (
                                         <th key={h} className={`px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider border border-gray-200 ${['Total Produksi', 'Belum Sampling', 'Proses Sampling', 'COA', 'Pengiriman Gudang'].includes(h) ? 'text-right' : 'text-left'}`}>{h}</th>
                                     ))}
                                 </tr>
@@ -468,26 +505,70 @@ export function CategoryDashboardPage({
                 </div>
                 {loadingChart ? (
                     <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-600" /></div>
-                ) : productionChartData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={280}>
-                        <BarChart data={productionChartData} barGap={4} barCategoryGap="20%">
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                            <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                            <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} width={50} />
-                            <Tooltip
-                                contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', fontSize: 12 }}
-                                labelFormatter={(l, payload) => payload?.[0]?.payload?.fullName || l}
-                            />
-                            <Bar dataKey="produksi" name="Produksi" fill="#10b981" radius={[4, 4, 0, 0]}>
-                                <LabelList dataKey="produksi" position="top" style={{ fontSize: 10, fill: '#059669', fontWeight: 600 }} />
-                            </Bar>
-                            <Bar dataKey="pengiriman" name="Pengiriman" fill="#3b82f6" radius={[4, 4, 0, 0]}>
-                                <LabelList dataKey="pengiriman" position="top" style={{ fontSize: 10, fill: '#2563eb', fontWeight: 600 }} />
-                            </Bar>
-                        </BarChart>
-                    </ResponsiveContainer>
                 ) : (
-                    <div className="flex items-center justify-center py-12 text-sm text-gray-400">Belum ada data produksi</div>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
+                        {/* Padat Chart */}
+                        <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-4">
+                            <div className="flex items-center justify-between mb-4">
+                                <h4 className="text-sm font-medium text-gray-700">Produk Padat</h4>
+                                <select value={padatUnit} onChange={e => setPadatUnit(e.target.value)} className="h-7 px-2 text-xs border border-emerald-200 rounded-lg bg-emerald-50 text-emerald-700 outline-none cursor-pointer focus:ring-1 focus:ring-emerald-500 hover:bg-emerald-100 transition-colors">
+                                    {MASS_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                                </select>
+                            </div>
+                            {productionChartDataPadat.length > 0 ? (
+                                <ResponsiveContainer width="100%" height={240}>
+                                    <BarChart data={productionChartDataPadat} barGap={4} barCategoryGap="20%">
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                                        <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                                        <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} width={40} />
+                                        <Tooltip
+                                            contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', fontSize: 12 }}
+                                            labelFormatter={(l, payload) => payload?.[0]?.payload?.fullName || l}
+                                        />
+                                        <Bar dataKey="produksi" name={`Produksi (${padatUnit})`} fill="#10b981" radius={[4, 4, 0, 0]}>
+                                            <LabelList dataKey="produksi" formatter={(v: any) => fmt(v as number)} position="top" style={{ fontSize: 10, fill: '#059669', fontWeight: 600 }} />
+                                        </Bar>
+                                        <Bar dataKey="pengiriman" name={`Pengiriman (${padatUnit})`} fill="#3b82f6" radius={[4, 4, 0, 0]}>
+                                            <LabelList dataKey="pengiriman" formatter={(v: any) => fmt(v as number)} position="top" style={{ fontSize: 10, fill: '#2563eb', fontWeight: 600 }} />
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="flex items-center justify-center h-[240px] text-sm text-gray-400">Belum ada data produksi padat</div>
+                            )}
+                        </div>
+
+                        {/* Cair Chart */}
+                        <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-4">
+                            <div className="flex items-center justify-between mb-4">
+                                <h4 className="text-sm font-medium text-gray-700">Produk Cair</h4>
+                                <select value={cairUnit} onChange={e => setCairUnit(e.target.value)} className="h-7 px-2 text-xs border border-blue-200 rounded-lg bg-blue-50 text-blue-700 outline-none cursor-pointer focus:ring-1 focus:ring-blue-500 hover:bg-blue-100 transition-colors">
+                                    {VOL_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                                </select>
+                            </div>
+                            {productionChartDataCair.length > 0 ? (
+                                <ResponsiveContainer width="100%" height={240}>
+                                    <BarChart data={productionChartDataCair} barGap={4} barCategoryGap="20%">
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                                        <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                                        <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} width={40} />
+                                        <Tooltip
+                                            contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', fontSize: 12 }}
+                                            labelFormatter={(l, payload) => payload?.[0]?.payload?.fullName || l}
+                                        />
+                                        <Bar dataKey="produksi" name={`Produksi (${cairUnit})`} fill="#10b981" radius={[4, 4, 0, 0]}>
+                                            <LabelList dataKey="produksi" formatter={(v: any) => fmt(v as number)} position="top" style={{ fontSize: 10, fill: '#059669', fontWeight: 600 }} />
+                                        </Bar>
+                                        <Bar dataKey="pengiriman" name={`Pengiriman (${cairUnit})`} fill="#3b82f6" radius={[4, 4, 0, 0]}>
+                                            <LabelList dataKey="pengiriman" formatter={(v: any) => fmt(v as number)} position="top" style={{ fontSize: 10, fill: '#2563eb', fontWeight: 600 }} />
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="flex items-center justify-center h-[240px] text-sm text-gray-400">Belum ada data produksi cair</div>
+                            )}
+                        </div>
+                    </div>
                 )}
             </div>
 

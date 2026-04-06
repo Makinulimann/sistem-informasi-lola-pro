@@ -13,6 +13,8 @@ export async function GET() {
 
         const categories: any[] = [];
 
+        const { data: allTabs } = await db.from<any>('produksi_tabs').select('*').execute();
+
         for (const top of topLevel) {
             const children = (allMenus || []).filter((m: any) => (m.parent_id || m.ParentId) === (top.id || top.Id));
 
@@ -22,6 +24,17 @@ export async function GET() {
             const grandchildren = children.flatMap((c: any) => (allMenus || []).filter((s: any) => (s.parent_id || s.ParentId) === (c.id || c.Id)));
             const firstGrandChild = grandchildren.find((m: any) => (m.href || m.Href) !== '#');
 
+            // Find all unique product slugs for this category
+            const categoryProductSlugs = children.map((c: any) => {
+                const gc = (allMenus || []).find((s: any) => (s.parent_id || s.ParentId) === (c.id || c.Id) && (s.href || s.Href) !== '#');
+                if (gc) {
+                    const href = gc.href || gc.Href;
+                    const parts = href.split('/').filter((s: string) => s);
+                    if (parts.length >= 3) return parts[2];
+                }
+                return null;
+            }).filter(Boolean);
+
             let categorySlug = null;
             if (firstGrandChild) {
                 const href = firstGrandChild.href || firstGrandChild.Href;
@@ -30,11 +43,14 @@ export async function GET() {
             }
 
             if (categorySlug) {
+                // Count all tabs for the products in this category
+                const totalTabsCount = (allTabs || []).filter((t: any) => categoryProductSlugs.includes(t.product_slug || t.ProductSlug)).length;
+
                 categories.push({
                     slug: categorySlug,
                     label: top.label || top.Label,
                     icon: top.icon || top.Icon,
-                    productCount: children.length
+                    productCount: totalTabsCount > 0 ? totalTabsCount : children.length
                 });
             }
         }

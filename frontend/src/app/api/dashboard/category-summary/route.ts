@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/supabase';
 
 function titleCase(s: string) {
+    if (s === 'phonska-oca') return 'Phonska Oca Plus';
     return s.split('-')
         .map(word => word ? word[0].toUpperCase() + word.slice(1) : '')
         .join(' ');

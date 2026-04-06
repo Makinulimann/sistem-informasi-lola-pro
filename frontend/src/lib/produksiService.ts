@@ -122,6 +122,7 @@ export interface SaveWithMaterialsRequest {
     tabId: number;
     tanggal: string;
     bs: number;
+    bsSatuan?: string;
     keterangan?: string;
     batchKode?: string;
     materials: MaterialUsage[];
@@ -134,9 +135,11 @@ export async function saveProduksiWithMaterials(data: SaveWithMaterialsRequest):
 export async function cancelProduksiWithMaterials(
     productSlug: string,
     tabId: number,
-    tanggal: string
+    tanggal: string,
+    fieldsToDelete?: string[],
+    productFullName?: string
 ): Promise<void> {
-    return api.post<void>('/Produksi/cancel-with-materials', { productSlug, tabId, tanggal });
+    return api.post<void>('/Produksi/cancel-with-materials', { productSlug, tabId, tanggal, fieldsToDelete, productFullName });
 }
 
 // ─── Update Sampling (PS) ───

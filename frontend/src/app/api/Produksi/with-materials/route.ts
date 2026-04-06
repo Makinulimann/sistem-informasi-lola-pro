@@ -13,6 +13,7 @@ export async function POST(request: Request) {
         const tabId = body.tabId !== undefined ? body.tabId : body.TabId;
         const tanggalValid = body.tanggal || body.Tanggal;
         const bsValue = body.bs !== undefined ? body.bs : body.BS;
+        const bsSatuanValue = body.bsSatuan || body.BsSatuan || '';
         const ketValue = body.keterangan || body.Keterangan || '';
         const materialsArray = body.materials || body.Materials;
         const batchKodeValue = body.batchKode || body.BatchKode || '';
@@ -63,10 +64,14 @@ export async function POST(request: Request) {
         // 2. Delete existing Mutasi
         const { data: relatedBahanBaku } = await db.from<any>('bahan_bakus').select('*').eq('product_slug', productSlug).execute();
 
+        const productLabelDdl = body.productFullName || body.ProductFullName || productSlug;
+        
         const toDeleteIds = (relatedBahanBaku || [])
             .filter((b: any) => {
                 const ket = b.keterangan || b.Keterangan;
-                return ket && ket.toLowerCase().startsWith('produksi ');
+                const rDate = new Date(b.tanggal || b.Tanggal);
+                const isSameDate = rDate.getTime() === targetUtc.getTime();
+                return ket && ket.toLowerCase().startsWith('produksi ') && ket.toLowerCase().includes(productLabelDdl.toLowerCase()) && isSameDate;
             })
             .map((b: any) => b.id || b.Id);
 
@@ -91,7 +96,7 @@ export async function POST(request: Request) {
                     kuantum: mat.kuantum || mat.Kuantum || 0,
                     satuan: mat.satuan || mat.Satuan || 'Kg',
                     dokumen: '',
-                    keterangan: `produksi ${productLabel} sejumlah ${bsFormatted}`
+                    keterangan: `produksi ${productLabel} sejumlah ${bsFormatted} ${bsSatuanValue}`.trim()
                 }));
 
             // Insert records one by one and log errors if any

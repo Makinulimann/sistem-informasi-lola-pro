@@ -24,15 +24,24 @@ export async function GET(request: Request) {
             return NextResponse.json({ message: 'Invalid date format.' }, { status: 400 });
         }
 
+        const utcOffset = 7 * 60 * 60 * 1000;
+        const targetUtc = new Date(localDate.getTime() - utcOffset);
+
         const { data: relatedMutasi } = await db.from<any>('bahan_bakus').select('*').eq('product_slug', productSlug).execute();
 
         const mutasi = (relatedMutasi || [])
-            .filter((b: any) => b.Keterangan && b.Keterangan.toLowerCase().startsWith('produksi '))
+            .filter((b: any) => {
+                const ket = b.keterangan || b.Keterangan || '';
+                const rDateStr = b.tanggal || b.Tanggal;
+                const rDate = rDateStr ? new Date(rDateStr) : null;
+                const isSameDate = rDate && rDate.getTime() === targetUtc.getTime();
+                return ket.toLowerCase().startsWith('produksi ') && isSameDate;
+            })
             .map((b: any) => ({
-                NamaBahan: b.NamaBahan,
-                Kuantum: b.Kuantum,
-                Satuan: b.Satuan,
-                Jenis: b.Jenis
+                NamaBahan: b.nama_bahan || b.NamaBahan,
+                Kuantum: b.kuantum || b.Kuantum,
+                Satuan: b.satuan || b.Satuan,
+                Jenis: b.jenis || b.Jenis
             }));
 
         return NextResponse.json(mutasi);

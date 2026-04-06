@@ -44,7 +44,12 @@ export async function POST(request: Request) {
         
         const maxOrder = existing && existing.length > 0 ? existing[0].order : 0;
 
+        // Fetch max ID to avoid sequence issues
+        const { data: allTabs } = await db.from<any>('produksi_tabs').select('id').order('id', { ascending: false }).execute();
+        const maxId = allTabs && allTabs.length > 0 ? allTabs[0].id : 0;
+
         const insertData = {
+            id: maxId + 1,
             product_slug: productSlug,
             nama: nama,
             order: maxOrder + 1

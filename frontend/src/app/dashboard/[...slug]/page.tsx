@@ -28,6 +28,7 @@ const CATEGORY_SLUGS = [
 ];
 
 function titleCase(s: string) {
+    if (s === 'phonska-oca') return 'Phonska Oca Plus';
     return s.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 

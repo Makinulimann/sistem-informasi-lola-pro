@@ -14,8 +14,13 @@ export async function GET() {
             return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
         }
 
-        // Sort by order ascending
-        const sortedMenus = (menus || []).sort((a: any, b: any) => a.order - b.order);
+        // Sort by order ascending and map 'Phonska Oca' to 'Phonska Oca Plus'
+        const sortedMenus = (menus || []).map((m: any) => {
+            if (m.label === 'Phonska Oca' || m.Label === 'Phonska Oca') {
+                return { ...m, label: 'Phonska Oca Plus', Label: 'Phonska Oca Plus' };
+            }
+            return m;
+        }).sort((a: any, b: any) => a.order - b.order);
 
         // Build Hierarchy function internally
         const buildHierarchy = (allMenus: any[], parentId: number | null): any[] => {

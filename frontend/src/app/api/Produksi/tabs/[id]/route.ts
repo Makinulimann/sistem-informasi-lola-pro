@@ -19,9 +19,8 @@ export async function PUT(
         if (!tab) return NextResponse.json({ message: 'Not Found' }, { status: 404 });
 
         const { data: updated, error } = await db.from<any>('produksi_tabs').update({
-            Nama: body.nama || body.Nama,
-            Order: body.order || body.Order,
-            updated_at: new Date().toISOString()
+            nama: body.nama || body.Nama,
+            order: body.order || body.Order
         }).eq('id', id);
 
         if (error) {
@@ -29,7 +28,7 @@ export async function PUT(
             return NextResponse.json({ message: 'Failed to update' }, { status: 500 });
         }
 
-        return NextResponse.json({ Id: updated?.Id, Nama: updated?.Nama, Order: updated?.Order });
+        return NextResponse.json({ Id: updated?.id, Nama: updated?.nama, Order: updated?.order });
     } catch (error) {
         console.error('Error renaming tab:', error);
         return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });

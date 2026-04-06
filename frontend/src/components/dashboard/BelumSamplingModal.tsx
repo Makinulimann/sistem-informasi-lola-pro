@@ -151,6 +151,7 @@ export function BelumSamplingModal({
 }: BelumSamplingModalProps) {
     const [step, setStep] = useState(0);
     const [bsValue, setBsValue] = useState<string>('');
+    const [bsSatuan, setBsSatuan] = useState<string>('');
     const [batchKode, setBatchKode] = useState<string>('');
     const [keterangan, setKeterangan] = useState<string>('');
     const [materials, setMaterials] = useState<MaterialInput[]>([]);
@@ -159,11 +160,15 @@ export function BelumSamplingModal({
     const [success, setSuccess] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    const isLiquid = productFullName.toLowerCase().includes('cair') || productFullName.toLowerCase().includes('liquid');
+    const unitFamily = isLiquid ? ['Liter', 'mL', 'KL'] : ['Ton', 'Kwintal', 'Kg', 'Gram'];
+
     // Reset state when modal opens
     useEffect(() => {
         if (isOpen) {
             setStep(0);
             setBsValue(currentBs > 0 ? String(currentBs) : '');
+            setBsSatuan(unitFamily[0]);
             setBatchKode(currentBatchKode || '');
             setKeterangan('');
             setMaterials([]);
@@ -301,6 +306,7 @@ export function BelumSamplingModal({
                 tabId,
                 tanggal,
                 bs: Number(bsValue),
+                bsSatuan: bsSatuan,
                 keterangan: keterangan || undefined,
                 batchKode: batchKode.trim(),
                 materials: materialsPayload,
@@ -385,16 +391,25 @@ export function BelumSamplingModal({
                                         <label className="block text-sm font-semibold text-gray-700 mb-3">
                                             Jumlah Produksi (Belum Sampling)
                                         </label>
-                                        <div className="relative">
+                                        <div className="relative flex shadow-sm rounded-xl">
                                             <input
                                                 type="number"
                                                 step="any"
                                                 value={bsValue}
                                                 onChange={e => { setBsValue(e.target.value); setError(null); }}
-                                                className="w-full text-2xl font-mono font-bold text-gray-900 px-4 py-4 border-2 border-emerald-200 rounded-xl focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all bg-white placeholder:text-gray-300"
+                                                className="flex-1 text-2xl font-mono font-bold text-gray-900 pl-4 pr-3 py-4 border-2 border-emerald-200 rounded-l-xl border-r-0 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all bg-white placeholder:text-gray-300 relative z-10"
                                                 placeholder="0"
                                                 autoFocus
                                             />
+                                            <select
+                                                value={bsSatuan}
+                                                onChange={e => setBsSatuan(e.target.value)}
+                                                className="w-24 bg-gray-50 border-2 border-emerald-200 rounded-r-xl text-sm font-semibold text-gray-700 px-3 py-4 cursor-pointer hover:bg-gray-100 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all text-center relative z-10"
+                                            >
+                                                {unitFamily.map(u => (
+                                                    <option key={u} value={u}>{u}</option>
+                                                ))}
+                                            </select>
                                         </div>
                                         {currentBs > 0 && (
                                             <p className="mt-2 text-xs text-gray-400">
@@ -422,21 +437,6 @@ export function BelumSamplingModal({
                                         )}
                                     </div>
 
-                                    <div className="bg-blue-50/50 rounded-xl border border-blue-100 p-4">
-                                        <div className="flex items-start gap-3">
-                                            <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-blue-600">
-                                                    <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
-                                                </svg>
-                                            </div>
-                                            <div>
-                                                <p className="text-sm font-medium text-blue-800">Langkah Pengisian</p>
-                                                <p className="text-xs text-blue-600 mt-1">
-                                                    Masukkan jumlah produksi, lalu di langkah selanjutnya Anda dapat menginput bahan-bahan yang digunakan berdasarkan stok yang tersedia.
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
 
                                     {/* Keterangan / Notes */}
                                     <div className="bg-gray-50/50 rounded-xl border border-gray-100 p-5">
