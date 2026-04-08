@@ -25,6 +25,39 @@ import {
 } from '@/lib/produksiService';
 import { BelumSamplingModal } from './BelumSamplingModal';
 
+/* ─── Unit Conversion ─── */
+const MASS_UNITS = ['Ton', 'Kwintal', 'Kg', 'Gram', 'Mg'];
+const VOL_UNITS = ['Kl', 'Liter', 'Ml'];
+
+function getUnitFamily(unit: string) {
+    const u = unit.toLowerCase();
+    if (['ton', 'kwintal', 'kg', 'gram', 'mg', 'kilo', 'kilogram', 'gr', 'g'].includes(u)) return MASS_UNITS;
+    if (['kl', 'liter', 'ml', 'l', 'lt'].includes(u)) return VOL_UNITS;
+    return [unit];
+}
+
+function getBaseMultiplier(unit: string) {
+    const u = unit.toLowerCase();
+    switch (u) {
+        case 'ton': return 1000;
+        case 'kwintal': return 100;
+        case 'kg': case 'kilo': case 'kilogram': return 1;
+        case 'gram': case 'gr': case 'g': return 0.001;
+        case 'mg': return 0.000001;
+        case 'kl': return 1000;
+        case 'liter': case 'l': case 'lt': return 1;
+        case 'ml': return 0.001;
+        default: return 1;
+    }
+}
+
+function convertValue(value: number, from: string, to: string) {
+    if (from.toLowerCase() === to.toLowerCase()) return value;
+    const fromMult = getBaseMultiplier(from);
+    const toMult = getBaseMultiplier(to);
+    return (value * fromMult) / toMult;
+}
+
 /* ─── Icons ─── */
 function SearchIcon() { return (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>); }
 function DownloadIcon() { return (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>); }
@@ -79,6 +112,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
     const [search, setSearch] = useState('');
 
     // Tabs
+    const [displayUnit, setDisplayUnit] = useState<string>(''); // override unit
     const [tabs, setTabs] = useState<ProduksiTab[]>([]);
     const [activeTabId, setActiveTabId] = useState<number | null>(null);
     const [tabsLoading, setTabsLoading] = useState(true);
@@ -402,6 +436,13 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
     /* ═══════════════════════════════════════════ */
     /*  RENDER                                     */
     /* ═══════════════════════════════════════════ */
+    const activeTabObj = tabs.find(t => t.id === activeTabId);
+    const activeTabName = activeTabObj?.nama || '';
+    const isActiveCair = `${productName} ${activeTabName}`.toLowerCase().includes('cair') || `${productName} ${activeTabName}`.toLowerCase().includes('liquid');
+    const baseUnit = isActiveCair ? 'Liter' : 'Kg';
+    const unitFamily = getUnitFamily(baseUnit);
+    const currentUnit = displayUnit && unitFamily.includes(displayUnit) ? displayUnit : baseUnit;
+
     return (
         <div className="space-y-8 p-2">
             {/* Header */}
@@ -419,11 +460,11 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
             {/* Summary Cards */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 <SummaryCard label="Periode" value={periodLabel} icon={<CalendarSmallIcon />} color="emerald" />
-                <SummaryCard label="Produksi" value={fmt(summary.totalProduksi)} icon={<FactoryIcon />} color="blue" />
-                <SummaryCard label="Belum Sampling" value={fmt(summary.totalBelumSampling)} icon={<TrendUpIcon />} color="amber" />
-                <SummaryCard label="Proses Sampling" value={fmt(summary.totalPs)} icon={<PlusIcon />} color="orange" />
-                <SummaryCard label="COA" value={fmt(summary.totalCoa)} icon={<CheckIcon />} color="cyan" />
-                <SummaryCard label="Pengiriman" value={fmt(summary.totalKeluar)} icon={<PackageIcon />} color="violet" />
+                <SummaryCard label={`Produksi (${currentUnit})`} value={fmt(convertValue(summary.totalProduksi, baseUnit, currentUnit))} icon={<FactoryIcon />} color="blue" />
+                <SummaryCard label={`Belum Sampling`} value={fmt(convertValue(summary.totalBelumSampling, baseUnit, currentUnit))} icon={<TrendUpIcon />} color="amber" />
+                <SummaryCard label={`Proses Sampling`} value={fmt(convertValue(summary.totalPs, baseUnit, currentUnit))} icon={<PlusIcon />} color="orange" />
+                <SummaryCard label={`COA (${currentUnit})`} value={fmt(convertValue(summary.totalCoa, baseUnit, currentUnit))} icon={<CheckIcon />} color="cyan" />
+                <SummaryCard label={`Pengiriman (${currentUnit})`} value={fmt(convertValue(summary.totalKeluar, baseUnit, currentUnit))} icon={<PackageIcon />} color="violet" />
             </div>
 
             {/* Error Alert */}
@@ -513,16 +554,26 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
 
                 {/* Filter Row */}
                 <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex flex-col md:flex-row gap-6 justify-between items-end">
-                    <div className="flex items-center gap-3">
-                        <span className="text-base font-medium text-gray-500">Periode:</span>
-                        <div className="flex items-center gap-2 bg-white px-4 py-2.5 rounded-xl border border-gray-200 shadow-sm">
-                            <select value={bulan} onChange={e => setBulan(Number(e.target.value))} className="bg-transparent text-base font-medium text-gray-700 focus:outline-none cursor-pointer">
-                                {BULAN_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                            </select>
-                            <span className="text-gray-300 mx-1">/</span>
-                            <select value={tahun} onChange={e => setTahun(Number(e.target.value))} className="bg-transparent text-base font-medium text-gray-700 focus:outline-none cursor-pointer">
-                                {generateYearOptions().map(y => <option key={y} value={y}>{y}</option>)}
-                            </select>
+                    <div className="flex flex-wrap items-center gap-6">
+                        <div className="flex items-center gap-3">
+                            <span className="text-base font-medium text-gray-500">Periode:</span>
+                            <div className="flex items-center gap-2 bg-white px-4 py-2.5 rounded-xl border border-gray-200 shadow-sm">
+                                <select value={bulan} onChange={e => setBulan(Number(e.target.value))} className="bg-transparent text-base font-medium text-gray-700 focus:outline-none cursor-pointer">
+                                    {BULAN_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                </select>
+                                <span className="text-gray-300 mx-1">/</span>
+                                <select value={tahun} onChange={e => setTahun(Number(e.target.value))} className="bg-transparent text-base font-medium text-gray-700 focus:outline-none cursor-pointer">
+                                    {generateYearOptions().map(y => <option key={y} value={y}>{y}</option>)}
+                                </select>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3 border-l border-gray-200 pl-4">
+                            <span className="text-base font-medium text-gray-500">Satuan:</span>
+                            <div className="flex items-center gap-2 bg-white px-4 py-2.5 rounded-xl border border-gray-200 shadow-sm">
+                                <select value={currentUnit} onChange={e => setDisplayUnit(e.target.value)} className="bg-transparent text-base font-medium text-gray-700 focus:outline-none cursor-pointer">
+                                    {unitFamily.map(u => <option key={u} value={u}>{u}</option>)}
+                                </select>
+                            </div>
                         </div>
                     </div>
                     <div className="relative w-full md:w-80">
@@ -564,18 +615,26 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                             const dirty = isRowDirty(row.tanggal);
 
                                             // Raw values (from original or dirty)
-                                            const bs = getRawValue(row, 'bs');
-                                            const ps = getRawValue(row, 'ps');
-                                            const coa = getRawValue(row, 'coa');
-                                            const pg = getRawValue(row, 'pg');
+                                            const bsRaw = getRawValue(row, 'bs');
+                                            const psRaw = getRawValue(row, 'ps');
+                                            const coaRaw = getRawValue(row, 'coa');
+                                            const pgRaw = getRawValue(row, 'pg');
 
-                                            // Accumulate Belum Sampling
-                                            runningBs += (bs - ps);
+                                            // Accumulate Belum Sampling natively before converting
+                                            runningBs += (bsRaw - psRaw);
+                                            
+                                            const bs = convertValue(bsRaw, baseUnit, currentUnit);
+                                            const ps = convertValue(psRaw, baseUnit, currentUnit);
+                                            const coa = convertValue(coaRaw, baseUnit, currentUnit);
+                                            const pg = convertValue(pgRaw, baseUnit, currentUnit);
 
                                             // Cascading display values
                                             const coaDisplay = coa;
                                             const psDisplay = ps;
-                                            const bsDisplay = Math.max(0, runningBs);
+                                            const bsDisplay = Math.max(0, convertValue(runningBs, baseUnit, currentUnit));
+                                            
+                                            const kumulatif = convertValue(row.kumulatif, baseUnit, currentUnit);
+                                            const stokAkhir = convertValue(row.stokAkhir, baseUnit, currentUnit);
 
                                             return (
                                             <tr key={row.tanggal} className={`${highlight ? 'bg-amber-50/50' : 'hover:bg-emerald-50/10'} transition-colors`}>
@@ -589,7 +648,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                                 <td className="p-1 border border-gray-200">
                                                     <div className="flex items-center gap-0.5">
                                                         <button
-                                                            onClick={() => setBsModal({ isOpen: true, tanggal: row.tanggal, currentBs: bs })}
+                                                            onClick={() => setBsModal({ isOpen: true, tanggal: row.tanggal, currentBs: bsRaw })}
                                                             className={`flex-1 h-9 px-3 text-right font-mono text-sm rounded-lg transition-all outline-none cursor-pointer
                                                                 ${bs > 0
                                                                     ? 'text-emerald-700 font-semibold bg-emerald-50/50 hover:bg-emerald-100 border border-emerald-200 hover:border-emerald-300'
@@ -611,7 +670,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                                     <button
                                                         onClick={() => {
                                                             setPsModal({ isOpen: true, tanggal: row.tanggal });
-                                                            setPsValue(ps > 0 ? String(ps) : '');
+                                                            setPsValue(psDisplay > 0 ? String(psDisplay) : '');
                                                             setPsBatchKode(row.psBatchKode || '');
                                                             setPsError(null);
                                                         }}
@@ -630,7 +689,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                                     <button
                                                         onClick={() => {
                                                             setCoaModal({ isOpen: true, tanggal: row.tanggal });
-                                                            setCoaValue(coa > 0 ? String(coa) : '');
+                                                            setCoaValue(coaDisplay > 0 ? String(coaDisplay) : '');
                                                             setCoaBatchKode(row.coaBatchKode || '');
                                                             setCoaError(null);
                                                         }}
@@ -646,18 +705,18 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
 
                                                 {/* Kumulatif Produksi (computed - read only) */}
                                                 <td className="px-4 py-3 text-right font-mono text-gray-700 tabular-nums border border-gray-200">
-                                                    {fmt(row.kumulatif)}
+                                                    {fmt(kumulatif)}
                                                     {dirty && <span className="text-xs text-amber-500 block">*</span>}
                                                 </td>
 
                                                 {/* Pengiriman Gudang (editable) */}
                                                 <td className="p-1 border border-gray-200">
-                                                    <InputCell value={pg} onChange={v => handleInputChange(row.tanggal, 'pg', v)} />
+                                                    <InputCell value={pg} onChange={v => handleInputChange(row.tanggal, 'pg', convertValue(Number(v), currentUnit, baseUnit))} />
                                                 </td>
 
                                                 {/* Stok Akhir (computed - read only) */}
                                                 <td className="px-4 py-3 text-right font-mono font-semibold text-emerald-700 tabular-nums border border-gray-200">
-                                                    {fmt(row.stokAkhir)}
+                                                    {fmt(stokAkhir)}
                                                     {dirty && <span className="text-xs text-amber-500 block">*</span>}
                                                 </td>
 
@@ -862,7 +921,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                                 className={`w-full text-left px-4 py-3 flex items-center justify-between hover:bg-amber-50 transition-colors ${psBatchKode === b.kode ? 'bg-amber-50 border-l-3 border-amber-500' : ''}`}
                                             >
                                                 <span className="font-medium text-gray-800">{b.kode}</span>
-                                                <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">Tersedia: {fmt(b.bsWip)}</span>
+                                                <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">Tersedia: {fmt(convertValue(b.bsWip, baseUnit, currentUnit))}</span>
                                             </button>
                                         ))
                                     )}
@@ -891,8 +950,9 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                     if (!psValue || val <= 0) { setPsError('Jumlah harus valid'); return; }
 
                                     const selectedBatch = psAvailableBatches.find(b => b.kode === psBatchKode);
-                                    if (selectedBatch && val > selectedBatch.bsWip) {
-                                        setPsError(`Jumlah melebihi batas (Maks. ${fmt(selectedBatch.bsWip)})`);
+                                    const valRaw = convertValue(val, currentUnit, baseUnit);
+                                    if (selectedBatch && valRaw > selectedBatch.bsWip) {
+                                        setPsError(`Jumlah melebihi batas (Maks. ${fmt(convertValue(selectedBatch.bsWip, baseUnit, currentUnit))})`);
                                         return;
                                     }
 
@@ -903,7 +963,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                             tabId: activeTabId || 0,
                                             tanggal: psModal.tanggal,
                                             batchKode: psBatchKode,
-                                            ps: val,
+                                            ps: valRaw,
                                         });
                                         setPsModal({ isOpen: false, tanggal: '' });
                                         setPsDropdownOpen(false);
@@ -962,7 +1022,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                                 className={`w-full text-left px-4 py-3 flex items-center justify-between hover:bg-blue-50 transition-colors ${coaBatchKode === b.kode ? 'bg-blue-50 border-l-3 border-blue-500' : ''}`}
                                             >
                                                 <span className="font-medium text-gray-800">{b.kode}</span>
-                                                <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-blue-100 text-blue-700">Tersedia: {fmt(b.coaWip)}</span>
+                                                <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-blue-100 text-blue-700">Tersedia: {fmt(convertValue(b.coaWip, baseUnit, currentUnit))}</span>
                                             </button>
                                         ))
                                     )}
@@ -990,8 +1050,9 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                     if (!coaValue || val <= 0) { setCoaError('Jumlah harus valid'); return; }
 
                                     const selectedBatch = coaAvailableBatches.find(b => b.kode === coaBatchKode);
-                                    if (selectedBatch && val > selectedBatch.coaWip) {
-                                        setCoaError(`Jumlah melebihi batas (Maks. ${fmt(selectedBatch.coaWip)})`);
+                                    const valRaw = convertValue(val, currentUnit, baseUnit);
+                                    if (selectedBatch && valRaw > selectedBatch.coaWip) {
+                                        setCoaError(`Jumlah melebihi batas (Maks. ${fmt(convertValue(selectedBatch.coaWip, baseUnit, currentUnit))})`);
                                         return;
                                     }
 
@@ -1002,7 +1063,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                             tabId: activeTabId || 0,
                                             tanggal: coaModal.tanggal,
                                             batchKode: coaBatchKode,
-                                            coa: val,
+                                            coa: valRaw,
                                         });
                                         setCoaModal({ isOpen: false, tanggal: '' });
                                         setCoaDropdownOpen(false);

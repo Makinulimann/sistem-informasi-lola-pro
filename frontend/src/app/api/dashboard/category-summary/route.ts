@@ -232,7 +232,10 @@ export async function GET(request: Request) {
 
             const tabSummaries = tabs.map((tab: any) => {
                 const tabId = tab.id || tab.Id;
-                const tabAllRecords = produksiRecords.filter((r: any) => (r.produksi_tab_id || r.ProduksiTabId) === tabId);
+                const tabUpToMonthRecords = produksiRecords.filter((r: any) => {
+                    const rTanggal = r.tanggal || r.Tanggal;
+                    return (r.produksi_tab_id || r.ProduksiTabId) === tabId && new Date(rTanggal) < endUtc;
+                });
                 const tabMonthlyRecords = monthlyRecords.filter((r: any) => (r.produksi_tab_id || r.ProduksiTabId) === tabId);
 
                 // --- 1. Monthly totals (BS, PG, COA) ---
@@ -254,9 +257,9 @@ export async function GET(request: Request) {
                 totalPG += pg;
                 totalCOA += coa;
 
-                // --- 2. Global Batch Balances ---
+                // --- 2. Global Batch Balances (Up to End of Period) ---
                 const batchMap: { [kode: string]: { bs: number, ps: number, coa: number } } = {};
-                for (const r of tabAllRecords) {
+                for (const r of tabUpToMonthRecords) {
                     const batchKode = r.BatchKode || r.batch_kode;
                     const psBatchKode = r.PSBatchKode || r.ps_batch_kode;
                     const coaBatchKode = r.COABatchKode || r.coa_batch_kode;

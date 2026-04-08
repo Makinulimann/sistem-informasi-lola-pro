@@ -7,6 +7,9 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     LabelList
 } from 'recharts';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { format } from 'date-fns';
+import { id } from 'date-fns/locale';
 
 /* ─── Unit Conversion ─── */
 const MASS_UNITS = ['Ton', 'Kwintal', 'Kg', 'Gram', 'Mg'];
@@ -43,6 +46,8 @@ function convertValue(value: number, from: string, to: string) {
 
 /* ─── Helpers ─── */
 const MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+function DownloadIcon() { return (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>); }
 
 /* ─── Product Color Palette ─── */
 const PRODUCT_COLORS = [
@@ -336,6 +341,82 @@ export function CategoryDashboardPage({
 
     const globalLoading = loadingMat && loadingProd && loadingChart;
 
+    const handleExportExcel = () => {
+        const exportDate = format(new Date(), 'EEEE, dd MMMM yyyy', { locale: id });
+        const period = `${MONTHS[prodBulan - 1]} ${prodTahun}`;
+        
+        const exportData: any[] = [];
+        paginatedProduksiProducts.forEach(product => {
+            product.production.tabs.forEach(tab => {
+                const isCair = `${product.label} ${tab.tabName}`.toLowerCase().includes('cair') || `${product.label} ${tab.tabName}`.toLowerCase().includes('liquid');
+                const baseUnit = isCair ? 'Liter' : 'Kg';
+                const currentUnit = isCair ? cairUnit : padatUnit;
+                
+                exportData.push({
+                    'Produk': product.label,
+                    'Jenis': tab.tabName,
+                    'Total Produksi': fmt(convertValue(tab.totalProduksi || 0, baseUnit, currentUnit)),
+                    'Belum Sampling': fmt(convertValue(tab.belumSampling || 0, baseUnit, currentUnit)),
+                    'Proses Sampling': fmt(convertValue(tab.prosesSampling || 0, baseUnit, currentUnit)),
+                    'COA': fmt(convertValue(tab.coa || 0, baseUnit, currentUnit)),
+                    'Pengiriman Gudang': fmt(convertValue(tab.pengirimanGudang || 0, baseUnit, currentUnit)),
+                    'Satuan': currentUnit,
+                });
+            });
+        });
+
+        import('@/lib/export-utils').then(({ downloadCSV }) => {
+            downloadCSV(
+                exportData,
+                `Ringkasan_Produksi_${categoryName.replace(/\s+/g, '_')}_${format(new Date(), 'yyyyMMdd')}.csv`
+            );
+        });
+    };
+
+    const handleExportPDF = () => {
+        const exportDate = format(new Date(), 'EEEE, dd MMMM yyyy', { locale: id });
+        const period = `${MONTHS[prodBulan - 1]} ${prodTahun}`;
+
+        const exportData: any[] = [];
+        paginatedProduksiProducts.forEach(product => {
+            product.production.tabs.forEach(tab => {
+                const isCair = `${product.label} ${tab.tabName}`.toLowerCase().includes('cair') || `${product.label} ${tab.tabName}`.toLowerCase().includes('liquid');
+                const baseUnit = isCair ? 'Liter' : 'Kg';
+                const currentUnit = isCair ? cairUnit : padatUnit;
+                
+                exportData.push({
+                    produk: product.label,
+                    jenis: tab.tabName,
+                    totalProduksi: fmt(convertValue(tab.totalProduksi || 0, baseUnit, currentUnit)),
+                    belumSampling: fmt(convertValue(tab.belumSampling || 0, baseUnit, currentUnit)),
+                    prosesSampling: fmt(convertValue(tab.prosesSampling || 0, baseUnit, currentUnit)),
+                    coa: fmt(convertValue(tab.coa || 0, baseUnit, currentUnit)),
+                    pengiriman: fmt(convertValue(tab.pengirimanGudang || 0, baseUnit, currentUnit)),
+                    satuan: currentUnit,
+                });
+            });
+        });
+
+        import('@/lib/export-utils').then(({ printTable }) => {
+            printTable({
+                title: `Ringkasan Produksi - ${categoryName}`,
+                subtitle: `Periode: ${period}`,
+                date: exportDate,
+                data: exportData,
+                columns: [
+                    { key: 'produk', label: 'Produk' },
+                    { key: 'jenis', label: 'Jenis' },
+                    { key: 'totalProduksi', label: 'Total Produksi' },
+                    { key: 'belumSampling', label: 'Belum Sampling' },
+                    { key: 'prosesSampling', label: 'Proses Sampling' },
+                    { key: 'coa', label: 'COA' },
+                    { key: 'pengiriman', label: 'Pengiriman Gudang' },
+                    { key: 'satuan', label: 'Satuan' }
+                ]
+            });
+        });
+    };
+
     return (
         <div className="space-y-6">
             {/* ── Header ── */}
@@ -393,6 +474,16 @@ export function CategoryDashboardPage({
                         </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex items-center gap-2 border-r border-gray-200 pr-2 mr-1">
+                            <span className="text-xs text-gray-500 font-medium">Padat:</span>
+                            <select value={padatUnit} onChange={e => setPadatUnit(e.target.value)} className="h-8 px-2 text-xs border border-amber-200 rounded-lg bg-amber-50 text-amber-700 outline-none cursor-pointer focus:ring-1 focus:ring-amber-500">
+                                {MASS_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                            </select>
+                            <span className="text-xs text-gray-500 font-medium ml-2">Cair:</span>
+                            <select value={cairUnit} onChange={e => setCairUnit(e.target.value)} className="h-8 px-2 text-xs border border-blue-200 rounded-lg bg-blue-50 text-blue-700 outline-none cursor-pointer focus:ring-1 focus:ring-blue-500">
+                                {VOL_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                            </select>
+                        </div>
                         <select value={prodBulan} onChange={e => setProdBulan(Number(e.target.value))} className="h-8 px-2 text-xs border border-gray-200 rounded-lg bg-white text-gray-700 outline-none cursor-pointer focus:border-amber-500">
                             {MONTHS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
                         </select>
@@ -409,6 +500,17 @@ export function CategoryDashboardPage({
                                 className="block w-full sm:w-40 pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-colors bg-white"
                             />
                         </div>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-gray-700 text-xs font-medium rounded-lg border border-gray-200 hover:bg-gray-50 shadow-sm transition-colors">
+                                    <DownloadIcon /> Export
+                                </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={handleExportExcel} className="py-2 px-4 text-xs cursor-pointer">Excel</DropdownMenuItem>
+                                <DropdownMenuItem onClick={handleExportPDF} className="py-2 px-4 text-xs cursor-pointer">PDF</DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </div>
                 </div>
                 {loadingProd ? (
@@ -418,7 +520,7 @@ export function CategoryDashboardPage({
                         <table className="w-full text-sm border-collapse">
                             <thead>
                                 <tr className="bg-gray-50/80">
-                                    {['Produk', 'Jenis', 'Total Produksi', 'Belum Sampling', 'Proses Sampling', 'COA', 'Pengiriman Gudang'].map(h => (
+                                    {['Produk', 'Jenis', 'Total Produksi', 'Belum Sampling', 'Proses Sampling', 'COA', 'Pengiriman Gudang', 'Satuan'].map(h => (
                                         <th key={h} className={`px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider border border-gray-200 ${['Total Produksi', 'Belum Sampling', 'Proses Sampling', 'COA', 'Pengiriman Gudang'].includes(h) ? 'text-right' : 'text-left'}`}>{h}</th>
                                     ))}
                                 </tr>
@@ -430,45 +532,75 @@ export function CategoryDashboardPage({
                                     const color = PRODUCT_COLORS[productIdx % PRODUCT_COLORS.length];
                                     return (
                                         <Fragment key={product.slug}>
-                                            {tabs.map((tab, idx) => (
-                                                <tr key={`${product.slug}-${tab.tabName}-${idx}`} className="hover:bg-gray-50/50 transition-colors">
-                                                    {idx === 0 && (
-                                                        <td className={`px-4 py-3 align-middle border border-gray-200 border-l-[3px] ${color.border} ${color.bg}`} rowSpan={tabs.length + 1}>
-                                                            <div className="flex items-center gap-3">
-                                                                {PRODUCT_IMAGES[product.slug] ? (
-                                                                    <div className={`w-10 h-10 rounded-xl ring-2 ${color.ring} ring-offset-1 overflow-hidden flex-shrink-0 shadow-sm`}>
-                                                                        <img
-                                                                            src={PRODUCT_IMAGES[product.slug]}
-                                                                            alt={product.label}
-                                                                            className="w-full h-full object-cover"
-                                                                        />
-                                                                    </div>
-                                                                ) : (
-                                                                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${color.gradientFrom} ${color.gradientTo} flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-sm`}>
-                                                                        {product.label.charAt(0)}
-                                                                    </div>
-                                                                )}
-                                                                <span className={`font-semibold text-sm ${color.text}`}>{product.label}</span>
-                                                            </div>
-                                                        </td>
-                                                    )}
-                                                    <td className="px-4 py-3 text-gray-600 text-xs border border-gray-200">{tab.tabName}</td>
-                                                    <td className="px-4 py-3 text-right font-mono text-gray-700 border border-gray-200">{fmt(tab.totalProduksi)}</td>
-                                                    <td className="px-4 py-3 text-right font-mono text-gray-700 border border-gray-200">{fmt(tab.belumSampling)}</td>
-                                                    <td className="px-4 py-3 text-right font-mono text-gray-700 border border-gray-200">{fmt(tab.prosesSampling)}</td>
-                                                    <td className="px-4 py-3 text-right font-mono text-gray-700 border border-gray-200">{fmt(tab.coa)}</td>
-                                                    <td className="px-4 py-3 text-right font-mono text-gray-700 border border-gray-200">{fmt(tab.pengirimanGudang)}</td>
-                                                </tr>
-                                            ))}
+                                            {tabs.map((tab, idx) => {
+                                                const isCair = `${product.label} ${tab.tabName}`.toLowerCase().includes('cair') || `${product.label} ${tab.tabName}`.toLowerCase().includes('liquid');
+                                                const baseUnit = isCair ? 'Liter' : 'Kg';
+                                                const currentUnit = isCair ? cairUnit : padatUnit;
+                                                
+                                                const vTotalProduksi = convertValue(tab.totalProduksi || 0, baseUnit, currentUnit);
+                                                const vBelumSampling = convertValue(tab.belumSampling || 0, baseUnit, currentUnit);
+                                                const vProsesSampling = convertValue(tab.prosesSampling || 0, baseUnit, currentUnit);
+                                                const vCoa = convertValue(tab.coa || 0, baseUnit, currentUnit);
+                                                const vPengirimanGudang = convertValue(tab.pengirimanGudang || 0, baseUnit, currentUnit);
+
+                                                return (
+                                                    <tr key={`${product.slug}-${tab.tabName}-${idx}`} className="hover:bg-gray-50/50 transition-colors">
+                                                        {idx === 0 && (
+                                                            <td className={`px-4 py-3 align-middle border border-gray-200 border-l-[3px] ${color.border} ${color.bg}`} rowSpan={tabs.length + 1}>
+                                                                <div className="flex items-center gap-3">
+                                                                    {PRODUCT_IMAGES[product.slug] ? (
+                                                                        <div className={`w-10 h-10 rounded-xl ring-2 ${color.ring} ring-offset-1 overflow-hidden flex-shrink-0 shadow-sm`}>
+                                                                            <img
+                                                                                src={PRODUCT_IMAGES[product.slug]}
+                                                                                alt={product.label}
+                                                                                className="w-full h-full object-cover"
+                                                                            />
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${color.gradientFrom} ${color.gradientTo} flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-sm`}>
+                                                                            {product.label.charAt(0)}
+                                                                        </div>
+                                                                    )}
+                                                                    <span className={`font-semibold text-sm ${color.text}`}>{product.label}</span>
+                                                                </div>
+                                                            </td>
+                                                        )}
+                                                        <td className="px-4 py-3 text-gray-600 text-xs border border-gray-200">{tab.tabName}</td>
+                                                        <td className="px-4 py-3 text-right font-mono text-gray-700 border border-gray-200">{fmt(vTotalProduksi)}</td>
+                                                        <td className="px-4 py-3 text-right font-mono text-gray-700 border border-gray-200">{fmt(vBelumSampling)}</td>
+                                                        <td className="px-4 py-3 text-right font-mono text-gray-700 border border-gray-200">{fmt(vProsesSampling)}</td>
+                                                        <td className="px-4 py-3 text-right font-mono text-gray-700 border border-gray-200">{fmt(vCoa)}</td>
+                                                        <td className="px-4 py-3 text-right font-mono text-gray-700 border border-gray-200">{fmt(vPengirimanGudang)}</td>
+                                                        <td className="px-4 py-3 text-xs text-center border border-gray-200 bg-gray-50/50 text-gray-500 font-medium">{currentUnit}</td>
+                                                    </tr>
+                                                );
+                                            })}
                                             {/* Subtotal row */}
-                                            <tr key={`${product.slug}-total`} className={color.totalBg}>
-                                                <td className={`px-4 py-2 text-xs font-semibold ${color.text} uppercase border border-gray-200`}>Total</td>
-                                                <td className="px-4 py-2 text-right font-mono font-bold text-gray-900 border border-gray-200">{fmt(product.production.totalProduksi)}</td>
-                                                <td className="px-4 py-2 text-right font-mono font-bold text-gray-900 border border-gray-200">{fmt(product.production.totalBelumSampling)}</td>
-                                                <td className="px-4 py-2 text-right font-mono font-bold text-gray-900 border border-gray-200">{fmt(product.production.totalProsesSampling)}</td>
-                                                <td className={`px-4 py-2 text-right font-mono font-bold ${color.text} border border-gray-200`}>{fmt(product.production.totalCOA)}</td>
-                                                <td className="px-4 py-2 text-right font-mono font-bold text-gray-900 border border-gray-200">{fmt(product.production.totalPengiriman)}</td>
-                                            </tr>
+                                            {(() => {
+                                                let tProduksi = 0, tBs = 0, tPs = 0, tCoa = 0, tPg = 0;
+                                                tabs.forEach(tab => {
+                                                    const isCair = `${product.label} ${tab.tabName}`.toLowerCase().includes('cair') || `${product.label} ${tab.tabName}`.toLowerCase().includes('liquid');
+                                                    const baseUnit = isCair ? 'Liter' : 'Kg';
+                                                    const currentUnit = isCair ? cairUnit : padatUnit;
+                                                    
+                                                    tProduksi += convertValue(tab.totalProduksi || 0, baseUnit, currentUnit);
+                                                    tBs += convertValue(tab.belumSampling || 0, baseUnit, currentUnit);
+                                                    tPs += convertValue(tab.prosesSampling || 0, baseUnit, currentUnit);
+                                                    tCoa += convertValue(tab.coa || 0, baseUnit, currentUnit);
+                                                    tPg += convertValue(tab.pengirimanGudang || 0, baseUnit, currentUnit);
+                                                });
+                                                return (
+                                                    <tr key={`${product.slug}-total`} className={color.totalBg}>
+                                                        <td className={`px-4 py-2 text-xs font-semibold ${color.text} uppercase border border-gray-200`}>Total</td>
+                                                        <td className="px-4 py-2 text-right font-mono font-bold text-gray-900 border border-gray-200">{fmt(tProduksi)}</td>
+                                                        <td className="px-4 py-2 text-right font-mono font-bold text-gray-900 border border-gray-200">{fmt(tBs)}</td>
+                                                        <td className="px-4 py-2 text-right font-mono font-bold text-gray-900 border border-gray-200">{fmt(tPs)}</td>
+                                                        <td className={`px-4 py-2 text-right font-mono font-bold ${color.text} border border-gray-200`}>{fmt(tCoa)}</td>
+                                                        <td className="px-4 py-2 text-right font-mono font-bold text-gray-900 border border-gray-200">{fmt(tPg)}</td>
+                                                        <td className="px-4 py-2 text-xs bg-transparent border border-gray-200"></td>
+                                                    </tr>
+                                                );
+                                            })()}
                                         </Fragment>
                                     );
                                 })}
