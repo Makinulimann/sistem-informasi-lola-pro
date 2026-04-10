@@ -8,10 +8,16 @@ import {
     PencilIcon, Trash2Icon, PlusIcon, SearchIcon, XIcon,
     FileTextIcon, ChevronLeftIcon, ChevronRightIcon,
     UploadIcon, ArrowUpDownIcon, ArrowUpIcon, ArrowDownIcon,
-    WrenchIcon, MapPinIcon, ClipboardListIcon
+    WrenchIcon, CalendarIcon, UserIcon, AlertCircleIcon,
+    TagIcon, InfoIcon
 } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { AppButton } from '@/components/ui/app-button';
+import { MaintenanceImportModal } from './MaintenanceImportModal';
+import { AppSelect } from '@/components/ui/app-select';
+import { AppSearchBar } from '@/components/ui/app-search-bar';
+import { AppPagination } from '@/components/ui/app-pagination';
 
 /* ─── Constants ─── */
 
@@ -50,6 +56,8 @@ export function MaintenancePage({ productCategory, productName, productSlug }: M
     const [search, setSearch] = useState('');
     const [bulan, setBulan] = useState('');
     const [tahun, setTahun] = useState('');
+    const [filterPrioritas, setFilterPrioritas] = useState('');
+    const [filterStatus, setFilterStatus] = useState('');
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(0);
 
@@ -59,6 +67,7 @@ export function MaintenancePage({ productCategory, productName, productSlug }: M
     // UI
     const [isLoading, setIsLoading] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<Maintenance | null>(null);
 
     // Delete confirm modal
@@ -70,7 +79,7 @@ export function MaintenancePage({ productCategory, productName, productSlug }: M
     const [isSaving, setIsSaving] = useState(false);
 
     // Sorting
-    const [sortBy, setSortBy] = useState<string | undefined>('tanggal');
+    const [sortBy, setSortBy] = useState<string | undefined>('tanggal_dibutuhkan');
     const [sortDesc, setSortDesc] = useState<boolean>(true);
 
     const toast = useToast();
@@ -91,18 +100,23 @@ export function MaintenancePage({ productCategory, productName, productSlug }: M
             const responseData = response.data || (response as any).Data || [];
             const responseTotal = response.total || (response as any).Total || 0;
 
-            setMaintenanceData(responseData);
-            setTotal(responseTotal);
+            // Client-side filter for prioritas & status since API may not support them
+            let filtered = responseData;
+            if (filterPrioritas) filtered = filtered.filter((d: any) => (d.prioritas || '').toLowerCase() === filterPrioritas.toLowerCase());
+            if (filterStatus) filtered = filtered.filter((d: any) => (d.status || '').toLowerCase() === filterStatus.toLowerCase());
+
+            setMaintenanceData(filtered);
+            setTotal(filterPrioritas || filterStatus ? filtered.length : responseTotal);
         } catch (error) {
             console.error('Failed to fetch data:', error);
         } finally {
             setIsLoading(false);
         }
-    }, [bulan, tahun, search, page, sortBy, sortDesc]);
+    }, [bulan, tahun, search, page, sortBy, sortDesc, filterPrioritas, filterStatus]);
 
     useEffect(() => {
         setPage(1);
-    }, [search, bulan, tahun]);
+    }, [search, bulan, tahun, filterPrioritas, filterStatus]);
 
     useEffect(() => {
         fetchData();
@@ -207,6 +221,17 @@ export function MaintenancePage({ productCategory, productName, productSlug }: M
                 initialData={editingItem}
             />
 
+            {/* Import Modal */}
+            <MaintenanceImportModal
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+                onSuccess={() => {
+                    fetchData();
+                    setIsImportModalOpen(false);
+                }}
+                productSlug={productSlug || ''}
+            />
+
             {/* Breadcrumb */}
             <div className="flex items-center gap-2 text-sm text-gray-400">
                 <span className="text-gray-500">Dashboard</span>
@@ -233,7 +258,7 @@ export function MaintenancePage({ productCategory, productName, productSlug }: M
             </div>
 
             {/* Main Card */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="bg-white border border-gray-200 overflow-hidden">
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-gray-100">
                     <div className="flex">
@@ -242,64 +267,87 @@ export function MaintenancePage({ productCategory, productName, productSlug }: M
                             <span className="absolute bottom-0 left-0 w-full h-0.5 bg-emerald-600 rounded-t" />
                         </div>
                     </div>
-                    <div className="px-4 py-2 sm:py-0">
-                        <button
-                            onClick={handleCreate}
-                            className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
+                    <div className="px-4 py-2 sm:py-0 flex items-center gap-2">
+                        <AppButton
+                            variant="secondary"
+                            size="md"
+                            onClick={() => setIsImportModalOpen(true)}
+                            icon={<UploadIcon className="size-4 text-emerald-600" />}
                         >
-                            <PlusIcon className="size-4" />
+                            Import Excel
+                        </AppButton>
+                        <AppButton
+                            variant="primary"
+                            size="md"
+                            onClick={handleCreate}
+                            icon={<PlusIcon className="size-4" />}
+                        >
                             Tambah Maintenance
-                        </button>
+                        </AppButton>
                     </div>
                 </div>
 
                 {/* Filters */}
                 <div className="p-4 border-b border-gray-100 bg-gray-50/50">
-                    <div className="flex flex-col md:flex-row md:items-end gap-4 justify-between">
-                        <div className="flex flex-col sm:flex-row gap-3 items-end">
-                            <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
-                                <span className="text-sm font-medium text-gray-500">Periode:</span>
-                                <select
-                                    value={bulan}
-                                    onChange={(e) => setBulan(e.target.value)}
-                                    className="bg-transparent text-sm font-medium text-gray-700 focus:outline-none cursor-pointer hover:text-emerald-600 transition-colors"
-                                >
-                                    {BULAN_OPTIONS.map((opt) => (
-                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                    ))}
-                                </select>
-                                <span className="text-gray-300">/</span>
-                                <select
-                                    value={tahun}
-                                    onChange={(e) => setTahun(e.target.value)}
-                                    className="bg-transparent text-sm font-medium text-gray-700 focus:outline-none cursor-pointer hover:text-emerald-600 transition-colors"
-                                >
-                                    {TAHUN_OPTIONS.map((opt) => (
-                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            {(bulan || tahun) && (
-                                <button
-                                    onClick={() => { setBulan(''); setTahun(''); }}
-                                    className="px-3 py-2 bg-white text-gray-500 text-sm font-medium rounded-lg border border-gray-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all shadow-sm"
+                    <div className="flex flex-col md:flex-row md:items-center gap-3 justify-between">
+                        <div className="flex flex-wrap gap-2 items-center">
+                            {/* Periode */}
+                            <AppSelect
+                                prefixLabel="Periode:"
+                                variant="ghost"
+                                value={bulan}
+                                onChange={(e) => setBulan(e.target.value)}
+                                options={BULAN_OPTIONS}
+                                className="bg-white border border-gray-200 px-3 py-2"
+                            />
+                            <AppSelect
+                                variant="ghost"
+                                value={tahun}
+                                onChange={(e) => setTahun(e.target.value)}
+                                options={TAHUN_OPTIONS}
+                                className="bg-white border border-gray-200 px-3 py-2 -ml-3"
+                            />
+                            {/* Prioritas filter */}
+                            <AppSelect
+                                value={filterPrioritas}
+                                onChange={(e) => setFilterPrioritas(e.target.value)}
+                                options={[
+                                    { value: '', label: 'Semua Prioritas' },
+                                    { value: 'Normal', label: 'Normal' },
+                                    { value: 'Urgent', label: 'Urgent' },
+                                ]}
+                                className="w-40"
+                            />
+                            <AppSelect
+                                value={filterStatus}
+                                onChange={(e) => setFilterStatus(e.target.value)}
+                                options={[
+                                    { value: '', label: 'Semua Status' },
+                                    { value: 'Open', label: 'Open' },
+                                    { value: 'In Progress', label: 'In Progress' },
+                                    { value: 'Resolved', label: 'Resolved' },
+                                    { value: 'Rejected', label: 'Rejected' },
+                                ]}
+                                className="w-40"
+                            />
+                            {(bulan || tahun || filterPrioritas || filterStatus) && (
+                                <AppButton
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => { setBulan(''); setTahun(''); setFilterPrioritas(''); setFilterStatus(''); }}
+                                    title="Reset filter"
+                                    className="text-gray-400 hover:text-red-500 hover:bg-red-50 border border-gray-200"
                                 >
                                     <XIcon className="size-4" />
-                                </button>
+                                </AppButton>
                             )}
                         </div>
-                        <div className="relative w-full md:w-72">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                                <SearchIcon className="size-4" />
-                            </span>
-                            <input
-                                type="text"
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                placeholder="Cari equipment, area, kegiatan..."
-                                className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow shadow-sm"
-                            />
-                        </div>
+                        <AppSearchBar
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Cari kode, nama, deskripsi..."
+                            containerClassName="w-full md:w-72"
+                        />
                     </div>
                 </div>
 
@@ -381,12 +429,13 @@ function MaintenanceTable({
                         <tr className="bg-gray-50/80">
                             {[
                                 { key: 'no', label: 'No', width: 'w-12', sortable: false },
-                                { key: 'tanggal', label: 'Tanggal', width: 'w-32', sortable: true },
-                                { key: 'equipment', label: 'Equipment', width: 'w-36', sortable: true },
-                                { key: 'area', label: 'Area', width: 'w-36', sortable: true },
-                                { key: 'kegiatan', label: 'Kegiatan', width: '', sortable: true },
-                                { key: 'keterangan', label: 'Keterangan', width: 'w-44', sortable: true },
-                                { key: 'dokumentasi', label: 'Dokumentasi', width: 'w-36', sortable: true },
+                                { key: 'kode', label: 'Kode', width: 'w-32', sortable: true },
+                                { key: 'nama', label: 'Nama', width: 'w-48', sortable: true },
+                                { key: 'prioritas', label: 'Prioritas', width: 'w-24', sortable: true },
+                                { key: 'status', label: 'Status', width: 'w-32', sortable: true },
+                                { key: 'keperluan', label: 'Keperluan', width: 'w-48', sortable: true },
+                                { key: 'deskripsi', label: 'Deskripsi', width: '', sortable: true },
+                                { key: 'tanggal_dibutuhkan', label: 'Tanggal Dibutuhkan', width: 'w-40', sortable: true },
                                 { key: 'aksi', label: 'Aksi', width: 'w-24', sortable: false }
                             ].map((col) => (
                                 <th
@@ -414,23 +463,38 @@ function MaintenanceTable({
                         {data.map((item, idx) => (
                             <tr key={item.id} className="hover:bg-emerald-50/10 transition-colors">
                                 <td className="px-4 py-3 text-gray-700 font-medium border border-gray-200">{(page - 1) * 10 + idx + 1}</td>
-                                <td className="px-4 py-3 border border-gray-200 text-gray-700">
-                                    {format(new Date(item.tanggal), 'dd/MM/yyyy')}
+                                <td className="px-4 py-3 border border-gray-200 text-gray-700 font-medium whitespace-nowrap">
+                                    {(item as any).kode || '-'}
                                 </td>
                                 <td className="px-4 py-3 border border-gray-200 text-gray-700">
-                                    {item.equipment || '-'}
+                                    {(item as any).nama || '-'}
+                                </td>
+                                <td className="px-4 py-3 border border-gray-200 text-center">
+                                    <PrioritasBadge value={(item as any).prioritas || 'Normal'} />
+                                </td>
+                                <td className="px-4 py-3 border border-gray-200 text-center">
+                                    <StatusBadge value={(item as any).status || 'Open'} />
                                 </td>
                                 <td className="px-4 py-3 border border-gray-200 text-gray-700">
-                                    {item.area || '-'}
-                                </td>
-                                <td className="px-4 py-3 border border-gray-200 text-gray-700 max-w-xs">
-                                    <p className="line-clamp-2">{item.kegiatan}</p>
-                                </td>
-                                <td className="px-4 py-3 border border-gray-200 text-gray-700 max-w-xs">
-                                    <p className="line-clamp-2">{item.keterangan || '-'}</p>
+                                    <p className="line-clamp-2">{(item as any).keperluan || '-'}</p>
                                 </td>
                                 <td className="px-4 py-3 border border-gray-200 text-gray-700">
-                                    {item.dokumentasi ? item.dokumentasi : '-'}
+                                    <div className="whitespace-pre-line text-xs">
+                                        {((item as any).deskripsi || '').split('\n').map((line: string, lid: number) => (
+                                            line.trim() ? (
+                                                <div key={lid} className="flex gap-2 items-start mb-1 last:mb-0">
+                                                    <span className="mt-1.5 w-1 h-1 bg-gray-400 shrink-0" />
+                                                    <span>{line}</span>
+                                                </div>
+                                            ) : null
+                                        ))}
+                                    </div>
+                                </td>
+                                <td className="px-4 py-3 border border-gray-200 text-gray-700 text-right font-medium">
+                                    <div className="flex items-center justify-end gap-2">
+                                        <CalendarIcon className="size-3.5 text-gray-400" />
+                                        {(item as any).tanggal_dibutuhkan ? format(new Date((item as any).tanggal_dibutuhkan), 'dd/MM/yyyy') : '-'}
+                                    </div>
                                 </td>
                                 <td className="px-4 py-3 border border-gray-200">
                                     <div className="flex items-center justify-center gap-1">
@@ -462,71 +526,85 @@ function MaintenanceTable({
                     <div key={item.id} className="p-4 hover:bg-gray-50/50">
                         <div className="flex items-start justify-between mb-2">
                             <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
-                                {format(new Date(item.tanggal), 'dd MMM yyyy', { locale: localeId })}
+                                <CalendarIcon className="size-3.5" />
+                                {(item as any).tanggal_dibutuhkan ? format(new Date((item as any).tanggal_dibutuhkan), 'dd MMM yyyy', { locale: localeId }) : '-'}
                             </div>
                             <div className="flex items-center gap-1">
                                 <button onClick={() => onEdit(item)} className="p-1 text-gray-400 hover:text-emerald-600"><PencilIcon className="size-4" /></button>
                                 <button onClick={() => onDelete(item.id)} className="p-1 text-gray-400 hover:text-red-600"><Trash2Icon className="size-4" /></button>
                             </div>
                         </div>
-                        <div className="flex flex-wrap gap-2 mb-2">
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs font-medium">
-                                <WrenchIcon className="size-3" />{item.equipment}
+                        <div className="flex flex-wrap gap-2 mb-3">
+                            <span className="inline-flex items-center px-2 py-0.5 bg-gray-50 text-gray-700 rounded text-[11px] font-bold uppercase border border-gray-100">
+                                {(item as any).kode || '-'}
                             </span>
-                            <span className="inline-flex items-center px-2.5 py-1 bg-amber-50 text-amber-700 rounded-full text-xs font-medium">
-                                {item.area}
+                            <span className="text-gray-400">•</span>
+                            <span className="text-sm font-semibold text-gray-800">
+                                {(item as any).nama || '-'}
                             </span>
                         </div>
-                        <p className="text-sm text-gray-700 line-clamp-3">{item.kegiatan}</p>
-                        {item.keterangan && (
-                            <p className="text-xs text-gray-500 mt-1 line-clamp-2">{item.keterangan}</p>
-                        )}
-                        {item.dokumentasi && (
-                            <p className="text-xs text-emerald-600 mt-1.5 flex items-center gap-1">
-                                <FileTextIcon className="size-3" />{item.dokumentasi}
+                        <div className="flex flex-wrap gap-2 mb-3">
+                            <PrioritasBadge value={(item as any).prioritas || 'Normal'} />
+                            <StatusBadge value={(item as any).status || 'Open'} />
+                        </div>
+                        <div className="text-sm text-gray-600 mb-2">
+                            <p className="font-medium text-gray-800 mb-0.5">Keperluan:</p>
+                            <p className="line-clamp-3">{(item as any).keperluan || '-'}</p>
+                        </div>
+                        <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600">
+                            <p className="font-medium text-gray-800 mb-1 flex items-center gap-1.5">
+                                <FileTextIcon className="size-3" /> Kegiatan:
                             </p>
-                        )}
+                            <div className="whitespace-pre-line leading-relaxed">
+                                {(item as any).deskripsi || '-'}
+                            </div>
+                        </div>
                     </div>
                 ))}
             </div>
 
             {/* Pagination */}
-            {totalPages > 1 && (
-                <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50/30">
-                    <span className="text-xs text-gray-500">
-                        Menampilkan {(page - 1) * 10 + 1}–{Math.min(page * 10, total)} dari {total} data
-                    </span>
-                    <div className="flex items-center gap-1">
-                        <button
-                            onClick={() => setPage(Math.max(1, page - 1))}
-                            disabled={page === 1}
-                            className="p-1.5 rounded-md text-gray-500 hover:bg-white hover:shadow-sm disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                        >
-                            <ChevronLeftIcon className="size-4" />
-                        </button>
-                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                            <button
-                                key={p}
-                                onClick={() => setPage(p)}
-                                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${p === page
-                                    ? 'bg-emerald-600 text-white shadow-sm'
-                                    : 'text-gray-500 hover:bg-white hover:shadow-sm'
-                                    }`}
-                            >
-                                {p}
-                            </button>
-                        ))}
-                        <button
-                            onClick={() => setPage(Math.min(totalPages, page + 1))}
-                            disabled={page === totalPages}
-                            className="p-1.5 rounded-md text-gray-500 hover:bg-white hover:shadow-sm disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                        >
-                            <ChevronRightIcon className="size-4" />
-                        </button>
-                    </div>
-                </div>
-            )}
+            <AppPagination
+                currentPage={page}
+                totalPages={totalPages}
+                onPageChange={setPage}
+                totalItems={total}
+            />
         </>
+    );
+}
+
+/* ═══════════════════════════════════════════ */
+/*  Apple-style Badge Components               */
+/* ═══════════════════════════════════════════ */
+
+function PrioritasBadge({ value }: { value: string }) {
+    const isUrgent = value === 'Urgent';
+    return (
+        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium tracking-wide ${
+            isUrgent
+                ? 'bg-red-50 text-red-600'
+                : 'bg-gray-100 text-gray-500'
+        }`}>
+            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isUrgent ? 'bg-red-500' : 'bg-gray-400'}`} />
+            {value}
+        </span>
+    );
+}
+
+function StatusBadge({ value }: { value: string }) {
+    const config: Record<string, { bg: string; text: string; dot: string }> = {
+        'Open':        { bg: 'bg-gray-100',   text: 'text-gray-500',   dot: 'bg-gray-400' },
+        'In Progress': { bg: 'bg-blue-50',    text: 'text-blue-600',   dot: 'bg-blue-500' },
+        'Resolved':    { bg: 'bg-emerald-50', text: 'text-emerald-700',dot: 'bg-emerald-500' },
+        'Rejected':    { bg: 'bg-red-50',     text: 'text-red-600',    dot: 'bg-red-500' },
+    };
+    const style = config[value] ?? config['Open'];
+    return (
+        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium tracking-wide ${style.bg} ${style.text}`}>
+            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${style.dot}`} />
+            {value}
+        </span>
     );
 }
 
@@ -546,10 +624,12 @@ function MaintenanceModal({
     initialData: Maintenance | null;
 }) {
     const [tanggal, setTanggal] = useState('');
-    const [equipment, setEquipment] = useState('');
-    const [area, setArea] = useState('');
-    const [kegiatan, setKegiatan] = useState('');
-    const [keterangan, setKeterangan] = useState('');
+    const [kode, setKode] = useState('');
+    const [nama, setNama] = useState('');
+    const [prioritas, setPrioritas] = useState<'Normal' | 'Urgent'>('Normal');
+    const [status, setStatus] = useState<'In Progress' | 'Open' | 'Rejected' | 'Resolved'>('Open');
+    const [keperluan, setKeperluan] = useState('');
+    const [deskripsi, setDeskripsi] = useState('');
     const [dokumentasi, setDokumentasi] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const toast = useToast();
@@ -558,18 +638,24 @@ function MaintenanceModal({
     useEffect(() => {
         if (isOpen) {
             if (initialData) {
-                setTanggal(format(new Date(initialData.tanggal), 'yyyy-MM-dd'));
-                setEquipment(initialData.equipment);
-                setArea(initialData.area);
-                setKegiatan(initialData.kegiatan);
-                setKeterangan(initialData.keterangan || '');
-                setDokumentasi(initialData.dokumentasi || '');
+                // Support both new and old field names for compatibility
+                const rawDate = (initialData as any).tanggalDibutuhkan || initialData.tanggal_dibutuhkan || initialData.tanggal;
+                setTanggal(rawDate ? format(new Date(rawDate), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'));
+                setKode((initialData as any).kode || initialData.kode || initialData.equipment || '');
+                setNama((initialData as any).nama || initialData.nama || (initialData as any).area || '');
+                setPrioritas((initialData as any).prioritas || initialData.prioritas || 'Normal');
+                setStatus((initialData as any).status || initialData.status || 'Open');
+                setKeperluan((initialData as any).keperluan || initialData.keperluan || initialData.keterangan || '');
+                setDeskripsi((initialData as any).deskripsi || initialData.deskripsi || (initialData as any).kegiatan || '');
+                setDokumentasi((initialData as any).dokumentasi || initialData.dokumentasi || '');
             } else {
                 setTanggal(format(new Date(), 'yyyy-MM-dd'));
-                setEquipment('');
-                setArea('');
-                setKegiatan('');
-                setKeterangan('');
+                setKode('');
+                setNama('');
+                setPrioritas('Normal');
+                setStatus('Open');
+                setKeperluan('');
+                setDeskripsi('');
                 setDokumentasi('');
             }
         }
@@ -577,18 +663,21 @@ function MaintenanceModal({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!tanggal || !equipment || !area || !kegiatan) {
-            toast.warning('Perhatian', 'Mohon lengkapi semua field yang wajib diisi.');
+        if (!tanggal || !kode || !nama || !deskripsi) {
+            toast.warning('Perhatian', 'Mohon lengkapi field wajib (Tanggal, Kode, Nama, Deskripsi).');
             return;
         }
         setIsSaving(true);
         try {
             await onSubmit({
-                tanggal: new Date(tanggal).toISOString(),
-                equipment,
-                area,
-                kegiatan,
-                keterangan: keterangan || null,
+                product_slug: initialData?.product_slug,
+                kode: kode,
+                nama: nama,
+                deskripsi: deskripsi,
+                keperluan: keperluan || null,
+                tanggal_dibutuhkan: new Date(tanggal).toISOString(),
+                prioritas,
+                status,
                 dokumentasi: dokumentasi || null,
             });
         } finally {
@@ -604,7 +693,7 @@ function MaintenanceModal({
             <div className="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity" onClick={onClose} />
 
             {/* Modal */}
-            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
+            <div className="relative bg-white shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
                     <h2 className="text-lg font-bold text-gray-800">
@@ -621,76 +710,125 @@ function MaintenanceModal({
                 {/* Scrollable Form Body */}
                 <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
                     <form id="maintenance-form" onSubmit={handleSubmit} className="space-y-5">
-                        {/* Tanggal */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Tanggal <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                type="date"
-                                value={tanggal}
-                                onChange={(e) => setTanggal(e.target.value)}
-                                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow"
-                                required
-                            />
+                        <div className="grid grid-cols-2 gap-4">
+                            {/* Kode */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Kode <span className="text-red-500">*</span>
+                                </label>
+                                <div className="relative">
+                                    <TagIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
+                                    <input
+                                        type="text"
+                                        value={kode}
+                                        onChange={(e) => setKode(e.target.value)}
+                                        placeholder="Kode"
+                                        className="w-full pl-9 pr-3 py-2.5 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow"
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            {/* Tanggal Dibutuhkan */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Tgl Dibutuhkan <span className="text-red-500">*</span>
+                                </label>
+                                <div className="relative">
+                                    <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
+                                    <input
+                                        type="date"
+                                        value={tanggal}
+                                        onChange={(e) => setTanggal(e.target.value)}
+                                        className="w-full pl-9 pr-3 py-2.5 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow"
+                                        required
+                                    />
+                                </div>
+                            </div>
                         </div>
 
-                        {/* Equipment */}
+                        {/* Nama */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Equipment <span className="text-red-500">*</span>
+                                Nama Pemohon <span className="text-red-500">*</span>
+                            </label>
+                            <div className="relative">
+                                <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
+                                <input
+                                    type="text"
+                                    value={nama}
+                                    onChange={(e) => setNama(e.target.value)}
+                                    placeholder="Nama lengkap..."
+                                    className="w-full pl-9 pr-3 py-2.5 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow"
+                                    required
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            {/* Prioritas */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Prioritas
+                                </label>
+                                <div className="relative">
+                                    <AlertCircleIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
+                                    <select
+                                        value={prioritas}
+                                        onChange={(e) => setPrioritas(e.target.value as any)}
+                                        className="w-full pl-9 pr-3 py-2.5 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow appearance-none"
+                                    >
+                                        <option value="Normal">Normal</option>
+                                        <option value="Urgent">Urgent</option>
+                                    </select>
+                                </div>
+                            </div>
+                            {/* Status */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Status
+                                </label>
+                                <div className="relative">
+                                    <InfoIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
+                                    <select
+                                        value={status}
+                                        onChange={(e) => setStatus(e.target.value as any)}
+                                        className="w-full pl-9 pr-3 py-2.5 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow appearance-none"
+                                    >
+                                        <option value="Open">Open</option>
+                                        <option value="In Progress">In Progress</option>
+                                        <option value="Rejected">Rejected</option>
+                                        <option value="Resolved">Resolved</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Keperluan */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Keperluan
                             </label>
                             <input
                                 type="text"
-                                value={equipment}
-                                onChange={(e) => setEquipment(e.target.value)}
-                                placeholder="Nama equipment..."
-                                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow"
-                                required
+                                value={keperluan}
+                                onChange={(e) => setKeperluan(e.target.value)}
+                                placeholder="Keperluan maintenance..."
+                                className="w-full px-3 py-2.5 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow"
                             />
                         </div>
 
-                        {/* Area */}
+                        {/* Deskripsi */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Area <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                type="text"
-                                value={area}
-                                onChange={(e) => setArea(e.target.value)}
-                                placeholder="Area maintenance..."
-                                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow"
-                                required
-                            />
-                        </div>
-
-                        {/* Kegiatan */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Kegiatan <span className="text-red-500">*</span>
+                                Deskripsi <span className="text-red-500">*</span>
                             </label>
                             <textarea
-                                value={kegiatan}
-                                onChange={(e) => setKegiatan(e.target.value)}
-                                placeholder="Jelaskan kegiatan maintenance..."
-                                rows={3}
-                                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow resize-none"
+                                value={deskripsi}
+                                onChange={(e) => setDeskripsi(e.target.value)}
+                                placeholder="Detail deskripsi kegiatan..."
+                                rows={4}
+                                className="w-full px-3 py-2.5 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow resize-none"
                                 required
-                            />
-                        </div>
-
-                        {/* Keterangan */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Keterangan <span className="text-gray-400 text-xs font-normal">(opsional)</span>
-                            </label>
-                            <textarea
-                                value={keterangan}
-                                onChange={(e) => setKeterangan(e.target.value)}
-                                placeholder="Keterangan tambahan..."
-                                rows={2}
-                                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow resize-none"
                             />
                         </div>
 
@@ -709,40 +847,35 @@ function MaintenanceModal({
                                     }}
                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                                 />
-                                <div className={`flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-xl transition-all h-32 ${dokumentasi ? 'border-emerald-500 bg-emerald-50/30' : 'border-gray-200 bg-gray-50 hover:bg-emerald-50/50 hover:border-emerald-300'}`}>
+                                <div className={`flex flex-col items-center justify-center p-6 border-2 border-dashed transition-all h-32 ${dokumentasi ? 'border-emerald-500 bg-emerald-50/30' : 'border-gray-200 bg-gray-50 hover:bg-emerald-50/50 hover:border-emerald-300'}`}>
                                     {dokumentasi ? (
-                                        <>
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
-                                                    <FileTextIcon className="size-5" />
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-sm font-medium text-gray-900 truncate max-w-xs">{dokumentasi}</p>
-                                                    <p className="text-xs text-emerald-600 font-medium">Dokumen siap diunggah</p>
-                                                </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        setDokumentasi('');
-                                                    }}
-                                                    className="p-2 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-lg transition-colors z-20 relative ml-2"
-                                                    title="Hapus"
-                                                >
-                                                    <XIcon className="size-4" />
-                                                </button>
+                                        <div className="flex items-center gap-3 w-full">
+                                            <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                                                <FileTextIcon className="size-5" />
                                             </div>
-                                        </>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium text-gray-900 truncate">{dokumentasi}</p>
+                                                <p className="text-xs text-emerald-600 font-medium">Dokumen dipilih</p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    setDokumentasi('');
+                                                }}
+                                                className="p-2 hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors z-20 relative"
+                                            >
+                                                <XIcon className="size-4" />
+                                            </button>
+                                        </div>
                                     ) : (
                                         <>
-                                            <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-gray-400 shadow-sm border border-gray-100 mb-3 group-hover:text-emerald-500 group-hover:border-emerald-200 transition-colors">
-                                                <UploadIcon className="size-5 text-gray-500 group-hover:text-emerald-500 transition-colors" />
-                                            </div>
+                                            <UploadIcon className="size-6 text-gray-400 mb-2" />
                                             <p className="text-sm font-medium text-gray-700">
-                                                <span className="text-emerald-600">Klik untuk unggah</span> atau drag & drop
+                                                <span className="text-emerald-600">Klik untuk unggah</span>
                                             </p>
-                                            <p className="text-xs text-gray-500 mt-1">PDF, JPG, PNG, DOCX (Maks. 5MB)</p>
+                                            <p className="text-xs text-gray-500 mt-1">PDF, JPG, PNG (Maks. 5MB)</p>
                                         </>
                                     )}
                                 </div>
@@ -752,29 +885,22 @@ function MaintenanceModal({
                 </div>
 
                 {/* Actions */}
-                <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3 shrink-0 rounded-b-2xl">
-                    <button
+                <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3 shrink-0">
+                    <AppButton
                         type="button"
+                        variant="secondary"
                         onClick={onClose}
-                        className="px-5 py-2.5 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-all shadow-sm"
                     >
                         Batal
-                    </button>
-                    <button
+                    </AppButton>
+                    <AppButton
                         type="submit"
                         form="maintenance-form"
-                        disabled={isSaving}
-                        className="px-6 py-2.5 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 focus:ring-4 focus:ring-emerald-600/20 transition-all shadow-sm hover:shadow-md active:scale-95"
+                        variant="primary"
+                        loading={isSaving}
                     >
-                        {isSaving ? (
-                            <span className="flex items-center gap-2">
-                                <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                                Menyimpan...
-                            </span>
-                        ) : (
-                            initialData ? 'Perbarui' : 'Simpan'
-                        )}
-                    </button>
+                        {isSaving ? 'Menyimpan...' : (initialData ? 'Simpan Perubahan' : 'Tambah Maintenance')}
+                    </AppButton>
                 </div>
             </div>
         </div>

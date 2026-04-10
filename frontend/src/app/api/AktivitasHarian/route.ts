@@ -11,6 +11,7 @@ export async function GET(request: Request) {
         const bulan = searchParams.get('bulan');
         const tahun = searchParams.get('tahun');
         const search = searchParams.get('search');
+        const jenisProduk = searchParams.get('jenisProduk');
         const page = parseInt(searchParams.get('page') || '1', 10);
         const limit = parseInt(searchParams.get('limit') || '10', 10);
         const sortBy = searchParams.get('sortBy') || 'tanggal';
@@ -47,6 +48,11 @@ export async function GET(request: Request) {
             );
         }
 
+        // Filter by jenisProduk
+        if (jenisProduk) {
+            filteredData = filteredData.filter((item: any) => item.jenis_produk === jenisProduk);
+        }
+
         // Sort
         const sortDir = sortDesc ? -1 : 1;
         filteredData.sort((a: any, b: any) => {
@@ -74,8 +80,9 @@ export async function POST(request: Request) {
 
         const insertData = {
             product_slug: body.productSlug || body.ProductSlug,
-            pic: body.pic || body.Pic || '',
-            lokasi: body.lokasi || body.Lokasi || '',
+            pic: body.pic || body.Pic || null,
+            lokasi: body.lokasi || body.Lokasi || null,
+            jenis_produk: body.jenis_produk || body.jenisProduk || null,
             tanggal: body.tanggal || body.Tanggal || new Date().toISOString(),
             deskripsi: body.deskripsi || body.Deskripsi || '',
         };

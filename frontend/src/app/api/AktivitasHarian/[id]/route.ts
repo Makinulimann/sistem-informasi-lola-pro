@@ -36,14 +36,12 @@ export async function PUT(
         if (!entity) return NextResponse.json({ message: 'Not Found' }, { status: 404 });
 
         const { data: updated, error } = await db.from<any>('aktivitas_harians').update({
-            nama_aktivitas: body.nama_aktivitas,
-            deskripsi: body.deskripsi,
-            tanggal: body.tanggal,
-            lokasi_id: body.lokasi_id,
-            pic_id: body.pic_id,
-            prioritas: body.prioritas,
-            kategori: body.kategori,
-            updated_at: new Date().toISOString()
+            deskripsi: body.deskripsi !== undefined ? body.deskripsi : entity.deskripsi,
+            tanggal: body.tanggal !== undefined ? body.tanggal : entity.tanggal,
+            lokasi: body.lokasi !== undefined ? body.lokasi : entity.lokasi,
+            pic: body.pic !== undefined ? body.pic : entity.pic,
+            jenis_produk: body.jenis_produk !== undefined ? body.jenis_produk : (body.jenisProduk !== undefined ? body.jenisProduk : entity.jenis_produk),
+            dokumentasi: body.dokumentasi !== undefined ? body.dokumentasi : entity.dokumentasi,
         }).eq('id', id);
 
         if (error) {

@@ -54,13 +54,13 @@ export function InputModal({
             />
 
             {/* Modal */}
-            <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full animate-in zoom-in-95 duration-200">
+            <div className="relative bg-white shadow-2xl max-w-md w-full animate-in zoom-in-95 duration-200">
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
                     <h3 className="text-lg font-bold text-gray-900">{title}</h3>
                     <button
                         onClick={onClose}
-                        className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                        className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
                     >
                         <X className="size-4" />
                     </button>
@@ -75,7 +75,7 @@ export function InputModal({
                             value={value}
                             onChange={(e) => setValue(e.target.value)}
                             placeholder={placeholder}
-                            className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow"
+                            className="w-full px-4 py-3 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow"
                             required
                         />
                     </div>
@@ -86,14 +86,14 @@ export function InputModal({
                             type="button"
                             onClick={onClose}
                             disabled={isLoading}
-                            className="flex-1 px-4 py-2.5 bg-white border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
+                            className="flex-1 px-4 py-2.5 bg-white border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition-all disabled:opacity-50"
                         >
                             {cancelText}
                         </button>
                         <button
                             type="submit"
                             disabled={isLoading || !value.trim()}
-                            className="flex-1 px-4 py-2.5 bg-emerald-600 text-white font-medium rounded-xl hover:bg-emerald-700 focus:ring-4 focus:ring-emerald-600/20 transition-all shadow-sm disabled:opacity-50"
+                            className="flex-1 px-4 py-2.5 bg-emerald-600 text-white font-medium hover:bg-emerald-700 focus:ring-4 focus:ring-emerald-600/20 transition-all disabled:opacity-50"
                         >
                             {isLoading ? (
                                 <span className="inline-flex items-center gap-2">

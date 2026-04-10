@@ -13,6 +13,11 @@ import { PencilIcon, Trash2Icon, PlusIcon, SearchIcon, XIcon, CalendarIcon, MapP
 import { useToast } from '@/components/ui/toast';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { InputModal } from '@/components/ui/input-modal';
+import { AktivitasImportModal } from './AktivitasImportModal';
+import { AppButton } from '@/components/ui/app-button';
+import { AppSelect } from '@/components/ui/app-select';
+import { AppSearchBar } from '@/components/ui/app-search-bar';
+import { AppPagination } from '@/components/ui/app-pagination';
 
 /* ─── Types ─── */
 
@@ -23,28 +28,7 @@ const tabs: { key: TabKey; label: string }[] = [
     { key: 'konfigurasi', label: 'Konfigurasi' },
 ];
 
-const BULAN_OPTIONS = [
-    { value: '', label: 'Semua Bulan' },
-    { value: '1', label: 'Januari' },
-    { value: '2', label: 'Februari' },
-    { value: '3', label: 'Maret' },
-    { value: '4', label: 'April' },
-    { value: '5', label: 'Mei' },
-    { value: '6', label: 'Juni' },
-    { value: '7', label: 'Juli' },
-    { value: '8', label: 'Agustus' },
-    { value: '9', label: 'September' },
-    { value: '10', label: 'Oktober' },
-    { value: '11', label: 'November' },
-    { value: '12', label: 'Desember' },
-];
-
-const TAHUN_OPTIONS = [
-    { value: '', label: 'Semua Tahun' },
-    { value: '2026', label: '2026' },
-    { value: '2025', label: '2025' },
-    { value: '2024', label: '2024' },
-];
+// Obsolete selection arrays removed since using native month input
 
 /* ─── Main Component ─── */
 
@@ -57,8 +41,9 @@ interface AktivitasHarianPageProps {
 export function AktivitasHarianPage({ productCategory, productName, productSlug }: AktivitasHarianPageProps) {
     const [activeTab, setActiveTab] = useState<TabKey>('data');
     const [search, setSearch] = useState('');
-    const [bulan, setBulan] = useState('');
-    const [tahun, setTahun] = useState('');
+    const currentMonth = new Date().toISOString().substring(0, 7);
+    const [periode, setPeriode] = useState<string>(currentMonth);
+    const [jenisProduk, setJenisProduk] = useState('');
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(0);
 
@@ -70,6 +55,7 @@ export function AktivitasHarianPage({ productCategory, productName, productSlug 
     // UI
     const [isLoading, setIsLoading] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<AktivitasHarian | null>(null);
 
     // Delete confirm modal
@@ -86,10 +72,12 @@ export function AktivitasHarianPage({ productCategory, productName, productSlug 
     const fetchData = useCallback(async () => {
         setIsLoading(true);
         try {
+            const [year, month] = periode ? periode.split('-') : ['', ''];
             const response = await aktivitasHarianService.getAll({
-                bulan: bulan || undefined,
-                tahun: tahun || undefined,
+                bulan: month ? Number(month).toString() : undefined,
+                tahun: year ? String(year) : undefined,
                 search: search || undefined,
+                jenisProduk: jenisProduk || undefined,
                 page: page,
                 limit: 10,
                 sortBy,
@@ -105,11 +93,11 @@ export function AktivitasHarianPage({ productCategory, productName, productSlug 
         } finally {
             setIsLoading(false);
         }
-    }, [bulan, tahun, search, page, sortBy, sortDesc]);
+    }, [periode, search, jenisProduk, page, sortBy, sortDesc]);
 
     useEffect(() => {
         setPage(1);
-    }, [search, bulan, tahun]);
+    }, [search, periode, jenisProduk]);
 
     const fetchTemplates = useCallback(async () => {
         try {
@@ -184,7 +172,7 @@ export function AktivitasHarianPage({ productCategory, productName, productSlug 
 
     return (
         <div className="space-y-6">
-            {/* Delete Confirm Modal */}
+            {/* Confirm Modal */}
             <ConfirmModal
                 isOpen={deleteConfirm.isOpen}
                 onClose={() => setDeleteConfirm({ isOpen: false, id: null })}
@@ -194,6 +182,15 @@ export function AktivitasHarianPage({ productCategory, productName, productSlug 
                 confirmText="Hapus"
                 variant="danger"
                 isLoading={isDeleting}
+            />
+
+            {/* Import Modal */}
+            <AktivitasImportModal
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+                onSuccess={() => {
+                    fetchData();
+                }}
             />
 
             {/* Modal */}
@@ -235,7 +232,7 @@ export function AktivitasHarianPage({ productCategory, productName, productSlug 
             </div>
 
             {/* Main Card */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="bg-white border border-gray-200 overflow-hidden">
                 {/* Tabs */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-gray-100">
                     <div className="flex">
@@ -257,14 +254,21 @@ export function AktivitasHarianPage({ productCategory, productName, productSlug 
                         ))}
                     </div>
                     {activeTab === 'data' && (
-                        <div className="px-4 py-2 sm:py-0">
-                            <button
-                                onClick={handleCreate}
-                                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
+                        <div className="px-4 py-2 sm:py-0 flex gap-3">
+                            <AppButton
+                                onClick={() => setIsImportModalOpen(true)}
+                                variant="secondary"
+                                icon={<UploadIcon className="size-4" />}
                             >
-                                <PlusIcon className="size-4" />
+                                Import Excel
+                            </AppButton>
+                            <AppButton
+                                onClick={handleCreate}
+                                variant="primary"
+                                icon={<PlusIcon className="size-4" />}
+                            >
                                 Tambah Aktivitas
-                            </button>
+                            </AppButton>
                         </div>
                     )}
                 </div>
@@ -274,49 +278,71 @@ export function AktivitasHarianPage({ productCategory, productName, productSlug 
                     <div className="p-4 border-b border-gray-100 bg-gray-50/50">
                         <div className="flex flex-col md:flex-row md:items-end gap-4 justify-between">
                             <div className="flex flex-col sm:flex-row gap-3 items-end">
-                                <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
+                                <div className="flex items-center gap-2 bg-white px-3 py-1 border border-gray-200">
                                     <span className="text-sm font-medium text-gray-500">Periode:</span>
-                                    <select
-                                        value={bulan}
-                                        onChange={(e) => setBulan(e.target.value)}
-                                        className="bg-transparent text-sm font-medium text-gray-700 focus:outline-none cursor-pointer hover:text-emerald-600 transition-colors"
-                                    >
-                                        {BULAN_OPTIONS.map((opt) => (
-                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                        ))}
-                                    </select>
-                                    <span className="text-gray-300">/</span>
-                                    <select
-                                        value={tahun}
-                                        onChange={(e) => setTahun(e.target.value)}
-                                        className="bg-transparent text-sm font-medium text-gray-700 focus:outline-none cursor-pointer hover:text-emerald-600 transition-colors"
-                                    >
-                                        {TAHUN_OPTIONS.map((opt) => (
-                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                        ))}
-                                    </select>
+                                <div className="flex items-center gap-1 group">
+                                    <AppButton 
+                                        onClick={() => {
+                                            if (!periode) return;
+                                            const d = new Date(`${periode}-01T12:00:00`);
+                                            d.setMonth(d.getMonth() - 1);
+                                            setPeriode(format(d, 'yyyy-MM'));
+                                        }}
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-gray-400 hover:text-emerald-600"
+                                        title="Bulan Sebelumnya"
+                                        icon={<ChevronLeftIcon className="size-4" />}
+                                    />
+                                    <input 
+                                        type="month" 
+                                        value={periode}
+                                        onChange={(e) => setPeriode(e.target.value)}
+                                        className="bg-transparent text-sm font-medium text-gray-700 focus:outline-none cursor-pointer hover:text-emerald-600 transition-colors px-1"
+                                    />
+                                    <AppButton 
+                                        onClick={() => {
+                                            if (!periode) return;
+                                            const d = new Date(`${periode}-01T12:00:00`);
+                                            d.setMonth(d.getMonth() + 1);
+                                            setPeriode(format(d, 'yyyy-MM'));
+                                        }}
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-gray-400 hover:text-emerald-600"
+                                        title="Bulan Selanjutnya"
+                                        icon={<ChevronRightIcon className="size-4" />}
+                                    />
                                 </div>
-                                {(bulan || tahun) && (
-                                    <button
-                                        onClick={() => { setBulan(''); setTahun(''); }}
-                                        className="px-3 py-2 bg-white text-gray-500 text-sm font-medium rounded-lg border border-gray-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all shadow-sm"
-                                    >
-                                        <XIcon className="size-4" />
-                                    </button>
+                                <span className="text-gray-300">/</span>
+                                <AppSelect
+                                    variant="ghost"
+                                    value={jenisProduk}
+                                    onChange={(e) => setJenisProduk(e.target.value)}
+                                    options={[
+                                        { value: '', label: 'Semua Jenis' },
+                                        { value: 'Produk Padat', label: 'Produk Padat' },
+                                        { value: 'Produk Cair', label: 'Produk Cair' },
+                                    ]}
+                                    className="pr-2"
+                                />
+                                </div>
+                                {(periode || jenisProduk) && (
+                                    <AppButton
+                                        onClick={() => { setPeriode(''); setJenisProduk(''); }}
+                                        variant="secondary"
+                                        size="md"
+                                        icon={<XIcon className="size-4" />}
+                                        className="hover:text-red-600 hover:border-red-200"
+                                    />
                                 )}
                             </div>
-                            <div className="relative w-full md:w-72">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                                    <SearchIcon className="size-4" />
-                                </span>
-                                <input
-                                    type="text"
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    placeholder="Cari PIC, lokasi, atau deskripsi..."
-                                    className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow shadow-sm"
-                                />
-                            </div>
+                            <AppSearchBar
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder="Cari PIC, lokasi, atau deskripsi..."
+                                containerClassName="w-full md:w-72"
+                            />
                         </div>
                     </div>
                 )}
@@ -411,6 +437,7 @@ function AktivitasTable({
                             {[
                                 { key: 'no', label: 'No', width: 'w-12', sortable: false },
                                 { key: 'tanggal', label: 'Tanggal', width: 'w-32', sortable: true },
+                                { key: 'jenis_produk', label: 'Jenis Produk', width: 'w-36', sortable: true },
                                 { key: 'pic', label: 'PIC', width: 'w-36', sortable: true },
                                 { key: 'lokasi', label: 'Lokasi', width: 'w-36', sortable: true },
                                 { key: 'deskripsi', label: 'Deskripsi Kegiatan', width: '', sortable: true },
@@ -446,33 +473,42 @@ function AktivitasTable({
                                     {format(new Date(item.tanggal), 'dd/MM/yyyy')}
                                 </td>
                                 <td className="px-4 py-3 border border-gray-200 text-gray-700">
+                                    {item.jenis_produk ? item.jenis_produk : '-'}
+                                </td>
+                                <td className="px-4 py-3 border border-gray-200 text-gray-700">
                                     {item.pic ? item.pic : '-'}
                                 </td>
                                 <td className="px-4 py-3 border border-gray-200 text-gray-700">
                                     {item.lokasi}
                                 </td>
-                                <td className="px-4 py-3 border border-gray-200 text-gray-700 max-w-xs">
-                                    <p className="line-clamp-2">{item.deskripsi}</p>
+                                <td className="px-4 py-3 border border-gray-200 text-gray-700 min-w-[350px]">
+                                    <ul className="list-disc list-outside ml-4 space-y-1">
+                                        {item.deskripsi.split('\n').filter(d => d.trim()).map((line, i) => (
+                                            <li key={i} title={line}>{line}</li>
+                                        ))}
+                                    </ul>
                                 </td>
                                 <td className="px-4 py-3 border border-gray-200 text-gray-700">
                                     {item.dokumentasi ? item.dokumentasi : '-'}
                                 </td>
                                 <td className="px-4 py-3 border border-gray-200">
                                     <div className="flex items-center justify-center gap-1">
-                                        <button
+                                        <AppButton
                                             onClick={() => onEdit(item)}
-                                            className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-gray-400 hover:text-emerald-600"
                                             title="Edit"
-                                        >
-                                            <PencilIcon className="size-4" />
-                                        </button>
-                                        <button
+                                            icon={<PencilIcon className="size-4" />}
+                                        />
+                                        <AppButton
                                             onClick={() => onDelete(item.id)}
-                                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-gray-400 hover:text-red-600"
                                             title="Hapus"
-                                        >
-                                            <Trash2Icon className="size-4" />
-                                        </button>
+                                            icon={<Trash2Icon className="size-4" />}
+                                        />
                                     </div>
                                 </td>
                             </tr>
@@ -506,7 +542,11 @@ function AktivitasTable({
                                 {item.lokasi}
                             </span>
                         </div>
-                        <p className="text-sm text-gray-700 line-clamp-3">{item.deskripsi}</p>
+                        <ul className="list-disc list-outside ml-4 space-y-1 text-sm text-gray-700 mt-2">
+                            {item.deskripsi.split('\n').filter(d => d.trim()).map((line, i) => (
+                                <li key={i}>{line}</li>
+                            ))}
+                        </ul>
                         {item.dokumentasi && (
                             <p className="text-xs text-emerald-600 mt-1.5 flex items-center gap-1">
                                 <ImageIcon className="size-3" />{item.dokumentasi}
@@ -517,41 +557,12 @@ function AktivitasTable({
             </div>
 
             {/* Pagination */}
-            {totalPages > 1 && (
-                <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50/30">
-                    <span className="text-xs text-gray-500">
-                        Menampilkan {(page - 1) * 10 + 1}–{Math.min(page * 10, total)} dari {total} data
-                    </span>
-                    <div className="flex items-center gap-1">
-                        <button
-                            onClick={() => setPage(Math.max(1, page - 1))}
-                            disabled={page === 1}
-                            className="p-1.5 rounded-md text-gray-500 hover:bg-white hover:shadow-sm disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                        >
-                            <ChevronLeftIcon className="size-4" />
-                        </button>
-                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                            <button
-                                key={p}
-                                onClick={() => setPage(p)}
-                                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${p === page
-                                    ? 'bg-emerald-600 text-white shadow-sm'
-                                    : 'text-gray-500 hover:bg-white hover:shadow-sm'
-                                    }`}
-                            >
-                                {p}
-                            </button>
-                        ))}
-                        <button
-                            onClick={() => setPage(Math.min(totalPages, page + 1))}
-                            disabled={page === totalPages}
-                            className="p-1.5 rounded-md text-gray-500 hover:bg-white hover:shadow-sm disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                        >
-                            <ChevronRightIcon className="size-4" />
-                        </button>
-                    </div>
-                </div>
-            )}
+            <AppPagination
+                currentPage={page}
+                totalPages={totalPages}
+                onPageChange={setPage}
+                totalItems={total}
+            />
         </>
     );
 }
@@ -810,21 +821,22 @@ function KonfigurasiTab({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
                 {/* ═══ PIC Section ═══ */}
-                <div className="border border-gray-200 rounded-xl overflow-hidden">
+                <div className="border border-gray-200 overflow-hidden">
                     {/* Header */}
                     <div className="bg-blue-50/50 px-4 py-3 border-b border-gray-200">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <h3 className="text-sm font-semibold text-gray-800">PIC</h3>
-                                <span className="text-xs text-gray-400 bg-white px-2 py-0.5 rounded-full">{pics.length}</span>
+                                <span className="text-xs text-gray-400 bg-white px-2 py-0.5">{pics.length}</span>
                             </div>
-                            <button
+                            <AppButton
                                 onClick={() => setPicInputModal(true)}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                                variant="primary"
+                                size="sm"
+                                icon={<PlusIcon className="size-3.5" />}
                             >
-                                <PlusIcon className="size-3.5" />
                                 Tambah PIC
-                            </button>
+                            </AppButton>
                         </div>
                     </div>
 
@@ -837,7 +849,7 @@ function KonfigurasiTab({
                                 value={picSearch}
                                 onChange={(e) => { setPicSearch(e.target.value); setPicPage(1); }}
                                 placeholder="Cari PIC..."
-                                className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow"
+                                className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow"
                             />
                         </div>
                     </div>
@@ -874,7 +886,7 @@ function KonfigurasiTab({
                                                             if (e.key === 'Escape') setEditingPicId(null);
                                                         }}
                                                         autoFocus
-                                                        className="w-full px-2 py-1 border border-blue-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                        className="w-full px-2 py-1 border border-blue-300 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                                                     />
                                                 ) : (
                                                     <span className="font-medium text-gray-800">{p.nama}</span>
@@ -884,37 +896,41 @@ function KonfigurasiTab({
                                                 <div className="flex items-center justify-center gap-1">
                                                     {editingPicId === p.id ? (
                                                         <>
-                                                            <button
+                                                            <AppButton
                                                                 onClick={() => handleEditPic(p.id)}
-                                                                className="p-1 text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors"
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-8 w-8 text-emerald-600"
                                                                 title="Simpan"
-                                                            >
-                                                                <PlusIcon className="size-4" />
-                                                            </button>
-                                                            <button
+                                                                icon={<PlusIcon className="size-4" />}
+                                                            />
+                                                            <AppButton
                                                                 onClick={() => setEditingPicId(null)}
-                                                                className="p-1 text-gray-400 hover:bg-gray-100 rounded-md transition-colors"
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-8 w-8 text-gray-400"
                                                                 title="Batal"
-                                                            >
-                                                                <XIcon className="size-4" />
-                                                            </button>
+                                                                icon={<XIcon className="size-4" />}
+                                                            />
                                                         </>
                                                     ) : (
                                                         <>
-                                                            <button
+                                                            <AppButton
                                                                 onClick={() => { setEditingPicId(p.id); setEditingPicNama(p.nama); }}
-                                                                className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-8 w-8 text-gray-400 hover:text-blue-600"
                                                                 title="Edit"
-                                                            >
-                                                                <PencilIcon className="size-3.5" />
-                                                            </button>
-                                                            <button
+                                                                icon={<PencilIcon className="size-3.5" />}
+                                                            />
+                                                            <AppButton
                                                                 onClick={() => handleDeletePic(p.id, p.nama)}
-                                                                className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-8 w-8 text-gray-400 hover:text-red-600"
                                                                 title="Hapus"
-                                                            >
-                                                                <Trash2Icon className="size-3.5" />
-                                                            </button>
+                                                                icon={<Trash2Icon className="size-3.5" />}
+                                                            />
                                                         </>
                                                     )}
                                                 </div>
@@ -929,7 +945,7 @@ function KonfigurasiTab({
                 </div>
 
                 {/* ═══ Lokasi Section ═══ */}
-                <div className="border border-gray-200 rounded-xl overflow-hidden">
+                <div className="border border-gray-200 overflow-hidden">
                     {/* Header */}
                     <div className="bg-amber-50/50 px-4 py-3 border-b border-gray-200">
                         <div className="flex items-center justify-between">
@@ -937,13 +953,14 @@ function KonfigurasiTab({
                                 <h3 className="text-sm font-semibold text-gray-800">Lokasi</h3>
                                 <span className="text-xs text-gray-400 bg-white px-2 py-0.5 rounded-full">{lokasis.length}</span>
                             </div>
-                            <button
+                            <AppButton
                                 onClick={() => setLokasiInputModal(true)}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 text-white text-xs font-medium rounded-lg hover:bg-amber-700 transition-colors shadow-sm"
+                                variant="primary"
+                                size="sm"
+                                icon={<PlusIcon className="size-3.5" />}
                             >
-                                <PlusIcon className="size-3.5" />
                                 Tambah Lokasi
-                            </button>
+                            </AppButton>
                         </div>
                     </div>
 
@@ -956,7 +973,7 @@ function KonfigurasiTab({
                                 value={lokasiSearch}
                                 onChange={(e) => { setLokasiSearch(e.target.value); setLokasiPage(1); }}
                                 placeholder="Cari Lokasi..."
-                                className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-shadow"
+                                className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-shadow"
                             />
                         </div>
                     </div>
@@ -1071,6 +1088,7 @@ function AktivitasModal({
     lokasis: LogbookLokasi[];
 }) {
     const [tanggal, setTanggal] = useState('');
+    const [jenisProdukForm, setJenisProdukForm] = useState('');
     const [pic, setPic] = useState<string[]>([]);
     const [lokasi, setLokasi] = useState('');
     const [deskripsi, setDeskripsi] = useState('');
@@ -1084,12 +1102,14 @@ function AktivitasModal({
         if (isOpen) {
             if (initialData) {
                 setTanggal(format(new Date(initialData.tanggal), 'yyyy-MM-dd'));
+                setJenisProdukForm(initialData.jenis_produk || '');
                 setPic(initialData.pic ? initialData.pic.split(', ') : []);
-                setLokasi(initialData.lokasi);
+                setLokasi(initialData.lokasi || '');
                 setDeskripsi(initialData.deskripsi);
                 setDokumentasi(initialData.dokumentasi || '');
             } else {
                 setTanggal(format(new Date(), 'yyyy-MM-dd'));
+                setJenisProdukForm('');
                 setPic([]);
                 setLokasi('');
                 setDeskripsi('');
@@ -1112,16 +1132,17 @@ function AktivitasModal({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!tanggal || pic.length === 0 || !lokasi || !deskripsi) {
-            toast.warning('Perhatian', 'Mohon lengkapi semua field yang wajib diisi.');
+        if (!tanggal || !deskripsi) {
+            toast.warning('Perhatian', 'Mohon lengkapi field Tanggal dan Deskripsi.');
             return;
         }
         setIsSaving(true);
         try {
             await onSubmit({
                 tanggal: new Date(tanggal).toISOString(),
-                pic: pic.join(', '),
-                lokasi,
+                jenis_produk: jenisProdukForm || null,
+                pic: pic.length > 0 ? pic.join(', ') : null,
+                lokasi: lokasi || null,
                 deskripsi,
                 dokumentasi: dokumentasi || null,
             });
@@ -1138,18 +1159,19 @@ function AktivitasModal({
             <div className="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity" onClick={onClose} />
 
             {/* Modal */}
-            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
+            <div className="relative bg-white shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
                     <h2 className="text-lg font-bold text-gray-800">
                         {initialData ? 'Edit Aktivitas' : 'Tambah Aktivitas Baru'}
                     </h2>
-                    <button
+                    <AppButton
+                        variant="ghost"
+                        size="icon"
                         onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-full transition-colors"
-                    >
-                        <XIcon className="size-5" />
-                    </button>
+                        icon={<XIcon className="size-5" />}
+                        className="text-gray-400 hover:text-gray-600"
+                    />
                 </div>
 
                 {/* Scrollable Form Body */}
@@ -1164,15 +1186,31 @@ function AktivitasModal({
                                 type="date"
                                 value={tanggal}
                                 onChange={(e) => setTanggal(e.target.value)}
-                                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow"
+                                className="w-full px-3 py-2.5 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow"
                                 required
                             />
+                        </div>
+
+                        {/* Jenis Produk */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Jenis Produk <span className="text-gray-400 text-xs font-normal">(opsional)</span>
+                            </label>
+                            <select
+                                value={jenisProdukForm}
+                                onChange={(e) => setJenisProdukForm(e.target.value)}
+                                className="w-full px-3 py-2.5 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow"
+                            >
+                                <option value="">Pilih Jenis Produk...</option>
+                                <option value="Produk Padat">Produk Padat</option>
+                                <option value="Produk Cair">Produk Cair</option>
+                            </select>
                         </div>
 
                         {/* PIC */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                PIC <span className="text-red-500">*</span>
+                                PIC <span className="text-gray-400 text-xs font-normal">(opsional)</span>
                             </label>
 
                             <div className="space-y-3">
@@ -1180,13 +1218,13 @@ function AktivitasModal({
                                 {pic.length > 0 && (
                                     <div className="flex flex-wrap gap-2">
                                         {pic.map((p) => (
-                                            <span key={p} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-sm font-medium">
+                                            <span key={p} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 text-sm font-medium">
                                                 <UserIcon className="size-3.5" />
                                                 {p}
                                                 <button
                                                     type="button"
                                                     onClick={() => handleRemovePic(p)}
-                                                    className="p-0.5 hover:bg-blue-100 rounded text-blue-500 hover:text-blue-700 transition-colors ml-1"
+                                                    className="p-0.5 hover:bg-blue-100 text-blue-500 hover:text-blue-700 transition-colors ml-1"
                                                 >
                                                     <XIcon className="size-3" />
                                                 </button>
@@ -1201,7 +1239,7 @@ function AktivitasModal({
                                         <select
                                             value=""
                                             onChange={(e) => handleAddPic(e.target.value)}
-                                            className="flex-1 px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow bg-white"
+                                            className="flex-1 px-3 py-2.5 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow bg-white"
                                         >
                                             <option value="" disabled>Tambah PIC dari daftar...</option>
                                             {pics.filter(p => !pic.includes(p.nama)).map((p) => (
@@ -1222,16 +1260,15 @@ function AktivitasModal({
                                                 }
                                             }}
                                             placeholder="Ketik nama PIC lalu tekan Enter..."
-                                            className="flex-1 px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow"
+                                            className="flex-1 px-3 py-2.5 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow"
                                         />
-                                        <button
-                                            type="button"
+                                        <AppButton
                                             onClick={() => handleAddPic(customPic)}
                                             disabled={!customPic.trim()}
-                                            className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-colors"
+                                            variant="secondary"
                                         >
                                             Tambah
-                                        </button>
+                                        </AppButton>
                                     </div>
                                 )}
                             </div>
@@ -1244,14 +1281,13 @@ function AktivitasModal({
                         {/* Lokasi */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Lokasi <span className="text-red-500">*</span>
+                                Lokasi <span className="text-gray-400 text-xs font-normal">(opsional)</span>
                             </label>
                             {lokasis.length > 0 ? (
                                 <select
                                     value={lokasi}
                                     onChange={(e) => setLokasi(e.target.value)}
-                                    className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow bg-white"
-                                    required
+                                    className="w-full px-3 py-2.5 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow bg-white"
                                 >
                                     <option value="">Pilih Lokasi...</option>
                                     {lokasis.map((l) => (
@@ -1264,8 +1300,7 @@ function AktivitasModal({
                                     value={lokasi}
                                     onChange={(e) => setLokasi(e.target.value)}
                                     placeholder="Ketik lokasi..."
-                                    className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow"
-                                    required
+                                    className="w-full px-3 py-2.5 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow"
                                 />
                             )}
                             {lokasis.length === 0 && (
@@ -1283,7 +1318,7 @@ function AktivitasModal({
                                 onChange={(e) => setDeskripsi(e.target.value)}
                                 placeholder="Jelaskan kegiatan yang dilakukan..."
                                 rows={3}
-                                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow resize-none"
+                                className="w-full px-3 py-2.5 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow resize-none"
                                 required
                             />
                         </div>
@@ -1303,7 +1338,7 @@ function AktivitasModal({
                                     }}
                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                                 />
-                                <div className={`flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-xl transition-all h-32 ${dokumentasi ? 'border-emerald-500 bg-emerald-50/30' : 'border-gray-200 bg-gray-50 hover:bg-emerald-50/50 hover:border-emerald-300'}`}>
+                                <div className={`flex flex-col items-center justify-center p-6 border-2 border-dashed transition-all h-32 ${dokumentasi ? 'border-emerald-500 bg-emerald-50/30' : 'border-gray-200 bg-gray-50 hover:bg-emerald-50/50 hover:border-emerald-300'}`}>
                                     {dokumentasi ? (
                                         <>
                                             <div className="flex items-center gap-3">
@@ -1314,24 +1349,24 @@ function AktivitasModal({
                                                     <p className="text-sm font-medium text-gray-900 truncate max-w-xs">{dokumentasi}</p>
                                                     <p className="text-xs text-emerald-600 font-medium">Dokumen siap diunggah</p>
                                                 </div>
-                                                <button
-                                                    type="button"
+                                                 <AppButton
                                                     onClick={(e) => {
                                                         e.preventDefault();
                                                         e.stopPropagation();
                                                         setDokumentasi('');
                                                     }}
-                                                    className="p-2 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-lg transition-colors z-20 relative ml-2"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-gray-400 hover:text-red-500 z-20"
                                                     title="Hapus"
-                                                >
-                                                    <XIcon className="size-4" />
-                                                </button>
+                                                    icon={<XIcon className="size-4" />}
+                                                />
                                             </div>
                                         </>
                                     ) : (
                                         <>
-                                            <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-gray-400 shadow-sm border border-gray-100 mb-3 group-hover:text-emerald-500 group-hover:border-emerald-200 transition-colors">
-                                                <UploadIcon className="size-5 text-gray-500 group-hover:text-emerald-500 transition-colors" />
+                                            <div className="w-10 h-10 bg-transparent flex items-center justify-center text-gray-400">
+                                                <UploadIcon className="size-5 text-gray-500" />
                                             </div>
                                             <p className="text-sm font-medium text-gray-700">
                                                 <span className="text-emerald-600">Klik untuk unggah</span> atau drag & drop
@@ -1346,29 +1381,22 @@ function AktivitasModal({
                 </div>
 
                 {/* Actions */}
-                <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3 shrink-0 rounded-b-2xl">
-                    <button
+                <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3 shrink-0">
+                    <AppButton
                         type="button"
                         onClick={onClose}
-                        className="px-5 py-2.5 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-all shadow-sm"
+                        variant="secondary"
                     >
                         Batal
-                    </button>
-                    <button
+                    </AppButton>
+                    <AppButton
                         type="submit"
                         form="aktivitas-form"
-                        disabled={isSaving}
-                        className="px-6 py-2.5 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 focus:ring-4 focus:ring-emerald-600/20 transition-all shadow-sm hover:shadow-md active:scale-95"
+                        variant="primary"
+                        loading={isSaving}
                     >
-                        {isSaving ? (
-                            <span className="flex items-center gap-2">
-                                <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                                Menyimpan...
-                            </span>
-                        ) : (
-                            initialData ? 'Perbarui' : 'Simpan'
-                        )}
-                    </button>
+                        {initialData ? 'Perbarui' : 'Simpan'}
+                    </AppButton>
                 </div>
             </div>
         </div>

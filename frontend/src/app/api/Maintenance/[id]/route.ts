@@ -35,15 +35,20 @@ export async function PUT(
         const { data: entity } = await db.from<any>('maintenances').select('*').eq('id', id).single();
         if (!entity) return NextResponse.json({ message: 'Not Found' }, { status: 404 });
 
-        const { data: updated, error } = await db.from<any>('maintenances').update({
-            product_slug: body.productSlug || body.ProductSlug,
-            equipment: body.equipment || body.Equipment || '',
-            area: body.area || body.Area || '',
-            tanggal: body.tanggal || body.Tanggal || new Date().toISOString(),
-            kegiatan: body.kegiatan || body.Kegiatan || '',
-            keterangan: body.keterangan || body.Keterangan || '',
+        const updateData = {
+            product_slug: body.product_slug || body.productSlug || body.ProductSlug,
+            kode: body.kode || body.Kode || body.equipment || body.Equipment || '',
+            nama: body.nama || body.Nama || body.area || body.Area || '',
+            deskripsi: body.deskripsi || body.Deskripsi || body.kegiatan || body.Kegiatan || '',
+            prioritas: body.prioritas || body.Prioritas || 'Normal',
+            status: body.status || body.Status || 'Open',
+            keperluan: body.keperluan || body.Keperluan || body.keterangan || body.Keterangan || '',
+            tanggal_dibutuhkan: body.tanggal_dibutuhkan || body.TanggalDibutuhkan || body.tanggal || body.Tanggal || new Date().toISOString(),
+            dokumentasi: body.dokumentasi || body.Dokumentasi || null,
             updated_at: new Date().toISOString()
-        }).eq('id', id);
+        };
+
+        const { data: updated, error } = await db.from<any>('maintenances').update(updateData).eq('id', id);
 
         if (error) {
             console.error('Error updating maintenance:', error);

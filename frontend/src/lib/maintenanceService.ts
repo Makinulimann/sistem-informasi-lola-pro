@@ -2,13 +2,21 @@ import { api } from './api';
 
 export interface Maintenance {
     id: number;
-    tanggal: string;
-    equipment: string;
-    area: string;
-    kegiatan: string;
-    keterangan?: string | null;
+    product_slug?: string;
+    kode: string;
+    nama: string;
+    prioritas: 'Normal' | 'Urgent';
+    status: 'In Progress' | 'Open' | 'Rejected' | 'Resolved';
+    keperluan: string | null;
+    deskripsi: string;
+    tanggal_dibutuhkan: string;
     dokumentasi?: string | null;
-    createdAt: string;
+    created_at?: string;
+    updated_at?: string;
+    // Legacy support (optional)
+    tanggal?: string;
+    equipment?: string;
+    keterangan?: string | null;
 }
 
 const cleanParams = (params: any) => {
@@ -32,9 +40,9 @@ export const maintenanceService = {
         return api.get<MaintenanceResponse>(`/Maintenance?${query}`);
     },
     getById: (id: number) => api.get<Maintenance>(`/Maintenance/${id}`),
-    create: (data: Omit<Maintenance, 'id' | 'createdAt'>) =>
+    create: (data: Omit<Maintenance, 'id' | 'created_at' | 'updated_at'>) =>
         api.post<Maintenance>('/Maintenance', data),
-    update: (id: number, data: Omit<Maintenance, 'id' | 'createdAt'>) =>
+    update: (id: number, data: Omit<Maintenance, 'id' | 'created_at' | 'updated_at'>) =>
         api.put<Maintenance>(`/Maintenance/${id}`, data),
     delete: (id: number) => api.delete(`/Maintenance/${id}`),
 };

@@ -10,6 +10,10 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
+import { AppSelect } from '@/components/ui/app-select';
+import { AppSearchBar } from '@/components/ui/app-search-bar';
+import { AppPagination } from '@/components/ui/app-pagination';
+import { AppButton } from '@/components/ui/app-button';
 
 /* ─── Unit Conversion ─── */
 const MASS_UNITS = ['Ton', 'Kwintal', 'Kg', 'Gram', 'Mg'];
@@ -47,7 +51,29 @@ function convertValue(value: number, from: string, to: string) {
 /* ─── Helpers ─── */
 const MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
-function DownloadIcon() { return (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>); }
+interface IconProps extends React.SVGProps<SVGSVGElement> {
+    size?: number | string;
+}
+
+function DownloadIcon({ size = 20, ...props }: IconProps) { 
+    return (
+        <svg 
+            width={size} 
+            height={size} 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2" 
+            strokeLinecap="round" 
+            strokeLinejoin="round" 
+            {...props}
+        >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+        </svg>
+    ); 
+}
 
 /* ─── Product Color Palette ─── */
 const PRODUCT_COLORS = [
@@ -462,10 +488,10 @@ export function CategoryDashboardPage({
             </div>
 
             {/* ═══ BENTO GRID – Ringkasan Produksi (Full Width, Top) ═══ */}
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col">
-                <div className="px-5 py-4 border-b border-gray-100 flex flex-col 2xl:flex-row 2xl:items-center justify-between gap-3">
+            <div className="bg-white border border-gray-200 overflow-hidden flex flex-col">
+                <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white flex-shrink-0">
+                        <div className="w-9 h-9 rounded-sm bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white flex-shrink-0">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5V8l-7 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" /></svg>
                         </div>
                         <div>
@@ -473,37 +499,63 @@ export function CategoryDashboardPage({
                             <p className="text-xs text-gray-400">Data kumulatif per produk</p>
                         </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <div className="flex items-center gap-2 border-r border-gray-200 pr-2 mr-1">
-                            <span className="text-xs text-gray-500 font-medium">Padat:</span>
-                            <select value={padatUnit} onChange={e => setPadatUnit(e.target.value)} className="h-8 px-2 text-xs border border-amber-200 rounded-lg bg-amber-50 text-amber-700 outline-none cursor-pointer focus:ring-1 focus:ring-amber-500">
-                                {MASS_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                            </select>
-                            <span className="text-xs text-gray-500 font-medium ml-2">Cair:</span>
-                            <select value={cairUnit} onChange={e => setCairUnit(e.target.value)} className="h-8 px-2 text-xs border border-blue-200 rounded-lg bg-blue-50 text-blue-700 outline-none cursor-pointer focus:ring-1 focus:ring-blue-500">
-                                {VOL_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                            </select>
-                        </div>
-                        <select value={prodBulan} onChange={e => setProdBulan(Number(e.target.value))} className="h-8 px-2 text-xs border border-gray-200 rounded-lg bg-white text-gray-700 outline-none cursor-pointer focus:border-amber-500">
-                            {MONTHS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
-                        </select>
-                        <select value={prodTahun} onChange={e => setProdTahun(Number(e.target.value))} className="h-8 px-2 text-xs border border-gray-200 rounded-lg bg-white text-gray-700 outline-none cursor-pointer focus:border-amber-500">
-                            {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
-                        </select>
-                        <div className="relative">
-                            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-                            <input
-                                type="text"
-                                value={produksiSearch}
-                                onChange={e => setProduksiSearch(e.target.value)}
-                                placeholder="Cari produk / tab..."
-                                className="block w-full sm:w-40 pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-colors bg-white"
+                </div>
+
+                {/* Filter Row */}
+                <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex flex-col lg:flex-row gap-4 justify-between items-end">
+                    <div className="flex flex-wrap items-center gap-3">
+                        {/* Period Group */}
+                        <div className="flex items-center gap-2">
+                            <AppSelect
+                                prefixLabel="Periode:"
+                                variant="default"
+                                value={prodBulan.toString()}
+                                onChange={(e) => setProdBulan(Number(e.target.value))}
+                                options={MONTHS.map((m, i) => ({ label: m, value: (i + 1).toString() }))}
+                                className="h-9 bg-white"
+                            />
+                            <AppSelect
+                                variant="default"
+                                value={prodTahun.toString()}
+                                onChange={(e) => setProdTahun(Number(e.target.value))}
+                                options={[2024, 2025, 2026, 2027].map(y => ({ label: y.toString(), value: y.toString() }))}
+                                className="h-9 bg-white -ml-2"
                             />
                         </div>
+
+                        {/* Unit Group */}
+                        <div className="flex items-center gap-2 border-l border-gray-200 pl-3">
+                            <AppSelect
+                                prefixLabel="Padat:"
+                                variant="sharp"
+                                value={padatUnit}
+                                onChange={(e) => setPadatUnit(e.target.value)}
+                                options={MASS_UNITS.map(u => ({ label: u, value: u }))}
+                                className="h-9 bg-white text-emerald-700"
+                            />
+                            <AppSelect
+                                prefixLabel="Cair:"
+                                variant="sharp"
+                                value={cairUnit}
+                                onChange={(e) => setCairUnit(e.target.value)}
+                                options={VOL_UNITS.map(u => ({ label: u, value: u }))}
+                                className="h-9 bg-white text-blue-700"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 w-full lg:w-auto">
+                        <AppSearchBar
+                            value={produksiSearch}
+                            onChange={(e) => setProduksiSearch(e.target.value)}
+                            placeholder="Cari produk / tab..."
+                            containerClassName="w-full lg:w-64"
+                            className="h-9 py-1"
+                        />
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <button className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-gray-700 text-xs font-medium rounded-lg border border-gray-200 hover:bg-gray-50 shadow-sm transition-colors">
-                                    <DownloadIcon /> Export
+                                <button className="h-9 px-4 flex items-center gap-2 bg-white text-gray-700 text-sm font-medium border border-gray-200 hover:bg-gray-50 hover:border-gray-300 shadow-sm transition-all whitespace-nowrap">
+                                    <DownloadIcon size={16} /> Export
                                 </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
@@ -549,7 +601,7 @@ export function CategoryDashboardPage({
                                                             <td className={`px-4 py-3 align-middle border border-gray-200 border-l-[3px] ${color.border} ${color.bg}`} rowSpan={tabs.length + 1}>
                                                                 <div className="flex items-center gap-3">
                                                                     {PRODUCT_IMAGES[product.slug] ? (
-                                                                        <div className={`w-10 h-10 rounded-xl ring-2 ${color.ring} ring-offset-1 overflow-hidden flex-shrink-0 shadow-sm`}>
+                                                                        <div className={`w-10 h-10 rounded-lg ring-2 ${color.ring} ring-offset-1 overflow-hidden flex-shrink-0 shadow-sm`}>
                                                                             <img
                                                                                 src={PRODUCT_IMAGES[product.slug]}
                                                                                 alt={product.label}
@@ -557,7 +609,7 @@ export function CategoryDashboardPage({
                                                                             />
                                                                         </div>
                                                                     ) : (
-                                                                        <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${color.gradientFrom} ${color.gradientTo} flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-sm`}>
+                                                                        <div className={`w-10 h-10 bg-gradient-to-br ${color.gradientFrom} ${color.gradientTo} flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-sm`}>
                                                                             {product.label.charAt(0)}
                                                                         </div>
                                                                     )}
@@ -613,22 +665,27 @@ export function CategoryDashboardPage({
                     </div>
                 )}
                 {prodTotalPages > 1 && (
-                    <TablePagination currentPage={prodPage} totalPages={prodTotalPages} onPageChange={setProdPage} totalItems={filteredProduksiData.length} itemsPerPage={ITEMS_PER_PAGE} />
+                    <AppPagination
+                        currentPage={prodPage}
+                        totalPages={prodTotalPages}
+                        onPageChange={setProdPage}
+                        totalItems={filteredProduksiData.length}
+                    />
                 )}
             </div>
 
             {/* ═══ BENTO GRID – Charts Row 1: Production (full width) ═══ */}
-            <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <div className="bg-white border border-gray-200 p-5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                     <div>
                         <h3 className="text-sm font-semibold text-gray-800">Produksi per Produk</h3>
                         <p className="text-xs text-gray-400 mt-0.5">{MONTHS[chartBulan - 1]} {chartTahun}</p>
                     </div>
                     <div className="flex items-center gap-2">
-                        <select value={chartBulan} onChange={e => setChartBulan(Number(e.target.value))} className="h-7 px-2 text-xs border border-gray-200 rounded-lg bg-white text-gray-700 outline-none cursor-pointer focus:border-emerald-500">
+                        <select value={chartBulan} onChange={e => setChartBulan(Number(e.target.value))} className="h-7 px-2 text-xs border border-gray-200 bg-white text-gray-700 outline-none cursor-pointer focus:border-emerald-500">
                             {MONTHS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
                         </select>
-                        <select value={chartTahun} onChange={e => setChartTahun(Number(e.target.value))} className="h-7 px-2 text-xs border border-gray-200 rounded-lg bg-white text-gray-700 outline-none cursor-pointer focus:border-emerald-500">
+                        <select value={chartTahun} onChange={e => setChartTahun(Number(e.target.value))} className="h-7 px-2 text-xs border border-gray-200 bg-white text-gray-700 outline-none cursor-pointer focus:border-emerald-500">
                             {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
                         </select>
                         <span className="flex items-center gap-1.5 text-xs ml-2"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />Produksi</span>
@@ -640,10 +697,10 @@ export function CategoryDashboardPage({
                 ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
                         {/* Padat Chart */}
-                        <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-4">
+                        <div className="border border-gray-100 bg-gray-50/50 p-4">
                             <div className="flex items-center justify-between mb-4">
                                 <h4 className="text-sm font-medium text-gray-700">Produk Padat</h4>
-                                <select value={padatUnit} onChange={e => setPadatUnit(e.target.value)} className="h-7 px-2 text-xs border border-emerald-200 rounded-lg bg-emerald-50 text-emerald-700 outline-none cursor-pointer focus:ring-1 focus:ring-emerald-500 hover:bg-emerald-100 transition-colors">
+                                <select value={padatUnit} onChange={e => setPadatUnit(e.target.value)} className="h-7 px-2 text-xs border border-emerald-200 bg-emerald-50 text-emerald-700 outline-none cursor-pointer focus:ring-1 focus:ring-emerald-500 hover:bg-emerald-100 transition-colors">
                                     {MASS_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
                                 </select>
                             </div>
@@ -671,10 +728,10 @@ export function CategoryDashboardPage({
                         </div>
 
                         {/* Cair Chart */}
-                        <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-4">
+                        <div className="border border-gray-100 bg-gray-50/50 p-4">
                             <div className="flex items-center justify-between mb-4">
                                 <h4 className="text-sm font-medium text-gray-700">Produk Cair</h4>
-                                <select value={cairUnit} onChange={e => setCairUnit(e.target.value)} className="h-7 px-2 text-xs border border-blue-200 rounded-lg bg-blue-50 text-blue-700 outline-none cursor-pointer focus:ring-1 focus:ring-blue-500 hover:bg-blue-100 transition-colors">
+                                <select value={cairUnit} onChange={e => setCairUnit(e.target.value)} className="h-7 px-2 text-xs border border-blue-200 bg-blue-50 text-blue-700 outline-none cursor-pointer focus:ring-1 focus:ring-blue-500 hover:bg-blue-100 transition-colors">
                                     {VOL_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
                                 </select>
                             </div>
@@ -708,17 +765,17 @@ export function CategoryDashboardPage({
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
                 {/* Material Balance Chart — per-material cards */}
-                <div className="bg-white rounded-xl border border-gray-200 p-5 flex flex-col">
+                <div className="bg-white border border-gray-200 p-5 flex flex-col">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                         <div>
                             <h3 className="text-sm font-semibold text-gray-800">Balance Bahan Baku</h3>
                             <p className="text-xs text-gray-400 mt-0.5">{MONTHS[balanceBulan - 1]} {balanceTahun}</p>
                         </div>
                         <div className="flex items-center gap-2">
-                            <select value={balanceBulan} onChange={e => setBalanceBulan(Number(e.target.value))} className="h-7 px-2 text-xs border border-gray-200 rounded-lg bg-white text-gray-700 outline-none cursor-pointer focus:border-emerald-500">
+                            <select value={balanceBulan} onChange={e => setBalanceBulan(Number(e.target.value))} className="h-7 px-2 text-xs border border-gray-200 bg-white text-gray-700 outline-none cursor-pointer focus:border-emerald-500">
                                 {MONTHS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
                             </select>
-                            <select value={balanceTahun} onChange={e => setBalanceTahun(Number(e.target.value))} className="h-7 px-2 text-xs border border-gray-200 rounded-lg bg-white text-gray-700 outline-none cursor-pointer focus:border-emerald-500">
+                            <select value={balanceTahun} onChange={e => setBalanceTahun(Number(e.target.value))} className="h-7 px-2 text-xs border border-gray-200 bg-white text-gray-700 outline-none cursor-pointer focus:border-emerald-500">
                                 {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
                             </select>
                         </div>
@@ -730,7 +787,7 @@ export function CategoryDashboardPage({
                             {materialBalanceData.map(m => {
                                 const maxVal = Math.max(m.suplai, m.mutasi, m.stok, 1);
                                 return (
-                                    <div key={m.nama} className="rounded-lg border border-gray-100 bg-gray-50/50 p-3">
+                                    <div key={m.nama} className="border border-gray-100 bg-gray-50/50 p-3">
                                         <div className="flex items-baseline justify-between mb-2">
                                             <span className="text-xs font-semibold text-gray-800">{m.nama}</span>
                                             <span className="text-[10px] text-gray-400 font-medium">{m.satuan}</span>
@@ -768,10 +825,10 @@ export function CategoryDashboardPage({
                 </div>
 
                 {/* Maintenance Chart – Horizontal Bars */}
-                <div className="bg-white rounded-xl border border-gray-200 p-5">
+                <div className="bg-white border border-gray-200 p-5">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                         <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white flex-shrink-0">
+                            <div className="w-9 h-9 rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white flex-shrink-0">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></svg>
                             </div>
                             <div>
@@ -780,17 +837,17 @@ export function CategoryDashboardPage({
                             </div>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
-                            <select value={maintBulan} onChange={e => setMaintBulan(Number(e.target.value))} className="h-7 px-2 text-xs border border-gray-200 rounded-lg bg-white text-gray-700 outline-none cursor-pointer focus:border-blue-500">
+                            <select value={maintBulan} onChange={e => setMaintBulan(Number(e.target.value))} className="h-7 px-2 text-xs border border-gray-200 bg-white text-gray-700 outline-none cursor-pointer focus:border-blue-500">
                                 {MONTHS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
                             </select>
-                            <select value={maintTahun} onChange={e => setMaintTahun(Number(e.target.value))} className="h-7 px-2 text-xs border border-gray-200 rounded-lg bg-white text-gray-700 outline-none cursor-pointer focus:border-blue-500">
+                            <select value={maintTahun} onChange={e => setMaintTahun(Number(e.target.value))} className="h-7 px-2 text-xs border border-gray-200 bg-white text-gray-700 outline-none cursor-pointer focus:border-blue-500">
                                 {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
                             </select>
-                            <select value={maintArea} onChange={e => { setMaintArea(e.target.value); setMaintEquipment(''); }} className="h-7 px-2 text-xs border border-gray-200 rounded-lg bg-white text-gray-700 outline-none cursor-pointer focus:border-blue-500 max-w-[120px]">
+                            <select value={maintArea} onChange={e => { setMaintArea(e.target.value); setMaintEquipment(''); }} className="h-7 px-2 text-xs border border-gray-200 bg-white text-gray-700 outline-none cursor-pointer focus:border-blue-500 max-w-[120px]">
                                 <option value="">Semua Area</option>
                                 {(maintData?.areas ?? []).map(a => <option key={a} value={a}>{a}</option>)}
                             </select>
-                            <select value={maintEquipment} onChange={e => setMaintEquipment(e.target.value)} className="h-7 px-2 text-xs border border-gray-200 rounded-lg bg-white text-gray-700 outline-none cursor-pointer focus:border-blue-500 max-w-[120px]">
+                            <select value={maintEquipment} onChange={e => setMaintEquipment(e.target.value)} className="h-7 px-2 text-xs border border-gray-200 bg-white text-gray-700 outline-none cursor-pointer focus:border-blue-500 max-w-[120px]">
                                 <option value="">Semua Equipment</option>
                                 {(maintData?.equipments ?? []).map(eq => <option key={eq} value={eq}>{eq}</option>)}
                             </select>
@@ -827,10 +884,10 @@ export function CategoryDashboardPage({
             {/* ═══ BENTO GRID – Ringkasan Bahan Baku (Full Width) ═══ */}
 
             {/* ── Material Stock Table ── */}
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col">
+            <div className="bg-white border border-gray-200 overflow-hidden flex flex-col">
                 <div className="px-5 py-4 border-b border-gray-100 flex flex-col 2xl:flex-row 2xl:items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white flex-shrink-0">
+                        <div className="w-9 h-9 rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white flex-shrink-0">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" /></svg>
                         </div>
                         <div>
@@ -839,26 +896,37 @@ export function CategoryDashboardPage({
                         </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 w-full 2xl:w-auto">
-                        <select value={matBulan} onChange={e => setMatBulan(Number(e.target.value))} className="h-8 px-2 text-xs border border-gray-200 rounded-lg bg-white text-gray-700 outline-none cursor-pointer focus:border-blue-500">
-                            {MONTHS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
-                        </select>
-                        <select value={matTahun} onChange={e => setMatTahun(Number(e.target.value))} className="h-8 px-2 text-xs border border-gray-200 rounded-lg bg-white text-gray-700 outline-none cursor-pointer focus:border-blue-500">
-                            {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
-                        </select>
-                        <select value={selectedMatProduct} onChange={e => setSelectedMatProduct(e.target.value)} className="h-8 px-2 text-xs border border-gray-200 rounded-lg bg-white text-gray-700 outline-none cursor-pointer focus:border-blue-500 max-w-[140px] truncate">
-                            <option value="">Semua Produk</option>
-                            {matData?.products.map(p => <option key={p.slug} value={p.slug}>{p.label}</option>)}
-                        </select>
-                        <div className="relative flex-1 sm:flex-none">
-                            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-                            <input
-                                type="text"
-                                value={materialSearch}
-                                onChange={e => setMaterialSearch(e.target.value)}
-                                placeholder="Cari bahan..."
-                                className="block w-full sm:w-40 pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
-                            />
-                        </div>
+                        <AppSelect
+                            variant="ghost"
+                            value={matBulan.toString()}
+                            onChange={(e) => setMatBulan(Number(e.target.value))}
+                            options={MONTHS.map((m, i) => ({ label: m, value: (i + 1).toString() }))}
+                            className="h-8 text-xs"
+                        />
+                        <AppSelect
+                            variant="ghost"
+                            value={matTahun.toString()}
+                            onChange={(e) => setMatTahun(Number(e.target.value))}
+                            options={[2024, 2025, 2026, 2027].map(y => ({ label: y.toString(), value: y.toString() }))}
+                            className="h-8 text-xs"
+                        />
+                        <AppSelect
+                            variant="ghost"
+                            value={selectedMatProduct}
+                            onChange={(e) => setSelectedMatProduct(e.target.value)}
+                            options={[
+                                { label: 'Semua Produk', value: '' },
+                                ...(matData?.products.map(p => ({ label: p.label, value: p.slug })) || [])
+                            ]}
+                            className="h-8 text-xs max-w-[140px]"
+                        />
+                        <AppSearchBar
+                            value={materialSearch}
+                            onChange={(e) => setMaterialSearch(e.target.value)}
+                            placeholder="Cari bahan..."
+                            className="w-full sm:w-40 text-xs py-1.5 h-8"
+                            containerClassName="h-8"
+                        />
                     </div>
                 </div>
                 {loadingMat ? (
@@ -923,7 +991,12 @@ export function CategoryDashboardPage({
                     </div>
                 )}
                 {matTotalPages > 1 && (
-                    <TablePagination currentPage={matPage} totalPages={matTotalPages} onPageChange={setMatPage} totalItems={flattenedMaterialsData.length} itemsPerPage={ITEMS_PER_PAGE} />
+                    <AppPagination
+                        currentPage={matPage}
+                        totalPages={matTotalPages}
+                        onPageChange={setMatPage}
+                        totalItems={flattenedMaterialsData.length}
+                    />
                 )}
             </div>
 
@@ -959,11 +1032,11 @@ function BentoStatCard({
     bgLight: string;
 }) {
     return (
-        <div className={`${bgLight} rounded-xl border border-gray-100 p-4 relative overflow-hidden`}>
+        <div className={`${bgLight} rounded-lg border border-gray-100 p-4 relative overflow-hidden`}>
             {/* Decorative circle */}
             <div className={`absolute -top-4 -right-4 w-20 h-20 bg-gradient-to-br ${gradient} rounded-full opacity-10`} />
             <div className="relative">
-                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center text-white mb-3`}>
+                <div className={`w-10 h-10 rounded-md bg-gradient-to-br ${gradient} flex items-center justify-center text-white mb-3`}>
                     {icon}
                 </div>
                 <p className="text-xs font-medium text-gray-500 mb-0.5">{label}</p>

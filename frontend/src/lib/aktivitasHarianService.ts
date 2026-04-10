@@ -3,11 +3,12 @@ import { api } from './api';
 export interface AktivitasHarian {
     id: number;
     tanggal: string;
-    pic: string;
-    lokasi: string;
+    pic?: string | null;
+    lokasi?: string | null;
     deskripsi: string;
     dokumentasi?: string | null;
     createdAt: string;
+    jenis_produk?: string | null;
 }
 
 export interface LogbookPic {
@@ -39,7 +40,7 @@ export interface AktivitasHarianResponse {
 
 export const aktivitasHarianService = {
     // Aktivitas Harian
-    getAll: (params: { bulan?: string; tahun?: string; search?: string; page?: number; limit?: number; sortBy?: string; sortDesc?: boolean }) => {
+    getAll: (params: { bulan?: string; tahun?: string; search?: string; jenisProduk?: string; page?: number; limit?: number; sortBy?: string; sortDesc?: boolean }) => {
         const query = new URLSearchParams(cleanParams(params)).toString();
         return api.get<AktivitasHarianResponse>(`/AktivitasHarian?${query}`);
     },
@@ -49,6 +50,8 @@ export const aktivitasHarianService = {
     update: (id: number, data: Omit<AktivitasHarian, 'id' | 'createdAt'>) =>
         api.put<AktivitasHarian>(`/AktivitasHarian/${id}`, data),
     delete: (id: number) => api.delete(`/AktivitasHarian/${id}`),
+    createBulk: (data: { items: Omit<AktivitasHarian, 'id' | 'createdAt'>[] }) => 
+        api.post<AktivitasHarian[]>('/AktivitasHarian/bulk', data),
 
     // PIC Templates
     getPics: () => api.get<LogbookPic[]>('/AktivitasHarian/pic'),

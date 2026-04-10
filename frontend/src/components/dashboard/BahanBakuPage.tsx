@@ -17,6 +17,10 @@ import {
 import { cn } from "@/lib/utils";
 import { bahanBakuService, Perusahaan, BahanBaku, Material, BalanceStok, BalanceStokRow } from '@/lib/bahanBakuService';
 import { PencilIcon, Trash2Icon as TrashIcon } from 'lucide-react';
+import { AppSelect } from '@/components/ui/app-select';
+import { AppSearchBar } from '@/components/ui/app-search-bar';
+import { AppPagination } from '@/components/ui/app-pagination';
+import { AppButton } from '@/components/ui/app-button';
 
 /* ─── Types ─── */
 
@@ -555,7 +559,7 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
 
             {deleteModal.isOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="bg-white shadow-xl max-w-sm w-full p-6 animate-in fade-in zoom-in-95 duration-200">
                         <div className="flex flex-col items-center text-center">
                             <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-4">
                                 <AlertTriangleIcon />
@@ -564,17 +568,29 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
                             <p className="text-sm text-gray-500 mb-6">Data yang dihapus tidak dapat dikembalikan. Lanjutkan?</p>
                         </div>
                         <div className="flex gap-3 w-full">
-                            <button onClick={() => setDeleteModal({ isOpen: false, id: null, type: null })} className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors">Batal</button>
-                            <button onClick={executeDelete} disabled={isDeleting} className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50">
+                            <AppButton
+                                variant="secondary"
+                                className="flex-1"
+                                onClick={() => setDeleteModal({ isOpen: false, id: null, type: null })}
+                            >
+                                Batal
+                            </AppButton>
+                            <AppButton
+                                variant="danger"
+                                className="flex-1"
+                                onClick={executeDelete}
+                                disabled={isDeleting}
+                                loading={isDeleting}
+                            >
                                 {isDeleting ? 'Menghapus...' : 'Ya, Hapus'}
-                            </button>
+                            </AppButton>
                         </div>
                     </div>
                 </div>
             )}
 
             {pageError && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center justify-between shadow-sm">
+                <div className="bg-red-50 border border-red-200 p-4 flex items-center justify-between shadow-sm">
                     <span className="text-sm font-medium text-red-800">{pageError}</span>
                     <button onClick={() => setPageError(null)} className="px-3 py-1.5 text-sm font-semibold text-red-700 bg-red-100 hover:bg-red-200 rounded-lg transition-colors">Tutup</button>
                 </div>
@@ -599,7 +615,7 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
             </div>
 
             {/* Tabs + Actions row */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="bg-white border border-gray-200 overflow-hidden">
                 {/* Header with tabs and button */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-gray-100">
                     <div className="flex">
@@ -631,23 +647,24 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-48 bg-white border border-gray-200 shadow-lg rounded-lg p-1 z-50">
                                     <DropdownMenuItem onClick={handleExportExcel} className="cursor-pointer hover:bg-gray-50 focus:bg-gray-50">
-                                        <span className="mr-2">📄</span> Export to Excel
+                                        Export to Excel
                                     </DropdownMenuItem>
                                     <DropdownMenuItem onClick={handleExportPDF} className="cursor-pointer hover:bg-gray-50 focus:bg-gray-50">
-                                        <span className="mr-2">📑</span> Export to PDF
+                                        Export to PDF
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         )}
 
                         {activeTab !== 'balance-stok' && activeTab !== 'konfigurasi' && (
-                            <button
+                            <AppButton
+                                variant="primary"
+                                size="sm"
+                                icon={<PlusIcon />}
                                 onClick={() => activeTab === 'mutasi' ? setIsMutasiModalOpen(true) : setIsSuplaiModalOpen(true)}
-                                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
                             >
-                                <PlusIcon />
                                 Tambah Data
-                            </button>
+                            </AppButton>
                         )}
                     </div>
                 </div>
@@ -659,35 +676,29 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
                             {/* Left Side: Period Filter (only for Suplai/Mutasi) */}
                             {/* Left Side: Period Filter (Available for all tabs) */}
                             <div className="flex flex-col sm:flex-row gap-4 items-end">
-                                <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
-                                    <span className="text-sm font-medium text-gray-500 mr-2">Periode:</span>
-                                    <select
-                                        value={bulan}
-                                        onChange={(e) => setBulan(e.target.value)}
-                                        className="bg-transparent text-sm font-medium text-gray-700 focus:outline-none cursor-pointer hover:text-emerald-600 transition-colors"
-                                    >
-                                        {BULAN_OPTIONS.map((opt) => (
-                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                        ))}
-                                    </select>
-                                    <span className="text-gray-300">/</span>
-                                    <select
-                                        value={tahun}
-                                        onChange={(e) => setTahun(e.target.value)}
-                                        className="bg-transparent text-sm font-medium text-gray-700 focus:outline-none cursor-pointer hover:text-emerald-600 transition-colors"
-                                    >
-                                        {TAHUN_OPTIONS.map((opt) => (
-                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                        ))}
-                                    </select>
-                                </div>
+                                <AppSelect
+                                    prefixLabel="Periode:"
+                                    variant="ghost"
+                                    value={bulan}
+                                    onChange={(e) => setBulan(e.target.value)}
+                                    options={BULAN_OPTIONS}
+                                    className="bg-white border border-gray-200 px-3 py-2"
+                                />
+                                <AppSelect
+                                    variant="ghost"
+                                    value={tahun}
+                                    onChange={(e) => setTahun(e.target.value)}
+                                    options={TAHUN_OPTIONS}
+                                    className="bg-white border border-gray-200 px-3 py-2 -ml-3"
+                                />
                                 {(bulan || tahun) && (
-                                    <button
+                                    <AppButton
+                                        variant="ghost"
+                                        size="sm"
                                         onClick={() => { setBulan(''); setTahun(''); }}
-                                        className="px-4 py-2 bg-white text-gray-500 text-sm font-medium rounded-lg border border-gray-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all shadow-sm"
                                     >
                                         ✕ Hapus Filter
-                                    </button>
+                                    </AppButton>
                                 )}
                                 {activeTab === 'balance-stok' && (bulan || tahun) && (
                                     <span className="text-xs text-gray-400 italic ml-2">
@@ -697,18 +708,12 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
                             </div>
 
                             {/* Right Side: Search */}
-                            <div className="relative w-full md:w-64">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                                    <SearchIcon />
-                                </span>
-                                <input
-                                    type="text"
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    placeholder="Cari data..."
-                                    className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow shadow-sm"
-                                />
-                            </div>
+                            <AppSearchBar
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder="Cari data..."
+                                containerClassName="w-full md:w-64"
+                            />
                         </div>
                     </div>
                 )}
@@ -1458,45 +1463,13 @@ function Pagination({
     total: number;
     setPage: (p: number) => void;
 }) {
-    if (total === 0) return null;
-    const from = (page - 1) * 10 + 1;
-    const to = Math.min(page * 10, total);
-
     return (
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-4 py-3 border-t border-gray-100">
-            <p className="text-xs text-gray-400 mb-2 sm:mb-0">
-                Showing {from} to {to} of {total} entries
-            </p>
-            <div className="flex items-center gap-1">
-                <button
-                    onClick={() => setPage(Math.max(1, page - 1))}
-                    disabled={page === 1}
-                    className="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                >
-                    <ChevronLeftIcon />
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                    <button
-                        key={p}
-                        onClick={() => setPage(p)}
-                        className={`min-w-[32px] py-1 rounded-md text-sm font-medium transition-colors
-              ${p === page
-                                ? 'bg-emerald-600 text-white shadow-sm'
-                                : 'text-gray-600 hover:bg-gray-100'
-                            }`}
-                    >
-                        {p}
-                    </button>
-                ))}
-                <button
-                    onClick={() => setPage(Math.min(totalPages, page + 1))}
-                    disabled={page === totalPages}
-                    className="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                >
-                    <ChevronRightIcon />
-                </button>
-            </div>
-        </div>
+        <AppPagination
+            currentPage={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            totalItems={total}
+        />
     );
 }
 

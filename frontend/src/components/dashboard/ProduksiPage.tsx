@@ -24,6 +24,9 @@ import {
     type ProduksiSummary,
 } from '@/lib/produksiService';
 import { BelumSamplingModal } from './BelumSamplingModal';
+import { AppSelect } from '@/components/ui/app-select';
+import { AppSearchBar } from '@/components/ui/app-search-bar';
+import { AppButton } from '@/components/ui/app-button';
 
 /* ─── Unit Conversion ─── */
 const MASS_UNITS = ['Ton', 'Kwintal', 'Kg', 'Gram', 'Mg'];
@@ -553,33 +556,35 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                 )}
 
                 {/* Filter Row */}
-                <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex flex-col md:flex-row gap-6 justify-between items-end">
-                    <div className="flex flex-wrap items-center gap-6">
-                        <div className="flex items-center gap-3">
-                            <span className="text-base font-medium text-gray-500">Periode:</span>
-                            <div className="flex items-center gap-2 bg-white px-4 py-2.5 rounded-xl border border-gray-200 shadow-sm">
-                                <select value={bulan} onChange={e => setBulan(Number(e.target.value))} className="bg-transparent text-base font-medium text-gray-700 focus:outline-none cursor-pointer">
-                                    {BULAN_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                                </select>
-                                <span className="text-gray-300 mx-1">/</span>
-                                <select value={tahun} onChange={e => setTahun(Number(e.target.value))} className="bg-transparent text-base font-medium text-gray-700 focus:outline-none cursor-pointer">
-                                    {generateYearOptions().map(y => <option key={y} value={y}>{y}</option>)}
-                                </select>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-3 border-l border-gray-200 pl-4">
-                            <span className="text-base font-medium text-gray-500">Satuan:</span>
-                            <div className="flex items-center gap-2 bg-white px-4 py-2.5 rounded-xl border border-gray-200 shadow-sm">
-                                <select value={currentUnit} onChange={e => setDisplayUnit(e.target.value)} className="bg-transparent text-base font-medium text-gray-700 focus:outline-none cursor-pointer">
-                                    {unitFamily.map(u => <option key={u} value={u}>{u}</option>)}
-                                </select>
-                            </div>
-                        </div>
+                <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex flex-col md:flex-row gap-4 justify-between items-end">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <AppSelect
+                            prefixLabel="Periode:"
+                            variant="default"
+                            value={String(bulan)}
+                            onChange={(e) => setBulan(Number(e.target.value))}
+                            options={BULAN_OPTIONS.map(o => ({ value: String(o.value), label: o.label }))}
+                        />
+                        <AppSelect
+                            variant="default"
+                            value={String(tahun)}
+                            onChange={(e) => setTahun(Number(e.target.value))}
+                            options={generateYearOptions().map(y => ({ value: String(y), label: String(y) }))}
+                        />
+                        <AppSelect
+                            prefixLabel="Satuan:"
+                            variant="default"
+                            value={currentUnit}
+                            onChange={(e) => setDisplayUnit(e.target.value)}
+                            options={unitFamily.map(u => ({ value: u, label: u }))}
+                        />
                     </div>
-                    <div className="relative w-full md:w-80">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"><SearchIcon /></span>
-                        <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari data..." className="w-full pl-11 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm" />
-                    </div>
+                    <AppSearchBar
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Cari data..."
+                        containerClassName="w-full md:w-80"
+                    />
                 </div>
 
                 {/* ═══════════════════ TABLE ═══════════════════ */}
@@ -786,8 +791,8 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                         <h3 className="text-lg font-bold text-gray-900 mb-2">Simpan Perubahan?</h3>
                         <p className="text-gray-600 mb-6">Apakah anda yakin ingin menyimpan perubahan data ini? Data produksi akan diperbarui.</p>
                         <div className="flex justify-end gap-3">
-                            <button onClick={() => setConfirmModal({ isOpen: false, rowDate: null })} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition-colors">Batal</button>
-                            <button onClick={handleSaveRow} className="px-4 py-2 bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg font-medium shadow-sm transition-colors">Ya, Simpan</button>
+                            <AppButton variant="secondary" onClick={() => setConfirmModal({ isOpen: false, rowDate: null })}>Batal</AppButton>
+                            <AppButton variant="primary" onClick={handleSaveRow}>Ya, Simpan</AppButton>
                         </div>
                     </div>
                 </div>
@@ -839,14 +844,17 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                             )}
                         </div>
                         <div className="flex justify-end gap-3">
-                            <button
+                            <AppButton
+                                variant="secondary"
                                 onClick={() => setCancelConfirm({ isOpen: false, tanggal: '', availableFields: {bs:false,ps:false,coa:false,pg:false}, selectedFields: {bs:false,ps:false,coa:false,pg:false} })}
                                 disabled={cancelLoading}
-                                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition-colors"
                             >
                                 Batal
-                            </button>
-                            <button
+                            </AppButton>
+                            <AppButton
+                                variant="danger"
+                                loading={cancelLoading}
+                                disabled={cancelLoading || (!cancelConfirm.selectedFields.bs && !cancelConfirm.selectedFields.ps && !cancelConfirm.selectedFields.coa && !cancelConfirm.selectedFields.pg && Object.values(cancelConfirm.availableFields).some(v => v))}
                                 onClick={async () => {
                                     setCancelLoading(true);
                                     try {
@@ -866,18 +874,9 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                         setCancelLoading(false);
                                     }
                                 }}
-                                disabled={cancelLoading || (!cancelConfirm.selectedFields.bs && !cancelConfirm.selectedFields.ps && !cancelConfirm.selectedFields.coa && !cancelConfirm.selectedFields.pg && Object.values(cancelConfirm.availableFields).some(v => v))}
-                                className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg font-medium shadow-sm transition-colors disabled:opacity-50"
                             >
-                                {cancelLoading ? (
-                                    <>
-                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                                        Menghapus...
-                                    </>
-                                ) : (
-                                    'Hapus Terpilih'
-                                )}
-                            </button>
+                                {cancelLoading ? 'Menghapus...' : 'Hapus Terpilih'}
+                            </AppButton>
                         </div>
                     </div>
                 </div>
@@ -942,8 +941,11 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                         {psError && <p className="text-sm text-red-600 mb-3">{psError}</p>}
 
                         <div className="flex justify-end gap-3">
-                            <button onClick={() => { setPsModal({ isOpen: false, tanggal: '' }); setPsDropdownOpen(false); }} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition-colors">Batal</button>
-                            <button
+                            <AppButton variant="secondary" onClick={() => { setPsModal({ isOpen: false, tanggal: '' }); setPsDropdownOpen(false); }}>Batal</AppButton>
+                            <AppButton
+                                variant="primary"
+                                loading={psSaving}
+                                disabled={psSaving}
                                 onClick={async () => {
                                     const val = Number(psValue);
                                     if (!psBatchKode.trim()) { setPsError('Kode Batch wajib diisi'); return; }
@@ -974,11 +976,9 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                         setPsSaving(false);
                                     }
                                 }}
-                                disabled={psSaving}
-                                className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-600 text-white hover:bg-amber-700 rounded-xl font-medium shadow-sm transition-colors disabled:opacity-50"
                             >
-                                {psSaving ? <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> Menyimpan...</> : 'Simpan'}
-                            </button>
+                                {psSaving ? 'Menyimpan...' : 'Simpan'}
+                            </AppButton>
                         </div>
                     </div>
                 </div>
@@ -1042,8 +1042,11 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                         {coaError && <p className="text-sm text-red-600 mb-3">{coaError}</p>}
 
                         <div className="flex justify-end gap-3">
-                            <button onClick={() => { setCoaModal({ isOpen: false, tanggal: '' }); setCoaDropdownOpen(false); }} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition-colors">Batal</button>
-                            <button
+                            <AppButton variant="secondary" onClick={() => { setCoaModal({ isOpen: false, tanggal: '' }); setCoaDropdownOpen(false); }}>Batal</AppButton>
+                            <AppButton
+                                variant="primary"
+                                loading={coaSaving}
+                                disabled={coaSaving}
                                 onClick={async () => {
                                     const val = Number(coaValue);
                                     if (!coaBatchKode.trim()) { setCoaError('Kode Batch wajib diisi'); return; }
@@ -1074,11 +1077,9 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                         setCoaSaving(false);
                                     }
                                 }}
-                                disabled={coaSaving}
-                                className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white hover:bg-blue-700 rounded-xl font-medium shadow-sm transition-colors disabled:opacity-50"
                             >
-                                {coaSaving ? <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> Menyimpan...</> : 'Simpan'}
-                            </button>
+                                {coaSaving ? 'Menyimpan...' : 'Simpan'}
+                            </AppButton>
                         </div>
                     </div>
                 </div>
