@@ -182,6 +182,7 @@ async function supabaseFetch<T = any>(
       method: options.method || 'GET',
       headers,
       body: options.body ? JSON.stringify(options.body) : undefined,
+      cache: 'no-store',
     });
 
     // Handle 204 No Content

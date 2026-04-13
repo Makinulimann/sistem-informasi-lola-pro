@@ -121,7 +121,7 @@ const iconMap: Record<string, () => ReactNode> = {
     users: UsersIcon,
 };
 
-/* ─── Sub-item links (Bahan Baku, Produksi, Analisa, RKAP) ─── */
+/* ─── Sub-item links (Bahan Baku, Produksi, Analisa) ─── */
 
 function SubItemLink({ label, href, pathname }: { label: string; href: string; pathname: string }) {
     const isActive = pathname === href;

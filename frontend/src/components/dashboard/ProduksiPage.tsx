@@ -467,7 +467,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                 <SummaryCard label={`Belum Sampling`} value={fmt(convertValue(summary.totalBelumSampling, baseUnit, currentUnit))} icon={<TrendUpIcon />} color="amber" />
                 <SummaryCard label={`Proses Sampling`} value={fmt(convertValue(summary.totalPs, baseUnit, currentUnit))} icon={<PlusIcon />} color="orange" />
                 <SummaryCard label={`COA (${currentUnit})`} value={fmt(convertValue(summary.totalCoa, baseUnit, currentUnit))} icon={<CheckIcon />} color="cyan" />
-                <SummaryCard label={`Pengiriman (${currentUnit})`} value={fmt(convertValue(summary.totalKeluar, baseUnit, currentUnit))} icon={<PackageIcon />} color="violet" />
+                <SummaryCard label={`Produksi PG (${currentUnit})`} value={fmt(convertValue(summary.totalKeluar, baseUnit, currentUnit))} icon={<PackageIcon />} color="violet" />
             </div>
 
             {/* Error Alert */}
@@ -479,7 +479,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
             )}
 
             {/* Main Card */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-md overflow-hidden">
+            <div className="bg-white border border-gray-200 overflow-hidden">
                 {/* Tabs Row */}
                 <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50/30">
                     <div className="flex overflow-x-auto scrollbar-hide items-center">
@@ -529,7 +529,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                         </div>
                         <div className="space-y-3 mb-4">
                             {tabs.map(tab => (
-                                <div key={tab.id} className="flex items-center gap-3 bg-white rounded-lg border border-gray-200 px-4 py-3 shadow-sm">
+                                <div key={tab.id} className="flex items-center gap-3 bg-white border border-gray-200 px-4 py-3 shadow-sm">
                                     {editingTabId === tab.id ? (
                                         <>
                                             <input autoFocus value={editTabValue} onChange={e => setEditTabValue(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleRenameTab(tab.id); if (e.key === 'Escape') setEditingTabId(null); }} className="flex-1 text-base px-3 py-1.5 border border-emerald-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-500" />
@@ -547,8 +547,8 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                             ))}
                         </div>
                         <div className="flex items-center gap-3">
-                            <input value={newTabName} onChange={e => setNewTabName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleAddTab(); }} className="flex-1 text-base px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 shadow-sm" placeholder="Nama jenis baru..." />
-                            <button onClick={handleAddTab} disabled={!newTabName.trim()} className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-base font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm">
+                            <input value={newTabName} onChange={e => setNewTabName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleAddTab(); }} className="flex-1 text-base px-4 py-2.5 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500" placeholder="Nama jenis baru..." />
+                            <button onClick={handleAddTab} disabled={!newTabName.trim()} className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-base font-medium hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                                 <PlusIcon /> Tambah
                             </button>
                         </div>
@@ -597,12 +597,12 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                 {/* Row 1: Flat headers */}
                                 <tr className="bg-gray-50/80">
                                     <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 sticky left-0 bg-gray-50/80 z-10 text-left w-32">Tanggal</th>
-                                    <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-right w-28">Produksi</th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-right w-28">Produksi (Belum Sampling)</th>
                                     <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-right w-28">Belum Sampling</th>
                                     <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-right w-28">Proses Sampling</th>
                                     <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-right w-20">COA</th>
                                     <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-right w-32">Kumulatif Produksi</th>
-                                    <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-center w-32">Pengiriman Gudang</th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-center w-32">Produksi (Pengiriman Gudang)</th>
                                     <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-right w-28">Stok Akhir</th>
                                     <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-left w-44">Keterangan</th>
                                     <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-center w-20">Aksi</th>

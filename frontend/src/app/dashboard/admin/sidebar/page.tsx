@@ -160,7 +160,7 @@ export default function SidebarManagementPage() {
 
     const availableRoles = ['Admin', 'VP', 'KPP', 'KP', 'KNP'];
 
-    const defaultLevel3Labels = ['Bahan Baku', 'Produksi', 'Analisa', 'RKAP'];
+    const defaultLevel3Labels = ['Bahan Baku', 'Produksi', 'Analisa'];
 
     // Helper: slugify label for href generation
     const slugify = (text: string) =>
@@ -613,7 +613,7 @@ export default function SidebarManagementPage() {
                                             </div>
                                             <p className="text-[11px] text-gray-400 ml-6">
                                                 {createLevel === 2
-                                                    ? 'Otomatis membuat sub halaman: Bahan Baku, Produksi, Analisa, RKAP'
+                                                    ? 'Otomatis membuat sub halaman: Bahan Baku, Produksi, Analisa'
                                                     : 'Menu yang memiliki child menu di bawahnya'}
                                             </p>
                                         </button>

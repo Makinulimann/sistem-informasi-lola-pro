@@ -7,7 +7,6 @@ import dynamic from 'next/dynamic';
 const BahanBakuPage = dynamic(() => import('@/components/dashboard/BahanBakuPage').then(mod => mod.BahanBakuPage), { ssr: false });
 const ProduksiPage = dynamic(() => import('@/components/dashboard/ProduksiPage').then(mod => mod.ProduksiPage), { ssr: false });
 const AnalisaPage = dynamic(() => import('@/components/dashboard/AnalisaPage').then(mod => mod.AnalisaPage), { ssr: false });
-const RKAPPage = dynamic(() => import('@/components/dashboard/RKAPPage').then(mod => mod.RKAPPage), { ssr: false });
 const CategoryDashboardPage = dynamic(() => import('@/components/dashboard/CategoryDashboardPage').then(mod => mod.CategoryDashboardPage), { ssr: false });
 
 interface PageProps {
@@ -19,7 +18,6 @@ const PAGE_COMPONENT_MAP: Record<string, React.ComponentType<any>> = {
     'bahan-baku': BahanBakuPage,
     'produksi': ProduksiPage,
     'analisa': AnalisaPage,
-    'rkap': RKAPPage,
 };
 
 // Known category slugs
@@ -59,7 +57,7 @@ export default function CatchAllPage({ params }: PageProps) {
         return <PageComponent productCategory={productCategory} productName={productName} productSlug={productSlug} />;
     }
 
-    // Dedicated placeholder routing conditions removed, RKAPPage handled standardly by generic slug check
+    // Dedicated placeholder routing conditions removed
 
 
     // Default: generic placeholder for unknown pages

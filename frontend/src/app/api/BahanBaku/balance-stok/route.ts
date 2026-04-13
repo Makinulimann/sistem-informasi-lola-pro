@@ -1,7 +1,5 @@
 export const dynamic = 'force-dynamic';
-// Using Node.js runtime for Prisma compatibility
-// Edge runtime now supported with Supabase!
-export const runtime = 'edge';
+// Removed edge runtime due to fetch timeouts on large table selects
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/supabase';
 
@@ -98,10 +96,16 @@ export async function GET(request: Request) {
 
         const hasPeriodFilter = !!(bulan || tahun);
 
-        // Fetch all data needed
-        const { data: allProductMaterials } = await db.from<any>('product_materials').select('*').execute();
-        const { data: allMasterItems } = await db.from<any>('master_items').select('*').execute();
-        const { data: allRecords } = await db.from<any>('bahan_bakus').select('*').execute();
+        // Fetch all data needed concurrently to avoid massive timeouts (was 34s+)
+        const [
+            { data: allProductMaterials },
+            { data: allMasterItems },
+            { data: allRecords }
+        ] = await Promise.all([
+            db.from<any>('product_materials').select('*').execute(),
+            db.from<any>('master_items').select('*').execute(),
+            db.from<any>('bahan_bakus').select('*').execute()
+        ]);
 
         // Build master items lookup
         const masterItemsMap = new Map();

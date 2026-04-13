@@ -209,7 +209,7 @@ function AnalisaFormModal({ isOpen, onClose, onSave, initialData, productSlug }:
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="bg-white shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                 <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
                     <h3 className="text-lg font-semibold text-gray-900">
                         {initialData ? 'Edit Data Analisa' : 'Tambah Data Analisa'}
@@ -479,7 +479,7 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
             </div>
 
             {/* Main Content Card */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col min-h-[500px]">
+            <div className="bg-white border border-gray-200 overflow-hidden flex flex-col min-h-[500px]">
 
                 {/* Actions Only (Tabs removed) */}
                 <div className="flex items-center justify-between border-b border-gray-100 p-4 bg-gray-50/30">

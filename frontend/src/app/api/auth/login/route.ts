@@ -1,8 +1,10 @@
 export const dynamic = 'force-dynamic';
+export const runtime = 'edge';
 export const preferredRegion = 'sin1';
 
 import { NextResponse } from 'next/server';
-import bcrypt from 'bcryptjs';
+import { genSalt, hash, compare } from 'bcrypt-ts';
+const bcrypt = { genSalt, hash, compare };
 import { signToken } from '@/lib/auth';
 import { createClient } from '@supabase/supabase-js';
 

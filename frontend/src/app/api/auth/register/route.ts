@@ -2,7 +2,8 @@ export const dynamic = 'force-dynamic';
 export const preferredRegion = 'sin1';
 
 import { NextResponse } from 'next/server';
-import bcrypt from 'bcryptjs';
+import { genSalt, hash, compare } from 'bcrypt-ts';
+const bcrypt = { genSalt, hash, compare };
 
 const supabaseUrl = 'https://wtnnvlibowwffgtjzoou.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind0bm52bGlib3d3ZmZndGp6b291Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzODM2MzgsImV4cCI6MjA4ODk1OTYzOH0.XxR1BNfFpVhId1nOSMfmvxvcVPi5SBE3JQG-BZJIvwU';

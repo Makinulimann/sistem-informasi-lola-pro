@@ -21,7 +21,6 @@ const subItems = (basePath: string): NavSubItem[] => [
     { label: 'Bahan Baku', href: `${basePath}/bahan-baku` },
     { label: 'Produksi', href: `${basePath}/produksi` },
     { label: 'Analisa', href: `${basePath}/analisa` },
-    { label: 'RKAP', href: `${basePath}/rkap` },
 ];
 
 export const navigation: NavSection[] = [
@@ -49,6 +48,7 @@ export const navigation: NavSection[] = [
             { label: 'Phonska Oca', children: subItems('/dashboard/produk-pengembangan/phonska-oca') },
             { label: 'Aktivitas Harian', href: '/dashboard/produk-pengembangan/aktivitas-harian' },
             { label: 'Maintenance', href: '/dashboard/produk-pengembangan/maintenance' },
+            { label: 'RKAP / RKO', href: '/dashboard/rkap' },
         ],
     },
 ];

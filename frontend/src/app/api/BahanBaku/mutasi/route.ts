@@ -1,7 +1,5 @@
 export const dynamic = 'force-dynamic';
-// Using Node.js runtime for Prisma compatibility
-// Edge runtime now supported with Supabase!
-export const runtime = 'edge';
+// Removed edge runtime due to fetch timeouts on large table selects
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/supabase';
 
