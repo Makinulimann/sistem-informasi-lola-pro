@@ -161,7 +161,7 @@ export function CategoryDashboardPage({
     useEffect(() => {
         let cancelled = false;
         setLoadingMat(true);
-        getCategorySummary(categorySlug, matBulan, matTahun)
+        getCategorySummary(categorySlug, matBulan ?? undefined, matTahun ?? undefined)
             .then(res => { if (!cancelled) setMatData(res); })
             .catch(console.error)
             .finally(() => { if (!cancelled) setLoadingMat(false); });
@@ -174,7 +174,7 @@ export function CategoryDashboardPage({
     useEffect(() => {
         let cancelled = false;
         setLoadingProd(true);
-        getCategorySummary(categorySlug, prodBulan, prodTahun)
+        getCategorySummary(categorySlug, prodBulan ?? undefined, prodTahun ?? undefined)
             .then(res => { if (!cancelled) setProdData(res); })
             .catch(console.error)
             .finally(() => { if (!cancelled) setLoadingProd(false); });
@@ -187,7 +187,7 @@ export function CategoryDashboardPage({
     useEffect(() => {
         let cancelled = false;
         setLoadingChart(true);
-        getCategorySummary(categorySlug, chartBulan, chartTahun)
+        getCategorySummary(categorySlug, chartBulan ?? undefined, chartTahun ?? undefined)
             .then(res => { if (!cancelled) setChartData(res); })
             .catch(console.error)
             .finally(() => { if (!cancelled) setLoadingChart(false); });
@@ -198,7 +198,7 @@ export function CategoryDashboardPage({
     useEffect(() => {
         let cancelled = false;
         setLoadingBalance(true);
-        getCategorySummary(categorySlug, balanceBulan, balanceTahun)
+        getCategorySummary(categorySlug, balanceBulan ?? undefined, balanceTahun ?? undefined)
             .then(res => { if (!cancelled) setBalanceData(res); })
             .catch(console.error)
             .finally(() => { if (!cancelled) setLoadingBalance(false); });
@@ -209,7 +209,7 @@ export function CategoryDashboardPage({
     useEffect(() => {
         let cancelled = false;
         setLoadingMaint(true);
-        getMaintenanceSummary(maintBulan, maintTahun, maintArea || undefined, maintEquipment || undefined)
+        getMaintenanceSummary(maintBulan ?? undefined, maintTahun ?? undefined, maintArea || undefined, maintEquipment || undefined)
             .then(res => { if (!cancelled) setMaintData(res); })
             .catch(console.error)
             .finally(() => { if (!cancelled) setLoadingMaint(false); });
@@ -370,7 +370,7 @@ export function CategoryDashboardPage({
 
     const handleExportExcel = () => {
         const exportDate = format(new Date(), 'EEEE, dd MMMM yyyy', { locale: id });
-        const period = `${MONTHS[prodBulan - 1]} ${prodTahun}`;
+        const period = prodBulan && prodTahun ? `${MONTHS[prodBulan - 1]} ${prodTahun}` : 'Seluruh Periode';
         
         const exportData: any[] = [];
         paginatedProduksiProducts.forEach(product => {
@@ -402,7 +402,7 @@ export function CategoryDashboardPage({
 
     const handleExportPDF = () => {
         const exportDate = format(new Date(), 'EEEE, dd MMMM yyyy', { locale: id });
-        const period = `${MONTHS[prodBulan - 1]} ${prodTahun}`;
+        const period = prodBulan && prodTahun ? `${MONTHS[prodBulan - 1]} ${prodTahun}` : 'Seluruh Periode';
 
         const exportData: any[] = [];
         paginatedProduksiProducts.forEach(product => {
@@ -671,7 +671,7 @@ export function CategoryDashboardPage({
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                     <div>
                         <h3 className="text-sm font-semibold text-gray-800">Produksi per Produk</h3>
-                        <p className="text-xs text-gray-400 mt-0.5">{MONTHS[chartBulan - 1]} {chartTahun}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{chartBulan && chartTahun ? `${MONTHS[chartBulan - 1]} ${chartTahun}` : 'Seluruh Periode'}</p>
                     </div>
                     <div className="flex items-center gap-2">
                         <AppPeriodFilter
@@ -769,7 +769,7 @@ export function CategoryDashboardPage({
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                         <div>
                             <h3 className="text-sm font-semibold text-gray-800">Balance Bahan Baku</h3>
-                            <p className="text-xs text-gray-400 mt-0.5">{MONTHS[balanceBulan - 1]} {balanceTahun}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">{balanceBulan && balanceTahun ? `${MONTHS[balanceBulan - 1]} ${balanceTahun}` : 'Seluruh Periode'}</p>
                         </div>
                         <div className="flex items-center gap-2">
                             <AppPeriodFilter
@@ -833,7 +833,7 @@ export function CategoryDashboardPage({
                             </div>
                             <div>
                                 <h3 className="text-sm font-semibold text-gray-800">Kegiatan Maintenance</h3>
-                                <p className="text-xs text-gray-400 mt-0.5">{MONTHS[maintBulan - 1]} {maintTahun} &middot; {maintData?.totalKegiatan ?? 0} kegiatan</p>
+                                <p className="text-xs text-gray-400 mt-0.5">{maintBulan && maintTahun ? `${MONTHS[maintBulan - 1]} ${maintTahun}` : 'Seluruh Periode'} &middot; {maintData?.totalKegiatan ?? 0} kegiatan</p>
                             </div>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">

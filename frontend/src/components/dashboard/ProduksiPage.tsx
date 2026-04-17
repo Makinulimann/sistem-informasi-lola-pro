@@ -199,7 +199,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
         setError(null);
         setDirtyRows({});
         try {
-            const result = await getProduksi(slug, activeTabId, bulan, tahun);
+            const result = await getProduksi(slug, activeTabId, bulan ?? undefined, tahun ?? undefined);
             setData(result.data);
             setSummary(result.summary);
             setAvailableBatches(result.availableBatches || []);
@@ -338,7 +338,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
         const activeTabName = tabs.find(t => t.id === activeTabId)?.nama || '';
         const fullProductName = `${productName} ${activeTabName}`.trim();
         const exportDate = format(new Date(), 'EEEE, dd MMMM yyyy', { locale: id });
-        const period = `${BULAN_NAMES[bulan]} ${tahun}`;
+        const period = bulan && tahun ? `${BULAN_NAMES[bulan]} ${tahun}` : 'Seluruh Periode';
 
         const exportData = filtered.map(row => {
             const bs = getRawValue(row, 'bs');
@@ -369,7 +369,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
         const activeTabName = tabs.find(t => t.id === activeTabId)?.nama || '';
         const fullProductName = `${productName} ${activeTabName}`.trim();
         const exportDate = format(new Date(), 'EEEE, dd MMMM yyyy', { locale: id });
-        const period = `${BULAN_NAMES[bulan]} ${tahun}`;
+        const period = bulan && tahun ? `${BULAN_NAMES[bulan]} ${tahun}` : 'Seluruh Periode';
 
         const exportData = filtered.map(row => {
             const bs = getRawValue(row, 'bs');
@@ -415,7 +415,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
         return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
     };
 
-    const periodLabel = `${BULAN_NAMES[bulan]} ${tahun}`;
+    const periodLabel = bulan && tahun ? `${BULAN_NAMES[bulan]} ${tahun}` : 'Seluruh Periode';
     const filtered = useMemo(() => {
         if (!search) return data;
         const q = search.toLowerCase();
@@ -770,8 +770,8 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                 tanggal={bsModal.tanggal}
                 currentBs={bsModal.currentBs}
                 currentBatchKode={data.find(r => r.tanggal === bsModal.tanggal)?.batchKode || ''}
-                bulan={bulan}
-                tahun={tahun}
+                bulan={bulan ?? getInitialMonth()}
+                tahun={tahun ?? getInitialYear()}
             />
 
             {/* Confirmation Modal */}
