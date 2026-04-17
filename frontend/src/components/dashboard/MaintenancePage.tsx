@@ -14,35 +14,14 @@ import {
 import { useToast } from '@/components/ui/toast';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { AppButton } from '@/components/ui/app-button';
+import { AppModal } from '@/components/ui/app-modal';
 import { MaintenanceImportModal } from './MaintenanceImportModal';
 import { AppSelect } from '@/components/ui/app-select';
 import { AppSearchBar } from '@/components/ui/app-search-bar';
 import { AppPagination } from '@/components/ui/app-pagination';
+import { AppPeriodFilter } from '@/components/ui/app-period-filter';
 
 /* ─── Constants ─── */
-
-const BULAN_OPTIONS = [
-    { value: '', label: 'Semua Bulan' },
-    { value: '1', label: 'Januari' },
-    { value: '2', label: 'Februari' },
-    { value: '3', label: 'Maret' },
-    { value: '4', label: 'April' },
-    { value: '5', label: 'Mei' },
-    { value: '6', label: 'Juni' },
-    { value: '7', label: 'Juli' },
-    { value: '8', label: 'Agustus' },
-    { value: '9', label: 'September' },
-    { value: '10', label: 'Oktober' },
-    { value: '11', label: 'November' },
-    { value: '12', label: 'Desember' },
-];
-
-const TAHUN_OPTIONS = [
-    { value: '', label: 'Semua Tahun' },
-    { value: '2026', label: '2026' },
-    { value: '2025', label: '2025' },
-    { value: '2024', label: '2024' },
-];
 
 /* ─── Main Component ─── */
 
@@ -54,8 +33,8 @@ interface MaintenancePageProps {
 
 export function MaintenancePage({ productCategory, productName, productSlug }: MaintenancePageProps) {
     const [search, setSearch] = useState('');
-    const [bulan, setBulan] = useState('');
-    const [tahun, setTahun] = useState('');
+    const [bulan, setBulan] = useState<number | null>(new Date().getMonth() + 1);
+    const [tahun, setTahun] = useState<number | null>(new Date().getFullYear());
     const [filterPrioritas, setFilterPrioritas] = useState('');
     const [filterStatus, setFilterStatus] = useState('');
     const [page, setPage] = useState(1);
@@ -89,8 +68,8 @@ export function MaintenancePage({ productCategory, productName, productSlug }: M
         setIsLoading(true);
         try {
             const response = await maintenanceService.getAll({
-                bulan: bulan || undefined,
-                tahun: tahun || undefined,
+                bulan: bulan ? String(bulan) : undefined,
+                tahun: tahun ? String(tahun) : undefined,
                 search: search || undefined,
                 page: page,
                 limit: 10,
@@ -117,6 +96,7 @@ export function MaintenancePage({ productCategory, productName, productSlug }: M
     useEffect(() => {
         setPage(1);
     }, [search, bulan, tahun, filterPrioritas, filterStatus]);
+
 
     useEffect(() => {
         fetchData();
@@ -292,20 +272,11 @@ export function MaintenancePage({ productCategory, productName, productSlug }: M
                     <div className="flex flex-col md:flex-row md:items-center gap-3 justify-between">
                         <div className="flex flex-wrap gap-2 items-center">
                             {/* Periode */}
-                            <AppSelect
-                                prefixLabel="Periode:"
-                                variant="ghost"
-                                value={bulan}
-                                onChange={(e) => setBulan(e.target.value)}
-                                options={BULAN_OPTIONS}
-                                className="bg-white border border-gray-200 px-3 py-2"
-                            />
-                            <AppSelect
-                                variant="ghost"
-                                value={tahun}
-                                onChange={(e) => setTahun(e.target.value)}
-                                options={TAHUN_OPTIONS}
-                                className="bg-white border border-gray-200 px-3 py-2 -ml-3"
+                            <AppPeriodFilter
+                                month={bulan}
+                                year={tahun}
+                                onMonthChange={setBulan}
+                                onYearChange={setTahun}
                             />
                             {/* Prioritas filter */}
                             <AppSelect
@@ -330,11 +301,11 @@ export function MaintenancePage({ productCategory, productName, productSlug }: M
                                 ]}
                                 className="w-40"
                             />
-                            {(bulan || tahun || filterPrioritas || filterStatus) && (
+                            {(filterPrioritas || filterStatus) && (
                                 <AppButton
                                     variant="ghost"
                                     size="icon"
-                                    onClick={() => { setBulan(''); setTahun(''); setFilterPrioritas(''); setFilterStatus(''); }}
+                                    onClick={() => { setFilterPrioritas(''); setFilterStatus(''); }}
                                     title="Reset filter"
                                     className="text-gray-400 hover:text-red-500 hover:bg-red-50 border border-gray-200"
                                 >
@@ -685,31 +656,28 @@ function MaintenanceModal({
         }
     };
 
-    if (!isOpen) return null;
+    const footer = (
+        <>
+            <AppButton type="button" variant="secondary" onClick={onClose}>Batal</AppButton>
+            <AppButton
+                type="submit"
+                form="maintenance-form"
+                variant="primary"
+                loading={isSaving}
+            >
+                {isSaving ? 'Menyimpan...' : (initialData ? 'Simpan Perubahan' : 'Tambah Maintenance')}
+            </AppButton>
+        </>
+    );
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-            {/* Backdrop */}
-            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity" onClick={onClose} />
-
-            {/* Modal */}
-            <div className="relative bg-white shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
-                {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
-                    <h2 className="text-lg font-bold text-gray-800">
-                        {initialData ? 'Edit Maintenance' : 'Tambah Maintenance Baru'}
-                    </h2>
-                    <button
-                        onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-full transition-colors"
-                    >
-                        <XIcon className="size-5" />
-                    </button>
-                </div>
-
-                {/* Scrollable Form Body */}
-                <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
-                    <form id="maintenance-form" onSubmit={handleSubmit} className="space-y-5">
+        <AppModal
+            isOpen={isOpen}
+            onClose={onClose}
+            title={initialData ? 'Edit Maintenance' : 'Tambah Maintenance Baru'}
+            footer={footer}
+        >
+            <form id="maintenance-form" onSubmit={handleSubmit} className="space-y-5">
                         <div className="grid grid-cols-2 gap-4">
                             {/* Kode */}
                             <div>
@@ -881,28 +849,7 @@ function MaintenanceModal({
                                 </div>
                             </div>
                         </div>
-                    </form>
-                </div>
-
-                {/* Actions */}
-                <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3 shrink-0">
-                    <AppButton
-                        type="button"
-                        variant="secondary"
-                        onClick={onClose}
-                    >
-                        Batal
-                    </AppButton>
-                    <AppButton
-                        type="submit"
-                        form="maintenance-form"
-                        variant="primary"
-                        loading={isSaving}
-                    >
-                        {isSaving ? 'Menyimpan...' : (initialData ? 'Simpan Perubahan' : 'Tambah Maintenance')}
-                    </AppButton>
-                </div>
-            </div>
-        </div>
+            </form>
+        </AppModal>
     );
 }

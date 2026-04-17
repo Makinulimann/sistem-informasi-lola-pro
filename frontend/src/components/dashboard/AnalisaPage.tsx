@@ -19,6 +19,12 @@ import {
     type AnalisaRow,
     type SaveAnalisaRequest
 } from '@/lib/analisaService';
+import { AppModal } from '@/components/ui/app-modal';
+import { AppButton } from '@/components/ui/app-button';
+import { AppPeriodFilter } from '@/components/ui/app-period-filter';
+import { AppInput } from '../ui/app-input';
+import { AppSearchBar } from '../ui/app-search-bar';
+import { AppPagination } from '../ui/app-pagination';
 
 /* ─── Icons ─── */
 function SearchIcon() { return (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>); }
@@ -34,28 +40,6 @@ function AlertTriangleIcon() { return (<svg width="24" height="24" viewBox="0 0 
 function PencilIcon() { return (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" /></svg>); }
 
 /* ─── Types ─── */
-
-
-/* ─── Constants ─── */
-const BULAN_OPTIONS = [
-    { value: '', label: 'Semua Bulan' },
-    { value: '1', label: 'Januari' }, { value: '2', label: 'Februari' }, { value: '3', label: 'Maret' },
-    { value: '4', label: 'April' }, { value: '5', label: 'Mei' }, { value: '6', label: 'Juni' },
-    { value: '7', label: 'Juli' }, { value: '8', label: 'Agustus' }, { value: '9', label: 'September' },
-    { value: '10', label: 'Oktober' }, { value: '11', label: 'November' }, { value: '12', label: 'Desember' },
-];
-
-function getInitialYear() { return new Date().getFullYear().toString(); }
-
-function generateYearOptions() {
-    const y = new Date().getFullYear();
-    const years = [{ value: '', label: 'Semua Tahun' }];
-    for (let i = y; i >= y - 3; i--) {
-        years.push({ value: i.toString(), label: i.toString() });
-    }
-    return years;
-}
-
 
 
 /* ─── Helpers ─── */
@@ -95,49 +79,7 @@ function StatusBadge({ status }: { status: string }) {
     );
 }
 
-/* ─── Pagination ─── */
-function Pagination({
-    page, totalPages, total, pageSize, setPage,
-}: {
-    page: number; totalPages: number; total: number; pageSize: number; setPage: (p: number) => void;
-}) {
-    const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
-    const to = Math.min(page * pageSize, total);
 
-    return (
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-4 py-3 border-t border-gray-100">
-            <p className="text-xs text-gray-400 mb-2 sm:mb-0">
-                Showing {from} to {to} of {total} entries
-            </p>
-            <div className="flex items-center gap-1">
-                <button
-                    onClick={() => setPage(Math.max(1, page - 1))}
-                    disabled={page === 1}
-                    className="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                >
-                    <ChevronLeftIcon />
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                    <button
-                        key={p}
-                        onClick={() => setPage(p)}
-                        className={`min-w-[32px] py-1 rounded-md text-sm font-medium transition-colors
-                            ${p === page ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
-                    >
-                        {p}
-                    </button>
-                ))}
-                <button
-                    onClick={() => setPage(Math.min(totalPages, page + 1))}
-                    disabled={page === totalPages}
-                    className="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                >
-                    <ChevronRightIcon />
-                </button>
-            </div>
-        </div>
-    );
-}
 
 /* ═══════════════════════════════════════════ */
 /*  Form Modal                                 */
@@ -150,6 +92,8 @@ interface ModalProps {
     initialData?: AnalisaRow | null;
     productSlug: string;
 }
+
+const fieldCls = 'w-full px-3 py-2.5 border border-gray-200 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition-all bg-white';
 
 function AnalisaFormModal({ isOpen, onClose, onSave, initialData, productSlug }: ModalProps) {
     const [tanggalSampling, setTanggalSampling] = useState('');
@@ -182,8 +126,6 @@ function AnalisaFormModal({ isOpen, onClose, onSave, initialData, productSlug }:
         }
     }, [isOpen, initialData]);
 
-    if (!isOpen) return null;
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setFormError(null);
@@ -207,113 +149,99 @@ function AnalisaFormModal({ isOpen, onClose, onSave, initialData, productSlug }:
         }
     };
 
+    const footer = (
+        <>
+            {formError && <span className="text-sm text-red-600 font-medium mr-auto">{formError}</span>}
+            <AppButton type="button" variant="secondary" onClick={onClose}>Batal</AppButton>
+            <AppButton type="submit" form="analisa-form" variant="primary" loading={isSaving}>
+                {isSaving ? 'Menyimpan...' : 'Simpan'}
+            </AppButton>
+        </>
+    );
+
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-                    <h3 className="text-lg font-semibold text-gray-900">
-                        {initialData ? 'Edit Data Analisa' : 'Tambah Data Analisa'}
-                    </h3>
-                    <button onClick={onClose} className="p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
-                        <XIcon />
-                    </button>
+        <AppModal
+            isOpen={isOpen}
+            onClose={onClose}
+            title={initialData ? 'Edit Data Analisa' : 'Tambah Data Analisa'}
+            footer={footer}
+        >
+            <form id="analisa-form" onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                        <label className="block text-sm font-medium text-gray-700">Tanggal Sampling</label>
+                        <input
+                            type="date"
+                            required
+                            value={tanggalSampling}
+                            onChange={e => setTanggalSampling(e.target.value)}
+                            className={fieldCls}
+                        />
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="block text-sm font-medium text-gray-700">Batch</label>
+                        <input
+                            type="text"
+                            required
+                            placeholder="Misal: Batch1"
+                            value={noBAPC}
+                            onChange={e => setNoBAPC(e.target.value)}
+                            className={fieldCls}
+                        />
+                    </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                            <label className="text-sm font-medium text-gray-700">Tanggal Sampling</label>
-                            <input
-                                type="date"
-                                required
-                                value={tanggalSampling}
-                                onChange={e => setTanggalSampling(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-shadow"
-                            />
-                        </div>
-                        <div className="space-y-1.5">
-                            <label className="text-sm font-medium text-gray-700">Batch</label>
-                            <input
-                                type="text"
-                                required
-                                placeholder="Misal: Batch1"
-                                value={noBAPC}
-                                onChange={e => setNoBAPC(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-shadow"
-                            />
-                        </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                        <label className="block text-base font-semibold text-gray-800">Kuantum</label>
+                        <input
+                            type="number"
+                            step="0.01"
+                            required
+                            placeholder="0.00"
+                            value={kuantum}
+                            onChange={e => setKuantum(e.target.value)}
+                            className={fieldCls}
+                        />
                     </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                            <label className="text-sm font-medium text-gray-700">Kuantum</label>
-                            <input
-                                type="number"
-                                step="0.01"
-                                required
-                                placeholder="0.00"
-                                value={kuantum}
-                                onChange={e => setKuantum(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-shadow"
-                            />
-                        </div>
-                        <div className="space-y-1.5">
-                            <label className="text-sm font-medium text-gray-700">Lembaga Sampling</label>
-                            <input
-                                type="text"
-                                required
-                                placeholder="Misal: Petrokimia Gresik"
-                                value={lembaga}
-                                onChange={e => setLembaga(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-shadow"
-                            />
-                        </div>
+                    <div className="space-y-1.5">
+                        <label className="block text-base font-semibold text-gray-800">Lembaga Sampling</label>
+                        <input
+                            type="text"
+                            required
+                            placeholder="Misal: Petrokimia Gresik"
+                            value={lembaga}
+                            onChange={e => setLembaga(e.target.value)}
+                            className={fieldCls}
+                        />
                     </div>
+                </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                            <label className="text-sm font-medium text-gray-700">Hasil Analisa</label>
-                            <select
-                                value={hasilAnalisa}
-                                onChange={e => setHasilAnalisa(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-shadow bg-white"
-                            >
-                                <option value="Pending">Pending</option>
-                                <option value="Lolos">Lolos</option>
-                                <option value="Tidak Lolos">Tidak Lolos</option>
-                            </select>
-                        </div>
-                        <div className="space-y-1.5">
-                            <label className="text-sm font-medium text-gray-700">Tanggal Analisa</label>
-                            <input
-                                type="date"
-                                value={tanggalAnalisa}
-                                onChange={e => setTanggalAnalisa(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-shadow"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="pt-4 flex justify-end gap-2 border-t border-gray-100 mt-6 items-center">
-                        {formError && <span className="text-sm text-red-600 font-medium mr-auto">{formError}</span>}
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 transition-colors"
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                        <label className="block text-sm font-medium text-gray-700">Hasil Analisa</label>
+                        <select
+                            value={hasilAnalisa}
+                            onChange={e => setHasilAnalisa(e.target.value)}
+                            className={fieldCls}
                         >
-                            Batal
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={isSaving}
-                            className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 border border-transparent rounded-lg hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition-colors disabled:opacity-50"
-                        >
-                            {isSaving ? 'Menyimpan...' : 'Simpan'}
-                        </button>
+                            <option value="Pending">Pending</option>
+                            <option value="Lolos">Lolos</option>
+                            <option value="Tidak Lolos">Tidak Lolos</option>
+                        </select>
                     </div>
-                </form>
-            </div>
-        </div>
+                    <div className="space-y-1.5">
+                        <label className="block text-sm font-medium text-gray-700">Tanggal Analisa</label>
+                        <input
+                            type="date"
+                            value={tanggalAnalisa}
+                            onChange={e => setTanggalAnalisa(e.target.value)}
+                            className={fieldCls}
+                        />
+                    </div>
+                </div>
+            </form>
+        </AppModal>
     );
 }
 
@@ -330,8 +258,8 @@ interface AnalisaPageProps {
 export function AnalisaPage({ productCategory, productName, productSlug }: AnalisaPageProps) {
     const slug = productSlug || 'petro-gladiator';
 
-    const [bulan, setBulan] = useState('');
-    const [tahun, setTahun] = useState(getInitialYear());
+    const [bulan, setBulan] = useState<number | null>(new Date().getMonth() + 1);
+    const [tahun, setTahun] = useState<number | null>(new Date().getFullYear());
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
     const pageSize = 10;
@@ -349,9 +277,7 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
     const fetchData = useCallback(async () => {
         try {
             setIsLoading(true);
-            const b = bulan ? parseInt(bulan) : undefined;
-            const t = tahun ? parseInt(tahun) : undefined;
-            const res = await getAnalisa(slug, b, t);
+            const res = await getAnalisa(slug, bulan || undefined, tahun || undefined);
             setData(res.data || []);
         } catch (error) {
             console.error('Error fetching analisa data:', error);
@@ -415,10 +341,8 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
         return list;
     }, [data, search]);
 
-    const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize));
+    const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize) || 1);
     const paginatedSlice = filteredData.slice((page - 1) * pageSize, page * pageSize);
-
-    const TAHUN_OPTIONS = generateYearOptions();
 
     return (
         <div className="space-y-6">
@@ -486,13 +410,14 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
                     <div className="text-sm font-semibold text-gray-700"></div>
 
                     {/* Actions */}
-                    <button
+                    <AppButton
+                        variant="primary"
+                        size="md"
+                        icon={<PlusIcon />}
                         onClick={openAddModal}
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
                     >
-                        <PlusIcon />
                         Tambah Data
-                    </button>
+                    </AppButton>
                 </div>
 
                 {/* Filters Row */}
@@ -500,41 +425,22 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
                     <div className="flex flex-col md:flex-row md:items-end gap-4 justify-between">
                         {/* Left: Period */}
                         <div className="flex flex-col sm:flex-row gap-3 items-end">
-                            <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
-                                <FilterIcon />
-                                <select
-                                    value={bulan}
-                                    onChange={(e) => { setBulan(e.target.value); setPage(1); }}
-                                    className="bg-transparent text-sm font-medium text-gray-700 focus:outline-none cursor-pointer hover:text-emerald-600 transition-colors"
-                                >
-                                    {BULAN_OPTIONS.map((opt) => (
-                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                    ))}
-                                </select>
-                                <span className="text-gray-300">|</span>
-                                <select
-                                    value={tahun}
-                                    onChange={(e) => { setTahun(e.target.value); setPage(1); }}
-                                    className="bg-transparent text-sm font-medium text-gray-700 focus:outline-none cursor-pointer hover:text-emerald-600 transition-colors"
-                                >
-                                    {TAHUN_OPTIONS.map((opt) => (
-                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                    ))}
-                                </select>
-                            </div>
+                            <AppPeriodFilter
+                                month={bulan}
+                                year={tahun}
+                                onMonthChange={setBulan}
+                                onYearChange={setTahun}
+                            />
                         </div>
 
                         {/* Right: Search */}
-                        <div className="relative w-full md:w-64">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                                <SearchIcon />
-                            </span>
-                            <input
-                                type="text"
+                        <div>
+                            <AppSearchBar
                                 value={search}
-                                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                                 placeholder="Cari data..."
-                                className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow shadow-sm"
+                                type="text"
+                                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                                containerClassName="w-full md:w-64"
                             />
                         </div>
                     </div>
@@ -627,11 +533,13 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
                 </div>
 
                 {/* Pagination */}
-                {!isLoading && (
-                    <div className="mt-auto">
-                        <Pagination page={page} totalPages={totalPages} total={filteredData.length} pageSize={pageSize} setPage={setPage} />
-                    </div>
-                )}
+                <AppPagination 
+                    currentPage={page}
+                    totalPages={totalPages}
+                    onPageChange={setPage}
+                    totalItems={filteredData.length}
+                    itemsPerPage={pageSize}
+                />
             </div>
         </div>
     );

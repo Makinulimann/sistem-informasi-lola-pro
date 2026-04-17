@@ -19,10 +19,14 @@ export function AppPagination({
     itemsPerPage = 10,
     className = '',
 }: AppPaginationProps) {
-    if (totalItems === 0) return null;
+    if (!totalItems || totalItems === 0) return null;
+    
+    // Safety check for NaN values
+    const safeCurrentPage = isNaN(currentPage) ? 1 : currentPage;
+    const safeItemsPerPage = isNaN(itemsPerPage) ? 10 : itemsPerPage;
 
-    const startItem = (currentPage - 1) * itemsPerPage + 1;
-    const endItem = Math.min(currentPage * itemsPerPage, totalItems);
+    const startItem = (safeCurrentPage - 1) * safeItemsPerPage + 1;
+    const endItem = Math.min(safeCurrentPage * safeItemsPerPage, totalItems);
 
     return (
         <div className={`flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50/30 ${className}`}>

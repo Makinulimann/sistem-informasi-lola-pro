@@ -3,6 +3,10 @@ import { masterItemService, MasterItem, ProductMaterial } from '@/lib/masterItem
 import { sidebarService, SidebarMenu } from '@/lib/sidebarService';
 import { PlusIcon, XIcon as LucideXIcon, InfoIcon, CheckIcon, PencilIcon, Trash2Icon, SearchIcon, AlertTriangleIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { AppButton } from '@/components/ui/app-button';
+import { AppModal } from '@/components/ui/app-modal';
+
+const normalizeSlug = (s?: string | null) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 interface ConfigurationTabProps {
     productSlug: string;
@@ -163,16 +167,16 @@ function MaterialTableSection({ title, description, items, jenis, productSlug, o
                             placeholder={`Cari ${jenis}...`}
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-200 transition-all"
+                            className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-200 transition-all"
                         />
                     </div>
-                    <button
+                    <AppButton
                         onClick={() => setIsAddOpen(true)}
-                        className={cn("flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm", theme.btn)}
+                        className={cn("flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors", theme.btn)}
                     >
                         <PlusIcon size={16} />
                         Tambah Data
-                    </button>
+                    </AppButton>
                 </div>
             </div>
 
@@ -351,7 +355,14 @@ function EditMaterialModal({ isOpen, onClose, initialData, jenis, productSlug, o
     }, [isOpen, productSlug, initialData.id, jenis]);
 
     const toggleProductSelection = (slug: string) => {
-        setSelectedProductSlugs(prev => prev.includes(slug) ? prev.filter(s => s !== slug) : [...prev, slug]);
+        setSelectedProductSlugs(prev => {
+            const normalized = normalizeSlug(slug);
+            const exists = prev.some(s => normalizeSlug(s) === normalized);
+            if (exists) {
+                return prev.filter(s => normalizeSlug(s) !== normalized);
+            }
+            return [...prev, slug];
+        });
     };
 
     const handleSubmit = async () => {
@@ -363,9 +374,9 @@ function EditMaterialModal({ isOpen, onClose, initialData, jenis, productSlug, o
 
             // 2. Handle Integration Changes
             // Find added
-            const added = selectedProductSlugs.filter(slug => !originalAssignments.includes(slug));
+            const added = selectedProductSlugs.filter(slug => !originalAssignments.some(os => normalizeSlug(os) === normalizeSlug(slug)));
             // Find removed
-            const removed = originalAssignments.filter(slug => !selectedProductSlugs.includes(slug));
+            const removed = originalAssignments.filter(os => !selectedProductSlugs.some(slug => normalizeSlug(slug) === normalizeSlug(os)));
 
             // Execute assignments
             if (added.length > 0) {
@@ -380,7 +391,7 @@ function EditMaterialModal({ isOpen, onClose, initialData, jenis, productSlug, o
                 // We re-fetch assignments to get correct IDs (safest way)
                 const freshAssignments = await masterItemService.getMasterItemAssignments(initialData.id);
                 const toRemoveIds = freshAssignments
-                    .filter(a => removed.includes(a.productSlug) && a.jenis === jenis)
+                    .filter(a => removed.some(r => normalizeSlug(r) === normalizeSlug(a.productSlug)) && a.jenis === jenis)
                     .map(a => a.id);
 
                 await Promise.all(toRemoveIds.map(id =>
@@ -398,24 +409,31 @@ function EditMaterialModal({ isOpen, onClose, initialData, jenis, productSlug, o
         }
     };
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
-                <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-lg font-bold text-gray-900">Edit Material</h3>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-500 transition-colors">
-                        <LucideXIcon className="w-5 h-5" />
-                    </button>
-                </div>
+    const footer = (
+        <>
+            <AppButton type="button" variant="secondary" onClick={onClose}>Batal</AppButton>
+            <AppButton
+                type="button"
+                variant="primary"
+                onClick={handleSubmit}
+                disabled={!name.trim() || isSaving}
+                loading={isSaving}
+            >
+                {isSaving ? 'Menyimpan...' : 'Simpan Perubahan'}
+            </AppButton>
+        </>
+    );
 
-                <div className="space-y-5 overflow-y-auto pr-2">
+    return (
+        <AppModal isOpen={isOpen} onClose={onClose} title="Edit Material" footer={footer}>
+            <div className="space-y-5">
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-gray-700">Nama Material</label>
                         <div className="relative">
                             <input
                                 value={name}
                                 onChange={e => setName(e.target.value)}
-                                className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all pl-9"
+                                className="flex h-10 w-full border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all pl-9"
                                 autoFocus
                             />
                             <PencilIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -425,7 +443,7 @@ function EditMaterialModal({ isOpen, onClose, initialData, jenis, productSlug, o
                     <div className="space-y-3 pt-2 border-t border-gray-100">
                         <label className="text-sm font-medium text-gray-700 flex justify-between items-center">
                             Integrasi Produk
-                            <span className="text-xs font-normal text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                            <span className="text-xs font-normal text-gray-500 bg-gray-100 px-2 py-0.5">
                                 {selectedProductSlugs.length} Dipilih
                             </span>
                         </label>
@@ -433,19 +451,22 @@ function EditMaterialModal({ isOpen, onClose, initialData, jenis, productSlug, o
                         {isLoadingAssignments ? (
                             <div className="flex justify-center py-4"><div className="animate-spin h-5 w-5 border-2 border-emerald-500 border-t-transparent rounded-full" /></div>
                         ) : (
-                            <div className="border border-gray-200 rounded-lg max-h-48 overflow-y-auto p-2 space-y-1 bg-gray-50/50">
+                            <div className="border border-gray-200 max-h-48 overflow-y-auto p-2 space-y-1 bg-gray-50/50">
                                 {availableProducts.map(prod => {
-                                    const isSelected = selectedProductSlugs.includes(prod.slug);
+                                    const isSelected = selectedProductSlugs.some(s => {
+                                        const ns = normalizeSlug(s);
+                                        return ns && (ns === normalizeSlug(prod.slug) || ns === normalizeSlug(prod.label));
+                                    });
                                     return (
                                         <div
                                             key={prod.slug}
                                             onClick={() => toggleProductSelection(prod.slug)}
                                             className={cn(
-                                                "flex items-center gap-3 p-2 rounded-md cursor-pointer text-sm transition-all select-none",
+                                                "flex items-center gap-3 p-2 cursor-pointer text-sm transition-all select-none",
                                                 isSelected ? "bg-emerald-50 text-emerald-900 font-medium border border-emerald-100 shadow-sm" : "hover:bg-gray-100 text-gray-600 border border-transparent"
                                             )}
                                         >
-                                            <div className={cn("w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0", isSelected ? "bg-emerald-500 border-emerald-500" : "border-gray-300 bg-white")}>
+                                            <div className={cn("w-4 h-4 border flex items-center justify-center transition-colors shrink-0", isSelected ? "bg-emerald-500 border-emerald-500" : "border-gray-300 bg-white")}>
                                                 {isSelected && <CheckIcon size={12} className="text-white" />}
                                             </div>
                                             <span className="truncate">{prod.label}</span>
@@ -463,15 +484,7 @@ function EditMaterialModal({ isOpen, onClose, initialData, jenis, productSlug, o
                         <p className="text-xs text-gray-400">Perhatian: Merubah satuan akan mempengaruhi semua produk terkait.</p>
                     </div>
                 </div>
-
-                <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-100">
-                    <button onClick={onClose} className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 text-gray-700 transition-colors">Batal</button>
-                    <button onClick={handleSubmit} disabled={!name.trim() || isSaving} className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50 shadow-sm">
-                        {isSaving ? 'Menyimpan...' : 'Simpan Perubahan'}
-                    </button>
-                </div>
-            </div>
-        </div>
+        </AppModal>
     );
 }
 
@@ -620,22 +633,39 @@ function AddMaterialModal({ isOpen, onClose, jenis, productSlug, onSuccess, colo
     };
 
     const toggleProductSelection = (slug: string) => {
-        setSelectedProductSlugs(prev => prev.includes(slug) ? prev.filter(s => s !== slug) : [...prev, slug]);
+        setSelectedProductSlugs(prev => {
+            const normalized = normalizeSlug(slug);
+            const exists = prev.some(s => normalizeSlug(s) === normalized);
+            if (exists) {
+                return prev.filter(s => normalizeSlug(s) !== normalized);
+            }
+            return [...prev, slug];
+        });
     };
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
-                <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-lg font-bold text-gray-900">
-                        {isCreateMode ? 'Buat Material Baru' : `Tambah ${jenis}`}
-                    </h3>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-500 transition-colors">
-                        <LucideXIcon className="w-5 h-5" />
-                    </button>
-                </div>
+    const addModalFooter = !isCreateMode ? null : (
+        <>
+            <AppButton type="button" variant="secondary" onClick={() => setIsCreateMode(false)}>Kembali</AppButton>
+            <AppButton
+                type="button"
+                variant="primary"
+                onClick={handleCreateSubmit}
+                disabled={isCreating || !createName || !createUnit}
+                loading={isCreating}
+            >
+                {isCreating ? 'Menyimpan...' : 'Simpan'}
+            </AppButton>
+        </>
+    );
 
-                {!isCreateMode ? (
+    return (
+        <AppModal
+            isOpen={isOpen}
+            onClose={onClose}
+            title={isCreateMode ? 'Buat Material Baru' : `Tambah ${jenis}`}
+            footer={addModalFooter || undefined}
+        >
+            {!isCreateMode ? (
                     <div className="flex flex-col h-full overflow-hidden">
                         <div className="relative mb-4">
                             <input
@@ -643,7 +673,7 @@ function AddMaterialModal({ isOpen, onClose, jenis, productSlug, onSuccess, colo
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 placeholder="Cari material..."
-                                className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                                className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
                                 autoFocus
                             />
                             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -659,7 +689,7 @@ function AddMaterialModal({ isOpen, onClose, jenis, productSlug, onSuccess, colo
                                         <div key={item.id} className="flex items-center gap-2 group">
                                             <button
                                                 onClick={() => handleSelect(item)}
-                                                className="flex-1 text-left px-4 py-3 hover:bg-emerald-50 rounded-lg text-sm flex justify-between items-center transition-colors border border-transparent hover:border-emerald-100"
+                                                className="flex-1 text-left px-4 py-3 hover:bg-emerald-50 text-sm flex justify-between items-center transition-colors border border-transparent hover:border-emerald-100"
                                             >
                                                 <div>
                                                     <span className="font-medium text-gray-900 block">{item.nama}</span>
@@ -667,11 +697,9 @@ function AddMaterialModal({ isOpen, onClose, jenis, productSlug, onSuccess, colo
                                                 </div>
                                                 <PlusIcon size={16} className="text-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity" />
                                             </button>
-
-                                            {/* DELETE MASTER ITEM BUTTON */}
                                             <button
                                                 onClick={(e) => handleDeleteMaster(item, e)}
-                                                className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                                className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
                                                 title="Hapus Master Item ini dari sistem"
                                             >
                                                 <Trash2Icon size={16} />
@@ -683,11 +711,8 @@ function AddMaterialModal({ isOpen, onClose, jenis, productSlug, onSuccess, colo
                                 <div className="text-center py-8">
                                     <p className="text-gray-500 text-sm mb-4">Material tidak ditemukan.</p>
                                     <button
-                                        onClick={() => {
-                                            setCreateName(search);
-                                            setIsCreateMode(true);
-                                        }}
-                                        className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium"
+                                        onClick={() => { setCreateName(search); setIsCreateMode(true); }}
+                                        className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white hover:bg-emerald-700 transition-colors text-sm font-medium"
                                     >
                                         <PlusIcon size={16} />
                                         Buat data baru "{search}"
@@ -700,7 +725,7 @@ function AddMaterialModal({ isOpen, onClose, jenis, productSlug, onSuccess, colo
                             )}
                         </div>
                     </div>
-                ) : (
+            ) : (
                     // CREATE FORM
                     <div className="flex flex-col h-full overflow-hidden">
                         <div className="space-y-4 overflow-y-auto flex-1 pr-2">
@@ -709,27 +734,33 @@ function AddMaterialModal({ isOpen, onClose, jenis, productSlug, onSuccess, colo
                                 <input
                                     value={createName}
                                     onChange={e => setCreateName(e.target.value)}
-                                    className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                                    className="flex h-10 w-full border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
                                 />
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-gray-700">Produk yang Menggunakan</label>
-                                <div className="border border-gray-200 rounded-lg max-h-40 overflow-y-auto p-2 space-y-1">
-                                    {availableProducts.map(prod => (
+                                <div className="border border-gray-200 max-h-40 overflow-y-auto p-2 space-y-1">
+                                    {availableProducts.map(prod => {
+                                        const isSelected = selectedProductSlugs.some(s => {
+                                            const ns = normalizeSlug(s);
+                                            return ns && (ns === normalizeSlug(prod.slug) || ns === normalizeSlug(prod.label));
+                                        });
+                                        return (
                                         <div
                                             key={prod.slug}
                                             onClick={() => toggleProductSelection(prod.slug)}
                                             className={cn(
-                                                "flex items-center gap-3 p-2 rounded-md cursor-pointer text-sm transition-colors",
-                                                selectedProductSlugs.includes(prod.slug) ? "bg-emerald-50 text-emerald-900 font-medium" : "hover:bg-gray-50 text-gray-700"
+                                                "flex items-center gap-3 p-2 cursor-pointer text-sm transition-colors",
+                                                isSelected ? "bg-emerald-50 text-emerald-900 font-medium" : "hover:bg-gray-50 text-gray-700"
                                             )}
                                         >
-                                            <div className={cn("w-4 h-4 rounded border flex items-center justify-center transition-colors", selectedProductSlugs.includes(prod.slug) ? "bg-emerald-500 border-emerald-500" : "border-gray-300 bg-white")}>
-                                                {selectedProductSlugs.includes(prod.slug) && <CheckIcon size={12} className="text-white" />}
+                                            <div className={cn("w-4 h-4 border flex items-center justify-center transition-colors", isSelected ? "bg-emerald-500 border-emerald-500" : "border-gray-300 bg-white")}>
+                                                {isSelected && <CheckIcon size={12} className="text-white" />}
                                             </div>
                                             {prod.label}
                                         </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </div>
                             <div className="space-y-2">
@@ -737,18 +768,9 @@ function AddMaterialModal({ isOpen, onClose, jenis, productSlug, onSuccess, colo
                                 <SelectUnit value={createUnit} onChange={setCreateUnit} />
                             </div>
                         </div>
-                        <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-100">
-                            <button onClick={() => setIsCreateMode(false)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 text-gray-700 transition-colors">
-                                Kembali
-                            </button>
-                            <button onClick={handleCreateSubmit} disabled={isCreating || !createName || !createUnit} className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50">
-                                {isCreating ? 'Menyimpan...' : 'Simpan'}
-                            </button>
-                        </div>
                     </div>
-                )}
-            </div>
-        </div>
+            )}
+        </AppModal>
     );
 }
 

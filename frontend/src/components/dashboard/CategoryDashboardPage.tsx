@@ -14,6 +14,7 @@ import { AppSelect } from '@/components/ui/app-select';
 import { AppSearchBar } from '@/components/ui/app-search-bar';
 import { AppPagination } from '@/components/ui/app-pagination';
 import { AppButton } from '@/components/ui/app-button';
+import { AppPeriodFilter } from '@/components/ui/app-period-filter';
 
 /* ─── Unit Conversion ─── */
 const MASS_UNITS = ['Ton', 'Kwintal', 'Kg', 'Gram', 'Mg'];
@@ -113,12 +114,12 @@ export function CategoryDashboardPage({
 }) {
     const now = new Date();
 
-    const [matBulan, setMatBulan] = useState(now.getMonth() + 1);
-    const [matTahun, setMatTahun] = useState(now.getFullYear());
-    const [prodBulan, setProdBulan] = useState(now.getMonth() + 1);
-    const [prodTahun, setProdTahun] = useState(now.getFullYear());
-    const [chartBulan, setChartBulan] = useState(now.getMonth() + 1);
-    const [chartTahun, setChartTahun] = useState(now.getFullYear());
+    const [matBulan, setMatBulan] = useState<number | null>(now.getMonth() + 1);
+    const [matTahun, setMatTahun] = useState<number | null>(now.getFullYear());
+    const [prodBulan, setProdBulan] = useState<number | null>(now.getMonth() + 1);
+    const [prodTahun, setProdTahun] = useState<number | null>(now.getFullYear());
+    const [chartBulan, setChartBulan] = useState<number | null>(now.getMonth() + 1);
+    const [chartTahun, setChartTahun] = useState<number | null>(now.getFullYear());
     
     // Unit Filters
     const [padatUnit, setPadatUnit] = useState('Kg');
@@ -143,14 +144,14 @@ export function CategoryDashboardPage({
     const [selectedUnits, setSelectedUnits] = useState<Record<string, string>>({});
 
     // Material Balance chart state (independent period)
-    const [balanceBulan, setBalanceBulan] = useState(now.getMonth() + 1);
-    const [balanceTahun, setBalanceTahun] = useState(now.getFullYear());
+    const [balanceBulan, setBalanceBulan] = useState<number | null>(now.getMonth() + 1);
+    const [balanceTahun, setBalanceTahun] = useState<number | null>(now.getFullYear());
     const [balanceData, setBalanceData] = useState<CategorySummaryResponse | null>(null);
     const [loadingBalance, setLoadingBalance] = useState(true);
 
     // Maintenance chart state
-    const [maintBulan, setMaintBulan] = useState(now.getMonth() + 1);
-    const [maintTahun, setMaintTahun] = useState(now.getFullYear());
+    const [maintBulan, setMaintBulan] = useState<number | null>(now.getMonth() + 1);
+    const [maintTahun, setMaintTahun] = useState<number | null>(now.getFullYear());
     const [maintArea, setMaintArea] = useState('');
     const [maintEquipment, setMaintEquipment] = useState('');
     const [maintData, setMaintData] = useState<MaintenanceSummary | null>(null);
@@ -506,20 +507,11 @@ export function CategoryDashboardPage({
                     <div className="flex flex-wrap items-center gap-3">
                         {/* Period Group */}
                         <div className="flex items-center gap-2">
-                            <AppSelect
-                                prefixLabel="Periode:"
-                                variant="default"
-                                value={prodBulan.toString()}
-                                onChange={(e) => setProdBulan(Number(e.target.value))}
-                                options={MONTHS.map((m, i) => ({ label: m, value: (i + 1).toString() }))}
-                                className="h-9 bg-white"
-                            />
-                            <AppSelect
-                                variant="default"
-                                value={prodTahun.toString()}
-                                onChange={(e) => setProdTahun(Number(e.target.value))}
-                                options={[2024, 2025, 2026, 2027].map(y => ({ label: y.toString(), value: y.toString() }))}
-                                className="h-9 bg-white -ml-2"
+                            <AppPeriodFilter
+                                month={prodBulan}
+                                year={prodTahun}
+                                onMonthChange={setProdBulan}
+                                onYearChange={setProdTahun}
                             />
                         </div>
 
@@ -682,12 +674,12 @@ export function CategoryDashboardPage({
                         <p className="text-xs text-gray-400 mt-0.5">{MONTHS[chartBulan - 1]} {chartTahun}</p>
                     </div>
                     <div className="flex items-center gap-2">
-                        <select value={chartBulan} onChange={e => setChartBulan(Number(e.target.value))} className="h-7 px-2 text-xs border border-gray-200 bg-white text-gray-700 outline-none cursor-pointer focus:border-emerald-500">
-                            {MONTHS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
-                        </select>
-                        <select value={chartTahun} onChange={e => setChartTahun(Number(e.target.value))} className="h-7 px-2 text-xs border border-gray-200 bg-white text-gray-700 outline-none cursor-pointer focus:border-emerald-500">
-                            {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
-                        </select>
+                        <AppPeriodFilter
+                            month={chartBulan}
+                            year={chartTahun}
+                            onMonthChange={setChartBulan}
+                            onYearChange={setChartTahun}
+                        />
                         <span className="flex items-center gap-1.5 text-xs ml-2"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />Produksi</span>
                         <span className="flex items-center gap-1.5 text-xs"><span className="w-2.5 h-2.5 rounded-full bg-blue-500" />Pengiriman</span>
                     </div>
@@ -700,9 +692,13 @@ export function CategoryDashboardPage({
                         <div className="border border-gray-100 bg-gray-50/50 p-4">
                             <div className="flex items-center justify-between mb-4">
                                 <h4 className="text-sm font-medium text-gray-700">Produk Padat</h4>
-                                <select value={padatUnit} onChange={e => setPadatUnit(e.target.value)} className="h-7 px-2 text-xs border border-emerald-200 bg-emerald-50 text-emerald-700 outline-none cursor-pointer focus:ring-1 focus:ring-emerald-500 hover:bg-emerald-100 transition-colors">
-                                    {MASS_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                                </select>
+                                <AppSelect
+                                    variant="sharp"
+                                    value={padatUnit}
+                                    onChange={e => setPadatUnit(e.target.value)}
+                                    options={MASS_UNITS.map(u => ({ label: u, value: u }))}
+                                    className="h-7 text-xs bg-emerald-50 text-emerald-700 border-emerald-200"
+                                />
                             </div>
                             {productionChartDataPadat.length > 0 ? (
                                 <ResponsiveContainer width="100%" height={240}>
@@ -731,9 +727,13 @@ export function CategoryDashboardPage({
                         <div className="border border-gray-100 bg-gray-50/50 p-4">
                             <div className="flex items-center justify-between mb-4">
                                 <h4 className="text-sm font-medium text-gray-700">Produk Cair</h4>
-                                <select value={cairUnit} onChange={e => setCairUnit(e.target.value)} className="h-7 px-2 text-xs border border-blue-200 bg-blue-50 text-blue-700 outline-none cursor-pointer focus:ring-1 focus:ring-blue-500 hover:bg-blue-100 transition-colors">
-                                    {VOL_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                                </select>
+                                <AppSelect
+                                    variant="sharp"
+                                    value={cairUnit}
+                                    onChange={e => setCairUnit(e.target.value)}
+                                    options={VOL_UNITS.map(u => ({ label: u, value: u }))}
+                                    className="h-7 text-xs bg-blue-50 text-blue-700 border-blue-200"
+                                />
                             </div>
                             {productionChartDataCair.length > 0 ? (
                                 <ResponsiveContainer width="100%" height={240}>
@@ -772,12 +772,12 @@ export function CategoryDashboardPage({
                             <p className="text-xs text-gray-400 mt-0.5">{MONTHS[balanceBulan - 1]} {balanceTahun}</p>
                         </div>
                         <div className="flex items-center gap-2">
-                            <select value={balanceBulan} onChange={e => setBalanceBulan(Number(e.target.value))} className="h-7 px-2 text-xs border border-gray-200 bg-white text-gray-700 outline-none cursor-pointer focus:border-emerald-500">
-                                {MONTHS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
-                            </select>
-                            <select value={balanceTahun} onChange={e => setBalanceTahun(Number(e.target.value))} className="h-7 px-2 text-xs border border-gray-200 bg-white text-gray-700 outline-none cursor-pointer focus:border-emerald-500">
-                                {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
-                            </select>
+                            <AppPeriodFilter
+                                month={balanceBulan}
+                                year={balanceTahun}
+                                onMonthChange={setBalanceBulan}
+                                onYearChange={setBalanceTahun}
+                            />
                         </div>
                     </div>
                     {loadingBalance ? (
@@ -837,20 +837,32 @@ export function CategoryDashboardPage({
                             </div>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
-                            <select value={maintBulan} onChange={e => setMaintBulan(Number(e.target.value))} className="h-7 px-2 text-xs border border-gray-200 bg-white text-gray-700 outline-none cursor-pointer focus:border-blue-500">
-                                {MONTHS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
-                            </select>
-                            <select value={maintTahun} onChange={e => setMaintTahun(Number(e.target.value))} className="h-7 px-2 text-xs border border-gray-200 bg-white text-gray-700 outline-none cursor-pointer focus:border-blue-500">
-                                {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
-                            </select>
-                            <select value={maintArea} onChange={e => { setMaintArea(e.target.value); setMaintEquipment(''); }} className="h-7 px-2 text-xs border border-gray-200 bg-white text-gray-700 outline-none cursor-pointer focus:border-blue-500 max-w-[120px]">
-                                <option value="">Semua Area</option>
-                                {(maintData?.areas ?? []).map(a => <option key={a} value={a}>{a}</option>)}
-                            </select>
-                            <select value={maintEquipment} onChange={e => setMaintEquipment(e.target.value)} className="h-7 px-2 text-xs border border-gray-200 bg-white text-gray-700 outline-none cursor-pointer focus:border-blue-500 max-w-[120px]">
-                                <option value="">Semua Equipment</option>
-                                {(maintData?.equipments ?? []).map(eq => <option key={eq} value={eq}>{eq}</option>)}
-                            </select>
+                            <AppPeriodFilter
+                                month={maintBulan}
+                                year={maintTahun}
+                                onMonthChange={setMaintBulan}
+                                onYearChange={setMaintTahun}
+                            />
+                            <AppSelect
+                                variant="ghost"
+                                value={maintArea}
+                                onChange={e => { setMaintArea(e.target.value); setMaintEquipment(''); }}
+                                options={[
+                                    { label: 'Semua Area', value: '' },
+                                    ...(maintData?.areas ?? []).map(a => ({ label: a, value: a }))
+                                ]}
+                                className="h-7 text-xs"
+                            />
+                            <AppSelect
+                                variant="ghost"
+                                value={maintEquipment}
+                                onChange={e => setMaintEquipment(e.target.value)}
+                                options={[
+                                    { label: 'Semua Equipment', value: '' },
+                                    ...(maintData?.equipments ?? []).map(eq => ({ label: eq, value: eq }))
+                                ]}
+                                className="h-7 text-xs"
+                            />
                         </div>
                     </div>
                     {loadingMaint ? (
@@ -896,19 +908,11 @@ export function CategoryDashboardPage({
                         </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 w-full 2xl:w-auto">
-                        <AppSelect
-                            variant="ghost"
-                            value={matBulan.toString()}
-                            onChange={(e) => setMatBulan(Number(e.target.value))}
-                            options={MONTHS.map((m, i) => ({ label: m, value: (i + 1).toString() }))}
-                            className="h-8 text-xs"
-                        />
-                        <AppSelect
-                            variant="ghost"
-                            value={matTahun.toString()}
-                            onChange={(e) => setMatTahun(Number(e.target.value))}
-                            options={[2024, 2025, 2026, 2027].map(y => ({ label: y.toString(), value: y.toString() }))}
-                            className="h-8 text-xs"
+                        <AppPeriodFilter
+                            month={matBulan}
+                            year={matTahun}
+                            onMonthChange={setMatBulan}
+                            onYearChange={setMatTahun}
                         />
                         <AppSelect
                             variant="ghost"
@@ -968,13 +972,13 @@ export function CategoryDashboardPage({
                                             </td>
                                             <td className="px-4 py-3 text-xs border border-gray-200">
                                                 {unitFamily.length > 1 ? (
-                                                    <select
+                                                    <AppSelect
+                                                        variant="ghost"
                                                         value={currentUnit}
                                                         onChange={e => setSelectedUnits(prev => ({ ...prev, [unitStateKey]: e.target.value }))}
-                                                        className="bg-white border border-gray-200 text-gray-700 text-xs rounded px-1.5 py-1 outline-none focus:border-blue-500 cursor-pointer"
-                                                    >
-                                                        {unitFamily.map(u => <option key={u} value={u}>{u}</option>)}
-                                                    </select>
+                                                        options={unitFamily.map(u => ({ label: u, value: u }))}
+                                                        className="h-7 text-xs"
+                                                    />
                                                 ) : (
                                                     <span className="text-gray-400">{currentUnit}</span>
                                                 )}

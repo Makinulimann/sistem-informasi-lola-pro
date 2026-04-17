@@ -93,12 +93,12 @@ export default function UsersPage() {
                     <h1 className="text-2xl font-bold text-gray-900">Manajemen Pengguna</h1>
                     <p className="text-gray-500 mt-1">Kelola pengguna, peran, dan status verifikasi.</p>
                 </div>
-                <div className="bg-white px-4 py-2 rounded-lg border border-gray-200 shadow-sm text-sm text-gray-600">
+                <div className="bg-white px-4 py-2 border border-gray-200 text-sm text-gray-600">
                     Total Pengguna: <span className="font-semibold text-emerald-600">{users.length}</span>
                 </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="bg-white border border-gray-200 overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
                         <thead className="bg-gray-50/50 border-b border-gray-200">
@@ -141,7 +141,7 @@ export default function UsersPage() {
                                         )}
                                     </td>
                                     <td className="px-6 py-4">
-                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border
+                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium border
                                             ${user.role === 'Admin'
                                                 ? 'bg-purple-50 text-purple-700 border-purple-100'
                                                 : user.role === 'None'
@@ -155,7 +155,7 @@ export default function UsersPage() {
                                     <td className="px-6 py-4 text-right">
                                         <DropdownMenu>
                                             <DropdownMenuTrigger className="outline-none">
-                                                <div className="p-2 hover:bg-gray-100 rounded-md transition-colors text-gray-400 hover:text-gray-600 cursor-pointer">
+                                                <div className="p-2 hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600 cursor-pointer">
                                                     <MoreHorizontal className="w-4 h-4" />
                                                 </div>
                                             </DropdownMenuTrigger>

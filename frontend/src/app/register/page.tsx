@@ -74,6 +74,8 @@ function CheckIcon() {
 }
 
 import { api, auth, ApiError } from '@/lib/api';
+import { AppButton } from '@/components/ui/app-button';
+import { AppInput } from '@/components/ui/app-input';
 
 export default function RegisterPage() {
     const [showPassword, setShowPassword] = useState(false);
@@ -188,7 +190,7 @@ export default function RegisterPage() {
             <div
                 className="flex-1 flex items-center justify-center px-6 py-8 lg:px-10 lg:py-0 overflow-y-auto"
             >
-                <div className="w-full max-w-md space-y-6">
+                <div className="w-full max-w-md space-y-6 py-8">
 
                     {/* Logos */}
                     <div className="flex items-center justify-center gap-4 flex-wrap">
@@ -233,95 +235,61 @@ export default function RegisterPage() {
                     <form className="space-y-4" onSubmit={handleSubmit}>
 
                         {/* Full Name */}
-                        <div>
-                            <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-1.5">
-                                Nama Lengkap
-                            </label>
-                            <div className="relative group">
-                                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-emerald-500">
-                                    <UserIcon />
-                                </span>
-                                <input
-                                    id="fullName"
-                                    type="text"
-                                    className="w-full pl-11 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition-all shadow-sm hover:border-gray-300"
-                                    placeholder="Masukkan nama lengkap"
-                                    value={fullName}
-                                    onChange={(e) => setFullName(e.target.value)}
-                                    required
-                                />
-                            </div>
-                        </div>
+                        <AppInput
+                            id="fullName"
+                            label="Nama Lengkap"
+                            placeholder="Masukkan nama lengkap"
+                            icon={<UserIcon />}
+                            value={fullName}
+                            onChange={(e) => setFullName(e.target.value)}
+                            required
+                        />
 
                         {/* No. Induk */}
-                        <div>
-                            <label htmlFor="noInduk" className="block text-sm font-medium text-gray-700 mb-1.5">
-                                No. Induk
-                            </label>
-                            <div className="relative group">
-                                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-emerald-500">
-                                    <BadgeIcon />
-                                </span>
-                                <input
-                                    id="noInduk"
-                                    type="text"
-                                    className="w-full pl-11 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition-all shadow-sm hover:border-gray-300"
-                                    placeholder="No. Induk Karyawan"
-                                    value={noInduk}
-                                    onChange={(e) => setNoInduk(e.target.value)}
-                                    required
-                                />
-                            </div>
-                        </div>
+                        <AppInput
+                            id="noInduk"
+                            label="No. Induk"
+                            placeholder="No. Induk Karyawan"
+                            icon={<BadgeIcon />}
+                            value={noInduk}
+                            onChange={(e) => setNoInduk(e.target.value)}
+                            required
+                        />
 
                         {/* Email */}
-                        <div>
-                            <label htmlFor="regEmail" className="block text-sm font-medium text-gray-700 mb-1.5">
-                                Email
-                            </label>
-                            <div className="relative group">
-                                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-emerald-500">
-                                    <MailIcon />
-                                </span>
-                                <input
-                                    id="regEmail"
-                                    type="email"
-                                    className="w-full pl-11 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition-all shadow-sm hover:border-gray-300"
-                                    placeholder="email@company.com"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    required
-                                />
-                            </div>
-                        </div>
+                        <AppInput
+                            id="regEmail"
+                            type="email"
+                            label="Email"
+                            placeholder="email@company.com"
+                            icon={<MailIcon />}
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            required
+                        />
 
                         {/* Password */}
                         <div>
-                            <label htmlFor="regPassword" className="block text-sm font-medium text-gray-700 mb-1.5">
-                                Kata Sandi
-                            </label>
-                            <div className="relative group">
-                                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-emerald-500">
-                                    <LockIcon />
-                                </span>
-                                <input
-                                    id="regPassword"
-                                    type={showPassword ? 'text' : 'password'}
-                                    className="w-full pl-11 pr-12 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition-all shadow-sm hover:border-gray-300"
-                                    placeholder="Minimal 8 karakter"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    required
-                                    minLength={8}
-                                />
-                                <button
-                                    type="button"
-                                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-0.5"
-                                    onClick={() => setShowPassword(prev => !prev)}
-                                >
-                                    {showPassword ? <EyeOpenIcon /> : <EyeClosedIcon />}
-                                </button>
-                            </div>
+                            <AppInput
+                                id="regPassword"
+                                type={showPassword ? 'text' : 'password'}
+                                label="Kata Sandi"
+                                placeholder="Minimal 8 karakter"
+                                icon={<LockIcon />}
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                required
+                                minLength={8}
+                                rightElement={
+                                    <button
+                                        type="button"
+                                        className="text-gray-400 hover:text-gray-600 transition-colors p-0.5"
+                                        onClick={() => setShowPassword(prev => !prev)}
+                                    >
+                                        {showPassword ? <EyeOpenIcon /> : <EyeClosedIcon />}
+                                    </button>
+                                }
+                            />
                             {/* Strength indicator */}
                             {password.length > 0 && (
                                 <div className="mt-2 space-y-1">
@@ -341,36 +309,26 @@ export default function RegisterPage() {
                         </div>
 
                         {/* Confirm Password */}
-                        <div>
-                            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1.5">
-                                Konfirmasi Kata Sandi
-                            </label>
-                            <div className="relative group">
-                                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-emerald-500">
-                                    <LockIcon />
-                                </span>
-                                <input
-                                    id="confirmPassword"
-                                    type={showConfirmPassword ? 'text' : 'password'}
-                                    className={`w-full pl-11 pr-12 py-3 bg-white border rounded-xl text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition-all shadow-sm hover:border-gray-300
-                                        ${confirmPassword && confirmPassword !== password ? 'border-red-300 focus:ring-red-500/40 focus:border-red-500' : 'border-gray-200'}`}
-                                    placeholder="Ketik ulang kata sandi"
-                                    value={confirmPassword}
-                                    onChange={(e) => setConfirmPassword(e.target.value)}
-                                    required
-                                />
+                        <AppInput
+                            id="confirmPassword"
+                            type={showConfirmPassword ? 'text' : 'password'}
+                            label="Konfirmasi Kata Sandi"
+                            placeholder="Ketik ulang kata sandi"
+                            icon={<LockIcon />}
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            required
+                            error={confirmPassword && confirmPassword !== password ? 'Kata sandi tidak cocok' : undefined}
+                            rightElement={
                                 <button
                                     type="button"
-                                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-0.5"
+                                    className="text-gray-400 hover:text-gray-600 transition-colors p-0.5"
                                     onClick={() => setShowConfirmPassword(prev => !prev)}
                                 >
                                     {showConfirmPassword ? <EyeOpenIcon /> : <EyeClosedIcon />}
                                 </button>
-                            </div>
-                            {confirmPassword && confirmPassword !== password && (
-                                <p className="mt-1 text-xs text-red-500">Kata sandi tidak cocok</p>
-                            )}
-                        </div>
+                            }
+                        />
 
                         {/* Terms */}
                         <label className="flex items-start gap-2.5 cursor-pointer select-none">
@@ -394,23 +352,14 @@ export default function RegisterPage() {
                         </label>
 
                         {/* Register Button */}
-                        <button
+                        <AppButton
                             type="submit"
-                            disabled={isLoading || !agree}
-                            className="relative w-full py-3 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white font-semibold rounded-xl hover:from-emerald-700 hover:to-emerald-600 focus:ring-4 focus:ring-emerald-600/20 transition-all shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed overflow-hidden"
+                            disabled={!agree}
+                            loading={isLoading}
+                            className="w-full py-3 shadow-emerald-500/25 hover:shadow-emerald-500/40"
                         >
-                            {isLoading ? (
-                                <span className="flex items-center justify-center gap-2">
-                                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                    </svg>
-                                    Sedang membuat akun...
-                                </span>
-                            ) : (
-                                'Buat Akun'
-                            )}
-                        </button>
+                            Buat Akun
+                        </AppButton>
 
                         {/* Login link */}
                         <p className="text-center text-sm text-gray-500">

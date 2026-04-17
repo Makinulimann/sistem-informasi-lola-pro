@@ -15,9 +15,11 @@ import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { InputModal } from '@/components/ui/input-modal';
 import { AktivitasImportModal } from './AktivitasImportModal';
 import { AppButton } from '@/components/ui/app-button';
+import { AppModal } from '@/components/ui/app-modal';
 import { AppSelect } from '@/components/ui/app-select';
 import { AppSearchBar } from '@/components/ui/app-search-bar';
 import { AppPagination } from '@/components/ui/app-pagination';
+import { AppPeriodFilter } from '@/components/ui/app-period-filter';
 
 /* ─── Types ─── */
 
@@ -41,8 +43,8 @@ interface AktivitasHarianPageProps {
 export function AktivitasHarianPage({ productCategory, productName, productSlug }: AktivitasHarianPageProps) {
     const [activeTab, setActiveTab] = useState<TabKey>('data');
     const [search, setSearch] = useState('');
-    const currentMonth = new Date().toISOString().substring(0, 7);
-    const [periode, setPeriode] = useState<string>(currentMonth);
+    const [bulan, setBulan] = useState<number | null>(new Date().getMonth() + 1);
+    const [tahun, setTahun] = useState<number | null>(new Date().getFullYear());
     const [jenisProduk, setJenisProduk] = useState('');
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(0);
@@ -72,10 +74,9 @@ export function AktivitasHarianPage({ productCategory, productName, productSlug 
     const fetchData = useCallback(async () => {
         setIsLoading(true);
         try {
-            const [year, month] = periode ? periode.split('-') : ['', ''];
             const response = await aktivitasHarianService.getAll({
-                bulan: month ? Number(month).toString() : undefined,
-                tahun: year ? String(year) : undefined,
+                bulan: bulan ? String(bulan) : undefined,
+                tahun: tahun ? String(tahun) : undefined,
                 search: search || undefined,
                 jenisProduk: jenisProduk || undefined,
                 page: page,
@@ -93,11 +94,11 @@ export function AktivitasHarianPage({ productCategory, productName, productSlug 
         } finally {
             setIsLoading(false);
         }
-    }, [periode, search, jenisProduk, page, sortBy, sortDesc]);
+    }, [bulan, tahun, search, jenisProduk, page, sortBy, sortDesc]);
 
     useEffect(() => {
         setPage(1);
-    }, [search, periode, jenisProduk]);
+    }, [search, bulan, tahun, jenisProduk]);
 
     const fetchTemplates = useCallback(async () => {
         try {
@@ -277,44 +278,14 @@ export function AktivitasHarianPage({ productCategory, productName, productSlug 
                 {activeTab === 'data' && (
                     <div className="p-4 border-b border-gray-100 bg-gray-50/50">
                         <div className="flex flex-col md:flex-row md:items-end gap-4 justify-between">
-                            <div className="flex flex-col sm:flex-row gap-3 items-end">
-                                <div className="flex items-center gap-2 bg-white px-3 py-1 border border-gray-200">
-                                    <span className="text-sm font-medium text-gray-500">Periode:</span>
-                                <div className="flex items-center gap-1 group">
-                                    <AppButton 
-                                        onClick={() => {
-                                            if (!periode) return;
-                                            const d = new Date(`${periode}-01T12:00:00`);
-                                            d.setMonth(d.getMonth() - 1);
-                                            setPeriode(format(d, 'yyyy-MM'));
-                                        }}
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 text-gray-400 hover:text-emerald-600"
-                                        title="Bulan Sebelumnya"
-                                        icon={<ChevronLeftIcon className="size-4" />}
-                                    />
-                                    <input 
-                                        type="month" 
-                                        value={periode}
-                                        onChange={(e) => setPeriode(e.target.value)}
-                                        className="bg-transparent text-sm font-medium text-gray-700 focus:outline-none cursor-pointer hover:text-emerald-600 transition-colors px-1"
-                                    />
-                                    <AppButton 
-                                        onClick={() => {
-                                            if (!periode) return;
-                                            const d = new Date(`${periode}-01T12:00:00`);
-                                            d.setMonth(d.getMonth() + 1);
-                                            setPeriode(format(d, 'yyyy-MM'));
-                                        }}
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 text-gray-400 hover:text-emerald-600"
-                                        title="Bulan Selanjutnya"
-                                        icon={<ChevronRightIcon className="size-4" />}
-                                    />
-                                </div>
-                                <span className="text-gray-300">/</span>
+                            <div className="flex flex-col sm:flex-row gap-3 items-center">
+                                <AppPeriodFilter
+                                    month={bulan}
+                                    year={tahun}
+                                    onMonthChange={setBulan}
+                                    onYearChange={setTahun}
+                                />
+                                <span className="text-gray-300 hidden sm:block">/</span>
                                 <AppSelect
                                     variant="ghost"
                                     value={jenisProduk}
@@ -326,16 +297,6 @@ export function AktivitasHarianPage({ productCategory, productName, productSlug 
                                     ]}
                                     className="pr-2"
                                 />
-                                </div>
-                                {(periode || jenisProduk) && (
-                                    <AppButton
-                                        onClick={() => { setPeriode(''); setJenisProduk(''); }}
-                                        variant="secondary"
-                                        size="md"
-                                        icon={<XIcon className="size-4" />}
-                                        className="hover:text-red-600 hover:border-red-200"
-                                    />
-                                )}
                             </div>
                             <AppSearchBar
                                 value={search}
@@ -1151,32 +1112,23 @@ function AktivitasModal({
         }
     };
 
-    if (!isOpen) return null;
+    const footer = (
+        <>
+            <AppButton type="button" onClick={onClose} variant="secondary">Batal</AppButton>
+            <AppButton type="submit" form="aktivitas-form" variant="primary" loading={isSaving}>
+                {initialData ? 'Perbarui' : 'Simpan'}
+            </AppButton>
+        </>
+    );
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-            {/* Backdrop */}
-            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity" onClick={onClose} />
-
-            {/* Modal */}
-            <div className="relative bg-white shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
-                {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
-                    <h2 className="text-lg font-bold text-gray-800">
-                        {initialData ? 'Edit Aktivitas' : 'Tambah Aktivitas Baru'}
-                    </h2>
-                    <AppButton
-                        variant="ghost"
-                        size="icon"
-                        onClick={onClose}
-                        icon={<XIcon className="size-5" />}
-                        className="text-gray-400 hover:text-gray-600"
-                    />
-                </div>
-
-                {/* Scrollable Form Body */}
-                <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
-                    <form id="aktivitas-form" onSubmit={handleSubmit} className="space-y-5">
+        <AppModal
+            isOpen={isOpen}
+            onClose={onClose}
+            title={initialData ? 'Edit Aktivitas' : 'Tambah Aktivitas Baru'}
+            footer={footer}
+        >
+            <form id="aktivitas-form" onSubmit={handleSubmit} className="space-y-5">
                         {/* Tanggal */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1377,28 +1329,7 @@ function AktivitasModal({
                                 </div>
                             </div>
                         </div>
-                    </form>
-                </div>
-
-                {/* Actions */}
-                <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3 shrink-0">
-                    <AppButton
-                        type="button"
-                        onClick={onClose}
-                        variant="secondary"
-                    >
-                        Batal
-                    </AppButton>
-                    <AppButton
-                        type="submit"
-                        form="aktivitas-form"
-                        variant="primary"
-                        loading={isSaving}
-                    >
-                        {initialData ? 'Perbarui' : 'Simpan'}
-                    </AppButton>
-                </div>
-            </div>
-        </div>
+            </form>
+        </AppModal>
     );
 }

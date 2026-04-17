@@ -73,7 +73,7 @@ export default function DashboardPage() {
             {loading ? (
                 <div className="flex items-center gap-3">
                     {[1, 2, 3].map(i => (
-                        <div key={i} className="h-12 w-48 bg-gray-100 rounded-xl animate-pulse" />
+                        <div key={i} className="h-12 w-48 bg-gray-100 animate-pulse" />
                     ))}
                 </div>
             ) : (
@@ -84,7 +84,7 @@ export default function DashboardPage() {
                             <button
                                 key={cat.slug}
                                 onClick={() => setActiveCategory(cat.slug)}
-                                className={`group flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 border
+                                className={`group flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium transition-all duration-200 border
                                     ${isActive
                                         ? 'bg-emerald-600 text-white border-emerald-600'
                                         : 'bg-white text-gray-700 border-gray-200 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700'

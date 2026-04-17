@@ -27,6 +27,7 @@ import { BelumSamplingModal } from './BelumSamplingModal';
 import { AppSelect } from '@/components/ui/app-select';
 import { AppSearchBar } from '@/components/ui/app-search-bar';
 import { AppButton } from '@/components/ui/app-button';
+import { AppPeriodFilter } from '@/components/ui/app-period-filter';
 
 /* ─── Unit Conversion ─── */
 const MASS_UNITS = ['Ton', 'Kwintal', 'Kg', 'Gram', 'Mg'];
@@ -76,16 +77,12 @@ function SettingsIcon() { return (<svg width="18" height="18" viewBox="0 0 24 24
 function CalendarSmallIcon() { return (<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="4" rx="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" /></svg>); }
 
 /* ─── Constants ─── */
-const BULAN_OPTIONS = [
-    { value: 1, label: 'Januari' }, { value: 2, label: 'Februari' }, { value: 3, label: 'Maret' },
-    { value: 4, label: 'April' }, { value: 5, label: 'Mei' }, { value: 6, label: 'Juni' },
-    { value: 7, label: 'Juli' }, { value: 8, label: 'Agustus' }, { value: 9, label: 'September' },
-    { value: 10, label: 'Oktober' }, { value: 11, label: 'November' }, { value: 12, label: 'Desember' },
-];
-const BULAN_NAMES: Record<number, string> = Object.fromEntries(BULAN_OPTIONS.map(o => [o.value, o.label]));
+const BULAN_NAMES: Record<number, string> = {
+    1: 'Januari', 2: 'Februari', 3: 'Maret', 4: 'April', 5: 'Mei', 6: 'Juni',
+    7: 'Juli', 8: 'Agustus', 9: 'September', 10: 'Oktober', 11: 'November', 12: 'Desember'
+};
 function getInitialMonth() { return new Date().getMonth() + 1; }
 function getInitialYear() { return new Date().getFullYear(); }
-function generateYearOptions() { const y = new Date().getFullYear(); const years = []; for (let i = y; i >= y - 3; i--) years.push(i); return years; }
 function fmt(n: number | null | undefined): string { return Number(n || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
 /* ─── Date Format: dd-MM-yyyy ─── */
@@ -110,8 +107,8 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
     const slug = productSlug || 'petro-gladiator';
 
     // ─── State ───
-    const [bulan, setBulan] = useState<number>(getInitialMonth);
-    const [tahun, setTahun] = useState<number>(getInitialYear);
+    const [bulan, setBulan] = useState<number | null>(getInitialMonth);
+    const [tahun, setTahun] = useState<number | null>(getInitialYear);
     const [search, setSearch] = useState('');
 
     // Tabs
@@ -558,18 +555,11 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                 {/* Filter Row */}
                 <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex flex-col md:flex-row gap-4 justify-between items-end">
                     <div className="flex flex-wrap items-center gap-3">
-                        <AppSelect
-                            prefixLabel="Periode:"
-                            variant="default"
-                            value={String(bulan)}
-                            onChange={(e) => setBulan(Number(e.target.value))}
-                            options={BULAN_OPTIONS.map(o => ({ value: String(o.value), label: o.label }))}
-                        />
-                        <AppSelect
-                            variant="default"
-                            value={String(tahun)}
-                            onChange={(e) => setTahun(Number(e.target.value))}
-                            options={generateYearOptions().map(y => ({ value: String(y), label: String(y) }))}
+                        <AppPeriodFilter
+                            month={bulan}
+                            year={tahun}
+                            onMonthChange={setBulan}
+                            onYearChange={setTahun}
                         />
                         <AppSelect
                             prefixLabel="Satuan:"

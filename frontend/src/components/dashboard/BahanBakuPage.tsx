@@ -21,6 +21,7 @@ import { AppSelect } from '@/components/ui/app-select';
 import { AppSearchBar } from '@/components/ui/app-search-bar';
 import { AppPagination } from '@/components/ui/app-pagination';
 import { AppButton } from '@/components/ui/app-button';
+import { AppPeriodFilter } from '@/components/ui/app-period-filter';
 
 /* ─── Types ─── */
 
@@ -174,32 +175,6 @@ function XIcon() {
     );
 }
 
-/* ─── Constants ─── */
-
-const BULAN_OPTIONS = [
-    { value: '', label: 'Pilih Bulan' },
-    { value: '01', label: 'Januari' },
-    { value: '02', label: 'Februari' },
-    { value: '03', label: 'Maret' },
-    { value: '04', label: 'April' },
-    { value: '05', label: 'Mei' },
-    { value: '06', label: 'Juni' },
-    { value: '07', label: 'Juli' },
-    { value: '08', label: 'Agustus' },
-    { value: '09', label: 'September' },
-    { value: '10', label: 'Oktober' },
-    { value: '11', label: 'November' },
-    { value: '12', label: 'Desember' },
-];
-
-const TAHUN_OPTIONS = [
-    { value: '', label: 'Pilih Tahun' },
-    { value: '2026', label: '2026' },
-    { value: '2025', label: '2025' },
-    { value: '2024', label: '2024' },
-    { value: '2023', label: '2023' },
-];
-
 /* ─── Pagination helper ─── */
 
 function usePagination<T>(data: T[], pageSize = 10) {
@@ -223,8 +198,8 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
     const [search, setSearch] = useState('');
 
     // Filter State
-    const [bulan, setBulan] = useState('');
-    const [tahun, setTahun] = useState('');
+    const [bulan, setBulan] = useState<number | null>(new Date().getMonth() + 1);
+    const [tahun, setTahun] = useState<number | null>(new Date().getFullYear());
 
     // Data State
     const [suplaiData, setSuplaiData] = useState<SuplaiRow[]>([]);
@@ -251,9 +226,9 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
         try {
             const params = {
                 productSlug: defaultProductSlug,
-                perusahaanId: undefined, // Removed filtering
-                bulan: bulan || undefined,
-                tahun: tahun || undefined,
+                perusahaanId: undefined,
+                bulan: bulan ? String(bulan) : undefined,
+                tahun: tahun ? String(tahun) : undefined,
             };
 
             if (activeTab === 'suplai') {
@@ -285,8 +260,8 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
             } else if (activeTab === 'balance-stok') {
                 const rows = await bahanBakuService.getBalanceStok({
                     productSlug: defaultProductSlug,
-                    bulan: bulan || undefined,
-                    tahun: tahun || undefined
+                    bulan: bulan ? String(bulan) : undefined,
+                    tahun: tahun ? String(tahun) : undefined
                 });
                 setBalanceStokRows(rows);
             }
@@ -640,12 +615,12 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
                         {activeTab !== 'konfigurasi' && (
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <button suppressHydrationWarning className="inline-flex items-center gap-2 px-4 py-2 bg-white text-gray-700 text-sm font-medium rounded-lg border border-gray-200 hover:bg-gray-50 hover:text-gray-900 transition-colors shadow-sm">
+                                    <button suppressHydrationWarning className="inline-flex items-center gap-2 px-4 py-2 bg-white text-gray-700 text-sm font-medium border border-gray-200 hover:bg-gray-50 hover:text-gray-900 transition-colors">
                                         <DownloadIcon />
                                         Export Data
                                     </button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48 bg-white border border-gray-200 shadow-lg rounded-lg p-1 z-50">
+                                <DropdownMenuContent align="end" className="w-48 bg-white border border-gray-200 p-1 z-50">
                                     <DropdownMenuItem onClick={handleExportExcel} className="cursor-pointer hover:bg-gray-50 focus:bg-gray-50">
                                         Export to Excel
                                     </DropdownMenuItem>
@@ -673,38 +648,14 @@ export function BahanBakuPage({ productCategory, productName, productSlug }: Bah
                 {activeTab !== 'konfigurasi' && (
                     <div className="p-4 border-b border-gray-100 bg-gray-50/50">
                         <div className="flex flex-col md:flex-row md:items-end gap-4 justify-between">
-                            {/* Left Side: Period Filter (only for Suplai/Mutasi) */}
-                            {/* Left Side: Period Filter (Available for all tabs) */}
+                            {/* Left Side: Period Filter */}
                             <div className="flex flex-col sm:flex-row gap-4 items-end">
-                                <AppSelect
-                                    prefixLabel="Periode:"
-                                    variant="ghost"
-                                    value={bulan}
-                                    onChange={(e) => setBulan(e.target.value)}
-                                    options={BULAN_OPTIONS}
-                                    className="bg-white border border-gray-200 px-3 py-2"
+                                <AppPeriodFilter
+                                    month={bulan}
+                                    year={tahun}
+                                    onMonthChange={setBulan}
+                                    onYearChange={setTahun}
                                 />
-                                <AppSelect
-                                    variant="ghost"
-                                    value={tahun}
-                                    onChange={(e) => setTahun(e.target.value)}
-                                    options={TAHUN_OPTIONS}
-                                    className="bg-white border border-gray-200 px-3 py-2 -ml-3"
-                                />
-                                {(bulan || tahun) && (
-                                    <AppButton
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => { setBulan(''); setTahun(''); }}
-                                    >
-                                        ✕ Hapus Filter
-                                    </AppButton>
-                                )}
-                                {activeTab === 'balance-stok' && (bulan || tahun) && (
-                                    <span className="text-xs text-gray-400 italic ml-2">
-                                        {`Menampilkan data periode: ${bulan ? BULAN_OPTIONS.find(o => o.value === bulan)?.label : ''} ${tahun}`}
-                                    </span>
-                                )}
                             </div>
 
                             {/* Right Side: Search */}
@@ -1128,8 +1079,8 @@ interface BalanceStokTableProps {
     data: BalanceStokRow[];
     productSlug: string;
     search: string;
-    bulan?: string;
-    tahun?: string;
+    bulan?: number | null;
+    tahun?: number | null;
 }
 
 function BalanceStokTable({ data, productSlug, search, bulan, tahun }: BalanceStokTableProps) {
@@ -1165,8 +1116,8 @@ function BalanceStokTable({ data, productSlug, search, bulan, tahun }: BalanceSt
                 productSlug,
                 namaBahan: nama,
                 tipe,
-                bulan: bulan || undefined,
-                tahun: tahun || undefined,
+                bulan: bulan ? String(bulan) : undefined,
+                tahun: tahun ? String(tahun) : undefined,
             });
             setHistoryData(data);
         } catch (e) {

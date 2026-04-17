@@ -197,7 +197,7 @@ function SectionItem({ section, pathname }: { section: NavSection; pathname: str
         return (
             <Link
                 href={section.href ?? '#'}
-                className={`flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors duration-150 rounded-lg mx-2
+                className={`flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors duration-150 mx-2
           ${pathname === section.href
                         ? 'bg-amber-500/15 text-amber-400'
                         : 'text-emerald-100/90 hover:bg-white/8 hover:text-white'
@@ -214,7 +214,7 @@ function SectionItem({ section, pathname }: { section: NavSection; pathname: str
         <div>
             <button
                 onClick={() => setOpen((prev) => !prev)}
-                className={`flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium transition-colors duration-150 rounded-lg mx-2
+                className={`flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium transition-colors duration-150 mx-2
           ${isSectionActive
                         ? 'bg-white/8 text-white'
                         : 'text-emerald-100/90 hover:bg-white/8 hover:text-white'
@@ -416,7 +416,7 @@ export function DashboardHeader({ onMenuToggle }: { onMenuToggle: () => void }) 
             <div className="flex items-center gap-4">
                 <button
                     onClick={onMenuToggle}
-                    className="lg:hidden p-1.5 rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                    className="lg:hidden p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
                 >
                     <MenuIcon />
                 </button>
@@ -424,7 +424,7 @@ export function DashboardHeader({ onMenuToggle }: { onMenuToggle: () => void }) 
             <div className="flex items-center gap-3">
                 <DropdownMenu>
                     <DropdownMenuTrigger className="outline-none">
-                        <div className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors">
+                        <div className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 transition-colors">
                             <div className="text-right hidden sm:block">
                                 <p className="text-sm font-semibold text-gray-700 leading-none">
                                     {user?.fullName || 'User'}

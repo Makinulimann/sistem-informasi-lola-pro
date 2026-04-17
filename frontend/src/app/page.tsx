@@ -45,7 +45,9 @@ function LockIcon() {
   );
 }
 
-import { api, auth, ApiError } from '@/lib/api'; // Added this via replacement logic
+import { api, auth, ApiError } from '@/lib/api';
+import { AppButton } from '@/components/ui/app-button';
+import { AppInput } from '@/components/ui/app-input';
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -210,56 +212,39 @@ export default function LoginPage() {
           {/* Form */}
           <form className="space-y-5" onSubmit={handleSubmit}>
             {/* Email Field */}
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1.5">
-                Email / Nomor Induk
-              </label>
-              <div className="relative group">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-emerald-500">
-                  <MailIcon />
-                </span>
-                <input
-                  id="email"
-                  type="text"
-                  className="w-full pl-11 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition-all shadow-sm hover:border-gray-300"
-                  placeholder="Masukkan email atau no. induk"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  autoComplete="username"
-                />
-              </div>
-            </div>
+            <AppInput
+              id="email"
+              label="Email / Nomor Induk"
+              placeholder="Masukkan email atau no. induk"
+              icon={<MailIcon />}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="username"
+            />
 
             {/* Password Field */}
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1.5">
-                Kata Sandi
-              </label>
-              <div className="relative group">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-emerald-500">
-                  <LockIcon />
-                </span>
-                <input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  className="w-full pl-11 pr-12 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition-all shadow-sm hover:border-gray-300"
-                  placeholder="Masukkan kata sandi"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  autoComplete="current-password"
-                />
+            <AppInput
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              label="Kata Sandi"
+              placeholder="Masukkan kata sandi"
+              icon={<LockIcon />}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              autoComplete="current-password"
+              rightElement={
                 <button
                   type="button"
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-0.5"
+                  className="text-gray-400 hover:text-gray-600 transition-colors p-0.5"
                   onClick={() => setShowPassword(prev => !prev)}
                   aria-label={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
                 >
                   {showPassword ? <EyeOpenIcon /> : <EyeClosedIcon />}
                 </button>
-              </div>
-            </div>
+              }
+            />
 
             {/* Remember + Forgot */}
             <div className="flex items-center justify-between">
@@ -281,23 +266,13 @@ export default function LoginPage() {
             </div>
 
             {/* Login Button */}
-            <button
+            <AppButton
               type="submit"
-              disabled={isLoading}
-              className="relative w-full py-3 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white font-semibold rounded-xl hover:from-emerald-700 hover:to-emerald-600 focus:ring-4 focus:ring-emerald-600/20 transition-all shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed overflow-hidden"
+              loading={isLoading}
+              className="w-full py-3 shadow-emerald-500/25 hover:shadow-emerald-500/40"
             >
-              {isLoading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  Sedang Masuk...
-                </span>
-              ) : (
-                'Masuk'
-              )}
-            </button>
+              Masuk
+            </AppButton>
 
             {/* Register Link */}
             <p className="text-center text-sm text-gray-500">
