@@ -152,8 +152,8 @@ export function CategoryDashboardPage({
     // Maintenance chart state
     const [maintBulan, setMaintBulan] = useState<number | null>(now.getMonth() + 1);
     const [maintTahun, setMaintTahun] = useState<number | null>(now.getFullYear());
-    const [maintArea, setMaintArea] = useState('');
-    const [maintEquipment, setMaintEquipment] = useState('');
+    const [maintKeperluan, setMaintKeperluan] = useState('');
+    const [maintPic, setMaintPic] = useState('');
     const [maintData, setMaintData] = useState<MaintenanceSummary | null>(null);
     const [loadingMaint, setLoadingMaint] = useState(true);
 
@@ -209,12 +209,12 @@ export function CategoryDashboardPage({
     useEffect(() => {
         let cancelled = false;
         setLoadingMaint(true);
-        getMaintenanceSummary(maintBulan ?? undefined, maintTahun ?? undefined, maintArea || undefined, maintEquipment || undefined)
+        getMaintenanceSummary(maintBulan ?? undefined, maintTahun ?? undefined, maintKeperluan || undefined, maintPic || undefined)
             .then(res => { if (!cancelled) setMaintData(res); })
             .catch(console.error)
             .finally(() => { if (!cancelled) setLoadingMaint(false); });
         return () => { cancelled = true; };
-    }, [maintBulan, maintTahun, maintArea, maintEquipment]);
+    }, [maintBulan, maintTahun, maintKeperluan, maintPic]);
 
     // Aggregate stats
     const stats = useMemo(() => {
@@ -824,7 +824,7 @@ export function CategoryDashboardPage({
                     )}
                 </div>
 
-                {/* Maintenance Chart – Horizontal Bars */}
+                {/* Maintenance Table – Horizontal Bars Replaced with Table */}
                 <div className="bg-white border border-gray-200 p-5">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                         <div className="flex items-center gap-3">
@@ -833,7 +833,7 @@ export function CategoryDashboardPage({
                             </div>
                             <div>
                                 <h3 className="text-sm font-semibold text-gray-800">Kegiatan Maintenance</h3>
-                                <p className="text-xs text-gray-400 mt-0.5">{maintBulan && maintTahun ? `${MONTHS[maintBulan - 1]} ${maintTahun}` : 'Seluruh Periode'} &middot; {maintData?.totalKegiatan ?? 0} kegiatan</p>
+                                <p className="text-xs text-gray-400 mt-0.5">{maintBulan && maintTahun ? `${MONTHS[maintBulan - 1]} ${maintTahun}` : 'Seluruh Periode'} &middot; {maintData?.totalActivities ?? 0} kegiatan</p>
                             </div>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
@@ -845,47 +845,51 @@ export function CategoryDashboardPage({
                             />
                             <AppSelect
                                 variant="ghost"
-                                value={maintArea}
-                                onChange={e => { setMaintArea(e.target.value); setMaintEquipment(''); }}
+                                value={maintKeperluan}
+                                onChange={e => { setMaintKeperluan(e.target.value); setMaintPic(''); }}
                                 options={[
-                                    { label: 'Semua Area', value: '' },
-                                    ...(maintData?.areas ?? []).map(a => ({ label: a, value: a }))
+                                    { label: 'Semua Keperluan', value: '' },
+                                    ...(maintData?.keperluans ?? []).map(k => ({ label: k, value: k }))
                                 ]}
-                                className="h-7 text-xs"
+                                className="h-7 text-xs max-w-[140px]"
                             />
                             <AppSelect
                                 variant="ghost"
-                                value={maintEquipment}
-                                onChange={e => setMaintEquipment(e.target.value)}
+                                value={maintPic}
+                                onChange={e => setMaintPic(e.target.value)}
                                 options={[
-                                    { label: 'Semua Equipment', value: '' },
-                                    ...(maintData?.equipments ?? []).map(eq => ({ label: eq, value: eq }))
+                                    { label: 'Semua PIC', value: '' },
+                                    ...(maintData?.pics ?? []).map(p => ({ label: p, value: p }))
                                 ]}
-                                className="h-7 text-xs"
+                                className="h-7 text-xs max-w-[140px]"
                             />
                         </div>
                     </div>
                     {loadingMaint ? (
                         <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600" /></div>
-                    ) : (maintData?.byEquipment?.length ?? 0) > 0 ? (
-                        <ResponsiveContainer width="100%" height={(maintData?.byEquipment?.length ?? 0) * 40 + 20}>
-                            <BarChart
-                                data={maintData?.byEquipment?.map(d => ({ name: d.equipment, kegiatan: d.count })) ?? []}
-                                layout="vertical"
-                                barCategoryGap="20%"
-                                margin={{ left: 10, right: 30 }}
-                            >
-                                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
-                                <XAxis type="number" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} allowDecimals={false} />
-                                <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#374151' }} axisLine={false} tickLine={false} width={120} />
-                                <Tooltip
-                                    contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', fontSize: 12 }}
-                                />
-                                <Bar dataKey="kegiatan" name="Kegiatan" fill="#6366f1" radius={[0, 4, 4, 0]} barSize={22}>
-                                    <LabelList dataKey="kegiatan" position="right" style={{ fontSize: 11, fill: '#4f46e5', fontWeight: 700 }} />
-                                </Bar>
-                            </BarChart>
-                        </ResponsiveContainer>
+                    ) : (maintData?.byKeperluanAndPic?.length ?? 0) > 0 ? (
+                        <div className="overflow-x-auto mt-4 max-h-[300px] overflow-y-auto">
+                            <table className="w-full text-sm border-collapse">
+                                <thead className="sticky top-0 z-10 bg-white shadow-sm">
+                                    <tr className="bg-gray-50/80">
+                                        <th className="px-4 py-2.5 text-xs font-semibold text-gray-600 uppercase tracking-wider border border-gray-200 text-left">Keperluan</th>
+                                        <th className="px-4 py-2.5 text-xs font-semibold text-gray-600 uppercase tracking-wider border border-gray-200 text-left">PIC</th>
+                                        <th className="px-4 py-2.5 text-xs font-semibold text-gray-600 uppercase tracking-wider border border-gray-200 text-center">Jumlah Kegiatan</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {maintData?.byKeperluanAndPic.map((row, idx) => (
+                                        <tr key={`${row.keperluan}-${row.pic}-${idx}`} className="hover:bg-gray-50/50 transition-colors">
+                                            <td className="px-4 py-2.5 text-gray-700 border border-gray-200">{row.keperluan}</td>
+                                            <td className="px-4 py-2.5 text-gray-700 border border-gray-200">{row.pic}</td>
+                                            <td className="px-4 py-2.5 text-center font-mono font-bold text-blue-700 border border-gray-200 bg-blue-50/30">
+                                                {row.count}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     ) : (
                         <div className="flex items-center justify-center py-12 text-sm text-gray-400">Belum ada data maintenance</div>
                     )}

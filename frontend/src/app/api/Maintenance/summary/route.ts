@@ -10,8 +10,8 @@ export async function GET(request: Request) {
         const { searchParams } = new URL(request.url);
         const bulan = searchParams.get('bulan');
         const tahun = searchParams.get('tahun');
-        const area = searchParams.get('area');
-        const equipment = searchParams.get('equipment');
+        const keperluanParams = searchParams.get('keperluan');
+        const picParams = searchParams.get('pic');
 
         const now = new Date(new Date().getTime() + 7 * 60 * 60 * 1000);
         const targetBulan = bulan ? parseInt(bulan, 10) : now.getUTCMonth() + 1;
@@ -26,46 +26,61 @@ export async function GET(request: Request) {
         // Fetch all records
         const { data: baseQuery } = await db.from<any>('maintenances').select('*').execute();
 
-        const allAreas = [...new Set((baseQuery || []).map((m: any) => m.area || m.Area))].filter(Boolean).sort();
-        const allEquipments = [...new Set((baseQuery || []).map((m: any) => m.equipment || m.Equipment))].filter(Boolean).sort();
+        const getKeperluan = (m: any) => m.keperluan || m.Keperluan || m.keterangan || m.Keterangan || 'Tanpa Keperluan';
+        const getPic = (m: any) => m.pic || m.PIC || m.pic_nama || m.nama || m.Nama || m.area || m.Area || 'Unknown PIC';
+
+        const allKeperluans = [...new Set((baseQuery || []).map(getKeperluan))].filter(Boolean).sort();
+        const allPics = [...new Set((baseQuery || []).map(getPic))].filter(Boolean).sort();
 
         // Apply date range and filters
         let filteredRecords = (baseQuery || []).filter((m: any) => {
-            const mTanggal = m.tanggal || m.Tanggal;
+            if (!bulan && !tahun) return true; // Seluruh periode
+            const mTanggal = m.tanggal_dibutuhkan || m.TanggalDibutuhkan || m.tanggal || m.Tanggal;
             const mDate = new Date(mTanggal);
             return mDate >= startUtc && mDate < endUtc;
         });
 
-        if (area) {
-            filteredRecords = filteredRecords.filter((m: any) => (m.area || m.Area) === area);
+        if (keperluanParams) {
+            filteredRecords = filteredRecords.filter((m: any) => getKeperluan(m) === keperluanParams);
         }
-        if (equipment) {
-            filteredRecords = filteredRecords.filter((m: any) => (m.equipment || m.Equipment) === equipment);
+        if (picParams) {
+            filteredRecords = filteredRecords.filter((m: any) => getPic(m) === picParams);
         }
 
-        const byAreaDict: { [key: string]: number } = {};
-        const byEquipmentDict: { [key: string]: number } = {};
+        const byKeperluanDict: { [key: string]: number } = {};
+        const byPicDict: { [key: string]: number } = {};
         const byDayDict: { [key: string]: number } = {};
+        const byKeperluanAndPicDict: { [key: string]: number } = {};
 
         filteredRecords.forEach((m: any) => {
-            const mArea = m.area || m.Area || 'Unknown';
-            const mEquipment = m.equipment || m.Equipment || 'Unknown';
-            const mTanggal = m.tanggal || m.Tanggal;
+            const mKeperluan = getKeperluan(m);
+            const mPic = getPic(m);
+            
+            const comboKey = `${mKeperluan}|${mPic}`;
 
-            byAreaDict[mArea] = (byAreaDict[mArea] || 0) + 1;
-            byEquipmentDict[mEquipment] = (byEquipmentDict[mEquipment] || 0) + 1;
+            byKeperluanDict[mKeperluan] = (byKeperluanDict[mKeperluan] || 0) + 1;
+            byPicDict[mPic] = (byPicDict[mPic] || 0) + 1;
+            byKeperluanAndPicDict[comboKey] = (byKeperluanAndPicDict[comboKey] || 0) + 1;
 
+            const mTanggal = m.tanggal_dibutuhkan || m.TanggalDibutuhkan || m.tanggal || m.Tanggal;
             const localDate = new Date(new Date(mTanggal).getTime() + utcOffset);
             const dayStr = String(localDate.getUTCDate()).padStart(2, '0');
             byDayDict[dayStr] = (byDayDict[dayStr] || 0) + 1;
         });
 
-        const byArea = Object.keys(byAreaDict)
-            .map(key => ({ area: key, count: byAreaDict[key] }))
+        const byKeperluan = Object.keys(byKeperluanDict)
+            .map(key => ({ keperluan: key, count: byKeperluanDict[key] }))
             .sort((a, b) => b.count - a.count);
 
-        const byEquipment = Object.keys(byEquipmentDict)
-            .map(key => ({ equipment: key, count: byEquipmentDict[key] }))
+        const byPic = Object.keys(byPicDict)
+            .map(key => ({ pic: key, count: byPicDict[key] }))
+            .sort((a, b) => b.count - a.count);
+            
+        const byKeperluanAndPic = Object.keys(byKeperluanAndPicDict)
+            .map(key => {
+                const [keperluan, pic] = key.split('|');
+                return { keperluan, pic, count: byKeperluanAndPicDict[key] };
+            })
             .sort((a, b) => b.count - a.count);
 
         const byDay = Object.keys(byDayDict)
@@ -76,10 +91,11 @@ export async function GET(request: Request) {
             bulan: targetBulan,
             tahun: targetTahun,
             totalActivities: filteredRecords.length,
-            areas: allAreas,
-            equipments: allEquipments,
-            byArea,
-            byEquipment,
+            keperluans: allKeperluans,
+            pics: allPics,
+            byKeperluan,
+            byPic,
+            byKeperluanAndPic,
             byDay
         });
     } catch (error) {
@@ -87,3 +103,4 @@ export async function GET(request: Request) {
         return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
     }
 }
+

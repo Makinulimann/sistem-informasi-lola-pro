@@ -50,24 +50,25 @@ export const maintenanceService = {
 export interface MaintenanceSummary {
     bulan: number;
     tahun: number;
-    totalKegiatan: number;
-    areas: string[];
-    equipments: string[];
-    byArea: { area: string; count: number }[];
-    byEquipment: { equipment: string; count: number }[];
+    totalActivities: number;
+    keperluans: string[];
+    pics: string[];
+    byKeperluan: { keperluan: string; count: number }[];
+    byPic: { pic: string; count: number }[];
+    byKeperluanAndPic: { keperluan: string; pic: string; count: number }[];
     byDay: { date: string; count: number }[];
 }
 
 export function getMaintenanceSummary(
     bulan?: number,
     tahun?: number,
-    area?: string,
-    equipment?: string
+    keperluan?: string,
+    pic?: string
 ): Promise<MaintenanceSummary> {
     const params = new URLSearchParams();
     if (bulan) params.set('bulan', String(bulan));
     if (tahun) params.set('tahun', String(tahun));
-    if (area) params.set('area', area);
-    if (equipment) params.set('equipment', equipment);
+    if (keperluan) params.set('keperluan', keperluan);
+    if (pic) params.set('pic', pic);
     return api.get<MaintenanceSummary>(`/Maintenance/summary?${params.toString()}`);
 }
