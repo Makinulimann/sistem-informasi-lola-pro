@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Settings, User, Mail, Lock, Shield, Camera, Info, Save, Key } from 'lucide-react';
+import { Settings, User, Mail, Lock, Shield, Camera, Info, Save, Key, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { AppInput } from '@/components/ui/app-input';
 import { AppButton } from '@/components/ui/app-button';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { api } from '@/lib/api';
 
 interface UserProfile {
@@ -37,6 +38,15 @@ export default function SettingsPage() {
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
 
+    // Password Visibility States
+    const [showOldPassword, setShowOldPassword] = useState(false);
+    const [showNewPassword, setShowNewPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+    // Confirmation Modals States
+    const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+    const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+
     // Load user data on mount
     const fetchProfile = async () => {
         try {
@@ -57,14 +67,19 @@ export default function SettingsPage() {
         fetchProfile();
     }, []);
 
-    // Handle profile update submit
-    const handleUpdateProfile = async (e: React.FormEvent) => {
+    // Intercept profile update form submit to open modal
+    const handleProfileSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!fullName.trim() || !email.trim()) {
             warning('Input Tidak Valid', 'Nama Lengkap dan Email tidak boleh kosong.');
             return;
         }
+        setIsProfileModalOpen(true);
+    };
 
+    // Actual profile update execution
+    const executeUpdateProfile = async () => {
+        setIsProfileModalOpen(false);
         try {
             setUpdatingProfile(true);
             await api.put('/users/profile', {
@@ -74,7 +89,7 @@ export default function SettingsPage() {
             });
             success('Profil Diperbarui', 'Informasi profil Anda berhasil diperbarui.');
             
-            // Refresh sidebar/header state by triggering custom event or reloading page data
+            // Refresh sidebar/header state
             if (typeof window !== 'undefined') {
                 window.dispatchEvent(new Event('profile-updated'));
             }
@@ -154,8 +169,8 @@ export default function SettingsPage() {
         }
     };
 
-    // Handle password update submit
-    const handleUpdatePassword = async (e: React.FormEvent) => {
+    // Intercept password update form submit to open modal
+    const handlePasswordSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!oldPassword || !newPassword || !confirmPassword) {
             warning('Input Kosong', 'Semua kolom kata sandi wajib diisi.');
@@ -172,6 +187,12 @@ export default function SettingsPage() {
             return;
         }
 
+        setIsPasswordModalOpen(true);
+    };
+
+    // Actual password update execution
+    const executeUpdatePassword = async () => {
+        setIsPasswordModalOpen(false);
         try {
             setUpdatingPassword(true);
             await api.patch('/users/profile', {
@@ -220,7 +241,7 @@ export default function SettingsPage() {
                 
                 {/* Left column: Avatar Uploader */}
                 <div className="lg:col-span-1 space-y-6">
-                    <div className="bg-white rounded-2xl border border-gray-150 shadow-sm p-6 flex flex-col items-center text-center">
+                    <div className="bg-white border border-gray-150 p-6 flex flex-col items-center text-center">
                         <h2 className="text-sm font-semibold text-gray-800 self-start mb-4 uppercase tracking-wider">
                             Foto Profil
                         </h2>
@@ -267,17 +288,16 @@ export default function SettingsPage() {
                             size="sm" 
                             onClick={triggerFileSelect} 
                             loading={uploadingPhoto}
-                            className="rounded-xl"
                         >
                             <Camera className="w-4 h-4 mr-1.5" />
                             Ganti Foto
                         </AppButton>
 
                         {/* Helper info */}
-                        <div className="mt-6 flex items-start gap-2 bg-emerald-50/50 p-3 rounded-xl border border-emerald-100/50 text-left">
+                        <div className="mt-6 flex items-start gap-2 bg-emerald-50/50 p-3 border border-emerald-100/50 text-left">
                             <Info className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                             <p className="text-[11px] text-emerald-800 leading-normal">
-                                Unggah foto profil dalam format JPG, PNG, atau WEBP. Batas ukuran file maksimum adalah <strong>5MB</strong>. Gambar akan disimpan secara aman di ImageKit CDN.
+                                Unggah foto profil dalam format JPG, PNG, atau WEBP. Batas ukuran file maksimum adalah <strong>5MB</strong>.
                             </p>
                         </div>
                     </div>
@@ -287,9 +307,9 @@ export default function SettingsPage() {
                 <div className="lg:col-span-2 space-y-6">
                     
                     {/* Card 1: Profil Info */}
-                    <div className="bg-white rounded-2xl border border-gray-150 shadow-sm p-6">
+                    <div className="bg-white border border-gray-150 p-6">
                         <div className="flex items-center gap-3 mb-6">
-                            <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100">
+                            <div className="w-9 h-9 bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100">
                                 <User className="w-4.5 h-4.5" />
                             </div>
                             <div>
@@ -298,7 +318,7 @@ export default function SettingsPage() {
                             </div>
                         </div>
 
-                        <form onSubmit={handleUpdateProfile} className="space-y-4">
+                        <form onSubmit={handleProfileSubmit} className="space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <AppInput 
                                     id="fullName"
@@ -346,7 +366,7 @@ export default function SettingsPage() {
                                 <AppButton 
                                     type="submit" 
                                     loading={updatingProfile}
-                                    className="rounded-xl shadow-sm hover:shadow"
+                                    className="hover:shadow"
                                 >
                                     <Save className="w-4 h-4 mr-1.5" />
                                     Simpan Profil
@@ -356,9 +376,9 @@ export default function SettingsPage() {
                     </div>
 
                     {/* Card 2: Password Update */}
-                    <div className="bg-white rounded-2xl border border-gray-150 shadow-sm p-6">
+                    <div className="bg-white border border-gray-150 p-6">
                         <div className="flex items-center gap-3 mb-6">
-                            <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100">
+                            <div className="w-9 h-9 bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100">
                                 <Key className="w-4.5 h-4.5" />
                             </div>
                             <div>
@@ -367,39 +387,66 @@ export default function SettingsPage() {
                             </div>
                         </div>
 
-                        <form onSubmit={handleUpdatePassword} className="space-y-4">
+                        <form onSubmit={handlePasswordSubmit} className="space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <AppInput 
                                     id="oldPassword"
-                                    type="password"
+                                    type={showOldPassword ? 'text' : 'password'}
                                     label="Kata Sandi Lama"
                                     placeholder="••••••••"
                                     icon={<Lock className="w-4.5 h-4.5" />}
                                     value={oldPassword}
                                     onChange={(e) => setOldPassword(e.target.value)}
                                     required
+                                    rightElement={
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowOldPassword(!showOldPassword)}
+                                            className="text-gray-400 hover:text-gray-600 transition-colors p-0.5"
+                                        >
+                                            {showOldPassword ? <EyeOff className="w-4.5 h-4.5" /> : <Eye className="w-4.5 h-4.5" />}
+                                        </button>
+                                    }
                                 />
 
                                 <AppInput 
                                     id="newPassword"
-                                    type="password"
+                                    type={showNewPassword ? 'text' : 'password'}
                                     label="Kata Sandi Baru"
                                     placeholder="••••••••"
                                     icon={<Lock className="w-4.5 h-4.5" />}
                                     value={newPassword}
                                     onChange={(e) => setNewPassword(e.target.value)}
                                     required
+                                    rightElement={
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowNewPassword(!showNewPassword)}
+                                            className="text-gray-400 hover:text-gray-600 transition-colors p-0.5"
+                                        >
+                                            {showNewPassword ? <EyeOff className="w-4.5 h-4.5" /> : <Eye className="w-4.5 h-4.5" />}
+                                        </button>
+                                    }
                                 />
 
                                 <AppInput 
                                     id="confirmPassword"
-                                    type="password"
+                                    type={showConfirmPassword ? 'text' : 'password'}
                                     label="Konfirmasi Sandi Baru"
                                     placeholder="••••••••"
                                     icon={<Lock className="w-4.5 h-4.5" />}
                                     value={confirmPassword}
                                     onChange={(e) => setConfirmPassword(e.target.value)}
                                     required
+                                    rightElement={
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                            className="text-gray-400 hover:text-gray-600 transition-colors p-0.5"
+                                        >
+                                            {showConfirmPassword ? <EyeOff className="w-4.5 h-4.5" /> : <Eye className="w-4.5 h-4.5" />}
+                                        </button>
+                                    }
                                 />
                             </div>
 
@@ -407,7 +454,7 @@ export default function SettingsPage() {
                                 <AppButton 
                                     type="submit" 
                                     loading={updatingPassword}
-                                    className="rounded-xl shadow-sm hover:shadow"
+                                    className="hover:shadow"
                                 >
                                     <Save className="w-4 h-4 mr-1.5" />
                                     Perbarui Sandi
@@ -419,6 +466,34 @@ export default function SettingsPage() {
                 </div>
 
             </div>
+
+            {/* ═══ CONFIRMATION MODALS ═══ */}
+
+            {/* Modal Confirmation - Simpan Profil */}
+            <ConfirmModal 
+                isOpen={isProfileModalOpen}
+                onClose={() => setIsProfileModalOpen(false)}
+                onConfirm={executeUpdateProfile}
+                title="Konfirmasi Ubah Profil"
+                message="Apakah Anda yakin ingin menyimpan perubahan informasi profil Anda?"
+                confirmText="Ya, Simpan"
+                cancelText="Batal"
+                variant="info"
+                isLoading={updatingProfile}
+            />
+
+            {/* Modal Confirmation - Perbarui Sandi */}
+            <ConfirmModal 
+                isOpen={isPasswordModalOpen}
+                onClose={() => setIsPasswordModalOpen(false)}
+                onConfirm={executeUpdatePassword}
+                title="Konfirmasi Ubah Kata Sandi"
+                message="Apakah Anda yakin ingin memperbarui kata sandi akun Anda?"
+                confirmText="Ya, Perbarui"
+                cancelText="Batal"
+                variant="warning"
+                isLoading={updatingPassword}
+            />
         </div>
     );
 }
