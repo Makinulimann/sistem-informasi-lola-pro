@@ -10,6 +10,16 @@ export default async function proxy(request: NextRequest) {
         return NextResponse.next();
     }
 
+    // Skip static assets, images, and public files
+    if (
+        pathname.startsWith('/images/') ||
+        pathname.startsWith('/_next/') ||
+        pathname.includes('.') ||
+        pathname === '/favicon.ico'
+    ) {
+        return NextResponse.next();
+    }
+
     // Handle API routes
     if (pathname.startsWith('/api')) {
         // Public API routes
@@ -79,7 +89,8 @@ export const config = {
          * - _next/static (static files)
          * - _next/image (image optimization files)
          * - favicon.ico (favicon file)
+         * - images (public images folder)
          */
-        '/((?!_next/static|_next/image|favicon.ico).*)',
+        '/((?!_next/static|_next/image|favicon.ico|images).*)',
     ],
 };
