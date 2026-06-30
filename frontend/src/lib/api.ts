@@ -137,6 +137,10 @@ export const api = {
         const token = auth.getToken();
         return request<T>(endpoint, { ...options, method: 'PUT', body: JSON.stringify(body) }, token);
     },
+    patch<T>(endpoint: string, body: any, options?: RequestInit): Promise<T> {
+        const token = auth.getToken();
+        return request<T>(endpoint, { ...options, method: 'PATCH', body: JSON.stringify(body) }, token);
+    },
     delete<T>(endpoint: string, options?: RequestInit): Promise<T> {
         const token = auth.getToken();
         return request<T>(endpoint, { ...options, method: 'DELETE' }, token);

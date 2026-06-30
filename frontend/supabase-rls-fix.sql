@@ -11,6 +11,12 @@
 -- ============================================================
 
 -- ┌─────────────────────────────────────────────┐
+-- │ 0. ADD PHOTO_URL COLUMN TO USERS TABLE       │
+-- └─────────────────────────────────────────────┘
+
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS photo_url TEXT;
+
+-- ┌─────────────────────────────────────────────┐
 -- │ 1. ENABLE RLS ON ALL 5 TABLES               │
 -- └─────────────────────────────────────────────┘
 
@@ -19,6 +25,7 @@ ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bill_of_materials ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.raw_materials ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.production_plans ENABLE ROW LEVEL SECURITY;
+
 
 -- ┌─────────────────────────────────────────────┐
 -- │ 2. CREATE RLS POLICIES                       │

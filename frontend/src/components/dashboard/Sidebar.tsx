@@ -383,24 +383,30 @@ export function Sidebar({
 
 export function DashboardHeader({ onMenuToggle }: { onMenuToggle: () => void }) {
     const router = useRouter();
-    const [user, setUser] = useState<{ fullName: string; role: string } | null>(null);
+    const [user, setUser] = useState<{ fullName: string; role: string; photoUrl?: string | null } | null>(null);
 
-    // Fetch user on mount
-    useEffect(() => {
-        const fetchUser = async () => {
-            try {
-                // We're casting here for simplicity, assuming the API returns this shape
-                const data = await api.get<{ fullName: string; role: string }>('/auth/me');
-                setUser(data);
-            } catch (err) {
-                // Ignore 401/403 (Unauthorized/Forbidden) - just means user is not logged in
-                if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
-                    return;
-                }
-                console.error('Failed to fetch user', err);
+    const fetchUser = async () => {
+        try {
+            const data = await api.get<{ fullName: string; role: string; photoUrl?: string | null }>('/auth/me');
+            setUser(data);
+        } catch (err) {
+            if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+                return;
             }
-        };
+            console.error('Failed to fetch user', err);
+        }
+    };
+
+    // Fetch user on mount and listen to updates
+    useEffect(() => {
         fetchUser();
+
+        if (typeof window !== 'undefined') {
+            window.addEventListener('profile-updated', fetchUser);
+            return () => {
+                window.removeEventListener('profile-updated', fetchUser);
+            };
+        }
     }, []);
 
     const handleLogout = async () => {
@@ -436,8 +442,12 @@ export function DashboardHeader({ onMenuToggle }: { onMenuToggle: () => void }) 
                                     {user?.role || 'Guest'}
                                 </p>
                             </div>
-                            <div className="w-10 h-10 rounded-full bg-emerald-600 flex items-center justify-center text-white text-sm font-semibold shadow-sm ring-2 ring-white">
-                                {user?.fullName ? user.fullName.charAt(0).toUpperCase() : 'U'}
+                            <div className="w-10 h-10 rounded-full bg-emerald-600 overflow-hidden flex items-center justify-center text-white text-sm font-semibold shadow-sm ring-2 ring-white">
+                                {user?.photoUrl ? (
+                                    <img src={user.photoUrl} alt={user.fullName} className="w-full h-full object-cover" />
+                                ) : (
+                                    user?.fullName ? user.fullName.charAt(0).toUpperCase() : 'U'
+                                )}
                             </div>
                         </div>
                     </DropdownMenuTrigger>

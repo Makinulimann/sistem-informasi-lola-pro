@@ -3,6 +3,7 @@ export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
+import { db } from '@/lib/supabase';
 
 export async function GET(request: NextRequest) {
     try {
@@ -27,12 +28,32 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        // Return user details expected by Sidebar.tsx
+        // Query real-time database state to get latest info & photo_url
+        const userResult = await db.from<any>('users')
+            .select('id,email,full_name,no_induk,role,photo_url')
+            .eq('id', decoded.sub)
+            .single();
+
+        if (!userResult.error && userResult.data) {
+            const user = userResult.data;
+            return NextResponse.json({
+                id: user.id,
+                email: user.email,
+                fullName: user.full_name,
+                noInduk: user.no_induk,
+                role: user.role,
+                photoUrl: user.photo_url || null
+            });
+        }
+
+        // Fallback to JWT token claims if database query fails or user is missing
         return NextResponse.json({
-            fullName: decoded.name, // In login route, we mapped user.FullName to 'name' in payload
-            role: decoded.role,
+            id: decoded.sub,
             email: decoded.email,
-            id: decoded.sub
+            fullName: decoded.name,
+            role: decoded.role,
+            noInduk: '',
+            photoUrl: null
         });
 
     } catch (error: any) {
