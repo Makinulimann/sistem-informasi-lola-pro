@@ -88,10 +88,10 @@ const PRODUCT_COLORS = [
 
 /* ─── Product Image Mapping (slug → image path) ─── */
 const PRODUCT_IMAGES: Record<string, string> = {
-    'petro-gladiator': '/images/petro-gladiator.png',
-    'bio-fertil': '/images/bio-fertil.png',
-    'petro-fish': '/images/petro-fish.png',
-    'phonska-oca': '/images/phonska-oca-plus.png',
+    'petro-gladiator': '/images/petro-gladiator.webp',
+    'bio-fertil': '/images/bio-fertil.webp',
+    'petro-fish': '/images/petro-fish.webp',
+    'phonska-oca': '/images/phonska-oca-plus.webp',
 };
 
 function fmt(n?: number | null): string {

@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   title: 'SIPPro',
   description: 'SIPPro Web Application',
   icons: {
-    icon: '/images/logo-PG.png',
+    icon: '/images/logo-PG.webp',
   },
 };
 

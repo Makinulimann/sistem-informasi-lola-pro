@@ -121,7 +121,7 @@ export default function LoginPage() {
         className="relative w-full lg:w-[55%] xl:w-[60%] min-h-[240px] lg:min-h-screen overflow-hidden"
       >
         <Image
-          src="/images/bg-petro.jpeg"
+          src="/images/bg-petro.webp"
           alt="PT Petrokimia Gresik"
           fill
           priority
@@ -164,7 +164,7 @@ export default function LoginPage() {
           {/* Logos */}
           <div className="flex items-center justify-center gap-4 flex-wrap">
             <Image
-              src="/images/danantara.png"
+              src="/images/danantara.webp"
               alt="Danantara Indonesia"
               width={120}
               height={38}
@@ -172,7 +172,7 @@ export default function LoginPage() {
             />
             <span className="hidden sm:block w-px h-8 bg-gray-200" />
             <Image
-              src="/images/logo-PG.png"
+              src="/images/logo-PG.webp"
               alt="Petrokimia Gresik"
               width={120}
               height={38}
@@ -180,7 +180,7 @@ export default function LoginPage() {
             />
             <span className="hidden sm:block w-px h-8 bg-gray-200" />
             <Image
-              src="/images/logo-pi.png"
+              src="/images/logo-pi.webp"
               alt="Pupuk Indonesia"
               width={120}
               height={38}

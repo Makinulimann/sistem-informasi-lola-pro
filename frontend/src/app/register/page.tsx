@@ -164,7 +164,7 @@ export default function RegisterPage() {
                 className="relative w-full lg:w-[50%] xl:w-[55%] min-h-[200px] lg:min-h-screen overflow-hidden"
             >
                 <Image
-                    src="/images/bg-petro.jpeg"
+                    src="/images/bg-petro.webp"
                     alt="PT Petrokimia Gresik"
                     fill
                     priority
@@ -194,11 +194,11 @@ export default function RegisterPage() {
 
                     {/* Logos */}
                     <div className="flex items-center justify-center gap-4 flex-wrap">
-                        <Image src="/images/danantara.png" alt="Danantara Indonesia" width={110} height={35} className="object-contain h-8 w-auto" />
+                        <Image src="/images/danantara.webp" alt="Danantara Indonesia" width={110} height={35} className="object-contain h-8 w-auto" />
                         <span className="hidden sm:block w-px h-7 bg-gray-200" />
-                        <Image src="/images/logo-PG.png" alt="Petrokimia Gresik" width={110} height={35} className="object-contain h-8 w-auto" />
+                        <Image src="/images/logo-PG.webp" alt="Petrokimia Gresik" width={110} height={35} className="object-contain h-8 w-auto" />
                         <span className="hidden sm:block w-px h-7 bg-gray-200" />
-                        <Image src="/images/logo-pi.png" alt="Pupuk Indonesia" width={110} height={35} className="object-contain h-8 w-auto" />
+                        <Image src="/images/logo-pi.webp" alt="Pupuk Indonesia" width={110} height={35} className="object-contain h-8 w-auto" />
                     </div>
 
                     {/* Heading */}

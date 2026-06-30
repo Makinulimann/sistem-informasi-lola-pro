@@ -346,7 +346,7 @@ export function Sidebar({
                 {/* Logo area */}
                 <div className="flex items-center justify-between px-4 py-4 border-b border-emerald-700/30">
                     <div className="flex items-center gap-3">
-                        <Image src="/images/logo-PG.png" alt="Petrokimia Gresik" width={36} height={36} className="object-contain" />
+                        <Image src="/images/logo-PG.webp" alt="Petrokimia Gresik" width={36} height={36} className="object-contain" />
                         <div>
                             <p className="text-sm font-bold text-white leading-tight">SIPPro</p>
                             <p className="text-[11px] text-emerald-300/70 leading-tight">Pengelolaan Produk</p>
