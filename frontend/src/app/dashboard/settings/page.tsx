@@ -25,6 +25,7 @@ export default function SettingsPage() {
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [fullName, setFullName] = useState('');
     const [email, setEmail] = useState('');
+    const [noInduk, setNoInduk] = useState('');
     const [photoUrl, setPhotoUrl] = useState<string | null>(null);
     
     // UI States
@@ -55,6 +56,7 @@ export default function SettingsPage() {
             setProfile(data);
             setFullName(data.fullName);
             setEmail(data.email);
+            setNoInduk(data.noInduk);
             setPhotoUrl(data.photoUrl);
         } catch (err: any) {
             error('Gagal Memuat Profil', err.message || 'Terjadi kesalahan saat memuat data profil.');
@@ -70,8 +72,8 @@ export default function SettingsPage() {
     // Intercept profile update form submit to open modal
     const handleProfileSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!fullName.trim() || !email.trim()) {
-            warning('Input Tidak Valid', 'Nama Lengkap dan Email tidak boleh kosong.');
+        if (!fullName.trim() || !noInduk.trim()) {
+            warning('Input Tidak Valid', 'Nama Lengkap dan Nomor Induk Karyawan tidak boleh kosong.');
             return;
         }
         setIsProfileModalOpen(true);
@@ -84,7 +86,7 @@ export default function SettingsPage() {
             setUpdatingProfile(true);
             await api.put('/users/profile', {
                 fullName,
-                email,
+                noInduk,
                 photoUrl
             });
             success('Profil Diperbarui', 'Informasi profil Anda berhasil diperbarui.');
@@ -150,7 +152,7 @@ export default function SettingsPage() {
             // Immediately save to user database so it doesn't get lost
             await api.put('/users/profile', {
                 fullName: fullName || profile?.fullName,
-                email: email || profile?.email,
+                noInduk: noInduk || profile?.noInduk,
                 photoUrl: uploadedUrl
             });
 
@@ -331,23 +333,23 @@ export default function SettingsPage() {
                                 />
 
                                 <AppInput 
-                                    id="email"
-                                    type="email"
-                                    label="Alamat Email"
-                                    placeholder="email@company.com"
-                                    icon={<Mail className="w-4.5 h-4.5" />}
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
+                                    id="noInduk"
+                                    label="Nomor Induk Karyawan"
+                                    placeholder="Nomor Induk Karyawan Anda"
+                                    icon={<Shield className="w-4.5 h-4.5" />}
+                                    value={noInduk}
+                                    onChange={(e) => setNoInduk(e.target.value)}
                                     required
                                 />
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <AppInput 
-                                    id="noInduk"
-                                    label="Nomor Induk Karyawan"
-                                    value={profile?.noInduk || ''}
-                                    icon={<Shield className="w-4.5 h-4.5" />}
+                                    id="email"
+                                    type="email"
+                                    label="Alamat Email"
+                                    value={email}
+                                    icon={<Mail className="w-4.5 h-4.5" />}
                                     disabled
                                     className="bg-gray-50 border-gray-200 cursor-not-allowed text-gray-500 font-medium"
                                 />

@@ -75,11 +75,11 @@ export function ConfirmModal({
             />
 
             {/* Modal */}
-            <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full animate-in zoom-in-95 duration-200">
+            <div className="relative bg-white shadow-2xl max-w-md w-full animate-in zoom-in-95 duration-200">
                 {/* Close button */}
                 <button
                     onClick={onClose}
-                    className="absolute top-4 right-4 p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                    className="absolute top-4 right-4 p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
                 >
                     <X className="size-4" />
                 </button>
@@ -98,14 +98,14 @@ export function ConfirmModal({
                     <button
                         onClick={onClose}
                         disabled={isLoading}
-                        className="flex-1 px-4 py-2.5 bg-white border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
+                        className="flex-1 px-4 py-2.5 bg-white border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
                     >
                         {cancelText}
                     </button>
                     <button
                         onClick={onConfirm}
                         disabled={isLoading}
-                        className={`flex-1 px-4 py-2.5 text-white font-medium rounded-xl transition-all shadow-sm focus:ring-4 disabled:opacity-50 ${config.confirmBtn}`}
+                        className={`flex-1 px-4 py-2.5 text-white font-medium transition-all shadow-sm focus:ring-4 disabled:opacity-50 ${config.confirmBtn}`}
                     >
                         {isLoading ? (
                             <span className="inline-flex items-center gap-2">

@@ -8,7 +8,8 @@ import {
     MoreHorizontal,
     Shield,
     User,
-    ShieldAlert
+    ShieldAlert,
+    Trash2
 } from 'lucide-react';
 import {
     DropdownMenu,
@@ -18,6 +19,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 
 interface UserDto {
     id: string;
@@ -33,6 +35,11 @@ export default function UsersPage() {
     const [users, setUsers] = useState<UserDto[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    // Deletion Modal States
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [userIdToDelete, setUserIdToDelete] = useState<string | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const fetchUsers = async () => {
         try {
@@ -70,6 +77,27 @@ export default function UsersPage() {
         }
     };
 
+    const handleDeleteClick = (id: string) => {
+        setUserIdToDelete(id);
+        setIsDeleteModalOpen(true);
+    };
+
+    const executeDelete = async () => {
+        if (!userIdToDelete) return;
+        try {
+            setIsDeleting(true);
+            await api.delete(`/users/${userIdToDelete}`);
+            // Optimistic update
+            setUsers(users.filter(u => u.id !== userIdToDelete));
+            setIsDeleteModalOpen(false);
+            setUserIdToDelete(null);
+        } catch (err: any) {
+            alert('Gagal menghapus pengguna: ' + err.message);
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
     if (isLoading) {
         return (
             <div className="flex bg-gray-50 items-center justify-center min-h-[400px]">
@@ -80,7 +108,7 @@ export default function UsersPage() {
 
     if (error) {
         return (
-            <div className="p-6 bg-red-50 text-red-600 rounded-lg">
+            <div className="p-6 bg-red-50 text-red-600">
                 Error: {error}
             </div>
         );
@@ -114,14 +142,14 @@ export default function UsersPage() {
                                 <tr key={user.id} className="hover:bg-gray-50/50 transition-colors">
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-semibold text-sm">
+                                            <div className="w-10 h-10 bg-emerald-100 text-emerald-600 flex items-center justify-center font-semibold text-sm">
                                                 {user.fullName.charAt(0).toUpperCase()}
                                             </div>
                                             <div>
                                                 <p className="font-medium text-gray-900">{user.fullName}</p>
                                                 <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
                                                     <span>{user.email}</span>
-                                                    <span className="w-1 h-1 rounded-full bg-gray-300"></span>
+                                                    <span className="w-1 h-1 bg-gray-300"></span>
                                                     <span>{user.noInduk}</span>
                                                 </div>
                                             </div>
@@ -129,12 +157,12 @@ export default function UsersPage() {
                                     </td>
                                     <td className="px-6 py-4">
                                         {user.isVerified ? (
-                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
                                                 <CheckCircle2 className="w-3.5 h-3.5" />
                                                 Terverifikasi
                                             </span>
                                         ) : (
-                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100">
+                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100">
                                                 <ShieldAlert className="w-3.5 h-3.5" />
                                                 Menunggu
                                             </span>
@@ -169,14 +197,23 @@ export default function UsersPage() {
                                                     </DropdownMenuItem>
                                                 )}
 
+                                                <DropdownMenuItem onClick={() => handleDeleteClick(user.id)} className="text-red-600 focus:text-red-700 focus:bg-red-50 cursor-pointer">
+                                                    <Trash2 className="mr-2 h-4 w-4" />
+                                                    Hapus Pengguna
+                                                </DropdownMenuItem>
+
                                                 <DropdownMenuLabel className="text-xs font-normal text-gray-500 mt-2">Atur Peran</DropdownMenuLabel>
-                                                {['Admin', 'VP', 'KPP', 'KP', 'KNP'].map((role) => (
+                                                {['Admin', 'VP', 'KPP', 'KP', 'KNP', 'user'].map((role) => (
                                                     <DropdownMenuItem
                                                         key={role}
                                                         onClick={() => handleRoleUpdate(user.id, role)}
                                                         className={`cursor-pointer ${user.role === role ? 'bg-gray-50 font-medium' : ''}`}
                                                     >
-                                                        <Shield className="mr-2 h-3 w-3 opacity-70" />
+                                                        {role === 'Admin' ? (
+                                                            <Shield className="mr-2 h-3.5 w-3.5 opacity-70" />
+                                                        ) : (
+                                                            <User className="mr-2 h-3.5 w-3.5 opacity-70" />
+                                                        )}
                                                         {role}
                                                     </DropdownMenuItem>
                                                 ))}
@@ -189,6 +226,22 @@ export default function UsersPage() {
                     </table>
                 </div>
             </div>
+
+            {/* Confirmation Modal for deleting user */}
+            <ConfirmModal 
+                isOpen={isDeleteModalOpen}
+                onClose={() => {
+                    setIsDeleteModalOpen(false);
+                    setUserIdToDelete(null);
+                }}
+                onConfirm={executeDelete}
+                title="Hapus Pengguna"
+                message="Apakah Anda yakin ingin menghapus pengguna ini? Tindakan ini tidak dapat dibatalkan dan semua data pengguna akan terhapus dari sistem."
+                confirmText="Ya, Hapus"
+                cancelText="Batal"
+                variant="danger"
+                isLoading={isDeleting}
+            />
         </div>
     );
 }

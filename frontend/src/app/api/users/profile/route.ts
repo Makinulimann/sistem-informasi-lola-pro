@@ -65,22 +65,22 @@ export async function PUT(request: NextRequest) {
             return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
         }
 
-        const { fullName, email, photoUrl } = await request.json();
+        const { fullName, noInduk, photoUrl } = await request.json();
 
-        if (!fullName || !email) {
-            return NextResponse.json({ message: 'Nama Lengkap dan Email wajib diisi.' }, { status: 400 });
+        if (!fullName || !noInduk) {
+            return NextResponse.json({ message: 'Nama Lengkap dan Nomor Induk Karyawan wajib diisi.' }, { status: 400 });
         }
 
-        // Check if email is already taken by another user
-        const checkEmail = await db.from<any>('users')
+        // Check if no_induk is already taken by another user
+        const checkNoInduk = await db.from<any>('users')
             .select('id')
-            .eq('email', email)
+            .eq('no_induk', noInduk)
             .execute();
 
-        if (!checkEmail.error && checkEmail.data && checkEmail.data.length > 0) {
-            const existingUser = checkEmail.data[0];
+        if (!checkNoInduk.error && checkNoInduk.data && checkNoInduk.data.length > 0) {
+            const existingUser = checkNoInduk.data[0];
             if (existingUser.id !== decoded.sub) {
-                return NextResponse.json({ message: 'Email sudah digunakan oleh akun lain.' }, { status: 400 });
+                return NextResponse.json({ message: 'Nomor Induk Karyawan sudah digunakan oleh akun lain.' }, { status: 400 });
             }
         }
 
@@ -88,7 +88,7 @@ export async function PUT(request: NextRequest) {
         const updateResult = await db.from<any>('users')
             .update({
                 full_name: fullName,
-                email: email,
+                no_induk: noInduk,
                 photo_url: photoUrl,
                 updated_at: new Date().toISOString()
             })
@@ -103,7 +103,7 @@ export async function PUT(request: NextRequest) {
             message: 'Profil berhasil diperbarui.',
             user: {
                 fullName,
-                email,
+                noInduk,
                 photoUrl
             }
         });
