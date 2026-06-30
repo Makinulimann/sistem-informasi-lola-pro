@@ -7,13 +7,36 @@ import { genSalt, hash, compare } from 'bcrypt-ts';
 const bcrypt = { genSalt, hash, compare };
 import { signToken } from '@/lib/auth';
 import { createClient } from '@supabase/supabase-js';
+import { logger } from '@/lib/logger';
+import { rateLimit } from '@/lib/rate-limit';
 
-const supabaseUrl = 'https://wtnnvlibowwffgtjzoou.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind0bm52bGlib3d3ZmZndGp6b291Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzODM2MzgsImV4cCI6MjA4ODk1OTYzOH0.XxR1BNfFpVhId1nOSMfmvxvcVPi5SBE3JQG-BZJIvwU';
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = (supabaseUrl && supabaseAnonKey) ? createClient(supabaseUrl, supabaseAnonKey) : null as any;
 
 export async function POST(request: Request) {
     try {
+        // Rate limiting: max 5 login attempts per minute per IP
+        const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+        const limiter = rateLimit(`login:${ip}`, 5, 60_000);
+        if (!limiter.success) {
+            return NextResponse.json(
+                { message: 'Terlalu banyak percobaan login. Silakan coba lagi nanti.' },
+                {
+                    status: 429,
+                    headers: {
+                        'Retry-After': String(Math.ceil(limiter.resetIn / 1000)),
+                    },
+                }
+            );
+        }
+
+        if (!supabaseUrl || !supabaseAnonKey || !supabase) {
+            return NextResponse.json(
+                { message: 'Konfigurasi database/Supabase tidak lengkap pada server.' },
+                { status: 500 }
+            );
+        }
         const { email, password } = await request.json();
 
         if (!email || !password) {
@@ -110,7 +133,7 @@ export async function POST(request: Request) {
             role: user.role,
         });
 
-        return NextResponse.json({
+        const response = NextResponse.json({
             accessToken: token,
             user: {
                 id: user.id,
@@ -120,8 +143,20 @@ export async function POST(request: Request) {
             }
         });
 
+        response.cookies.set({
+            name: 'sippro_token',
+            value: token,
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            path: '/',
+            maxAge: 60 * 60 * 24 // 1 day
+        });
+
+        return response;
+
     } catch (error: any) {
-        console.error('Login Error:', error);
+        logger.error('Login Error', error);
         return NextResponse.json(
             { message: 'Terjadi kesalahan pada server.' },
             { status: 500 }

@@ -1,6 +1,9 @@
 import { SignJWT, jwtVerify } from 'jose'
 
-const secretKey = process.env.JWT_SECRET || 'SuperSecretKeyForSIPProApplicationDevelopmentVerifyChangeInProd!'
+const secretKey = process.env.JWT_SECRET;
+if (!secretKey) {
+    throw new Error('JWT_SECRET environment variable is missing/not configured.');
+}
 const key = new TextEncoder().encode(secretKey)
 
 export async function signToken(payload: any) {

@@ -3,12 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 // Edge-compatible Supabase client using fetch API
 // Works on Cloudflare Workers/Edge runtime
 
-// Hardcoded fallback values for deployment (can be overridden by env vars)
-const DEFAULT_SUPABASE_URL = 'https://wtnnvlibowwffgtjzoou.supabase.co';
-const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind0bm52bGlib3d3ZmZndGp6b291Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzODM2MzgsImV4cCI6MjA4ODk1OTYzOH0.XxR1BNfFpVhId1nOSMfmvxvcVPi5SBE3JQG-BZJIvwU';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
 // For Edge runtime, we use direct REST calls instead of the default client
 // to avoid any Node.js dependencies
@@ -297,11 +293,13 @@ export const db = {
 };
 
 // Legacy export for compatibility
-export const supabase = createClient(supabaseUrl!, supabaseKey!, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false,
-  },
-});
+export const supabase = (supabaseUrl && supabaseKey) 
+  ? createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    })
+  : null as any;
 
 export default supabase;

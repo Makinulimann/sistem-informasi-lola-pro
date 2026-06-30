@@ -44,3 +44,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# test files and logs
+test-auth.json
+test-auth.mjs
+eslint-report.json
+eslint-report.txt
+stats.html

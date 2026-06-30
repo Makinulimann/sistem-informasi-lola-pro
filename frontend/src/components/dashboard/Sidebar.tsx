@@ -6,7 +6,6 @@ import Image from 'next/image';
 import { useRouter, usePathname } from 'next/navigation';
 import { navigation, type NavSection, type NavChild } from '@/lib/navigation';
 import { api, auth, ApiError } from '@/lib/api';
-import { jwtDecode } from 'jwt-decode';
 import { LogOut, Settings, User, ChevronDown as ChevronDownIcon } from 'lucide-react';
 import {
     DropdownMenu,
@@ -251,16 +250,15 @@ export function Sidebar({
     const [menuItems, setMenuItems] = useState<any[]>([]);
 
     useEffect(() => {
-        const token = auth.getToken();
-        if (token) {
+        const fetchUser = async () => {
             try {
-                const decoded: any = jwtDecode(token);
-                setRole(decoded.role || null);
+                const data = await api.get<{ role: string }>('/auth/me');
+                setRole(data.role || null);
             } catch (error) {
-                console.error("Failed to decode token:", error);
                 setRole(null);
             }
-        }
+        };
+        fetchUser();
     }, []);
 
     // Fetch sidebar menu from API
@@ -405,7 +403,12 @@ export function DashboardHeader({ onMenuToggle }: { onMenuToggle: () => void }) 
         fetchUser();
     }, []);
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
+        try {
+            await api.post('/auth/logout', {});
+        } catch (err) {
+            console.error('Failed to log out server-side:', err);
+        }
         auth.removeToken();
         // Force full reload to clear any memory state
         window.location.href = '/';

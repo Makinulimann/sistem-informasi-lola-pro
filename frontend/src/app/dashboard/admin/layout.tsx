@@ -2,31 +2,26 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth } from '@/lib/api';
-import { jwtDecode } from 'jwt-decode';
+import { api } from '@/lib/api';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
 
     useEffect(() => {
-        const token = auth.getToken();
-        if (!token) {
-            router.replace('/');
-            return;
-        }
-
-        try {
-            const decoded: any = jwtDecode(token);
-            if (decoded.role !== 'Admin' && decoded.role !== 'admin') {
-                router.replace('/dashboard');
-            } else {
-                setIsAuthorized(true);
+        const checkAuth = async () => {
+            try {
+                const data = await api.get<{ role: string }>('/auth/me');
+                if (data.role !== 'Admin' && data.role !== 'admin') {
+                    router.replace('/dashboard');
+                } else {
+                    setIsAuthorized(true);
+                }
+            } catch (error) {
+                router.replace('/');
             }
-        } catch (error) {
-            console.error('Failed to decode token:', error);
-            router.replace('/');
-        }
+        };
+        checkAuth();
     }, [router]);
 
     if (isAuthorized === null) {

@@ -4,12 +4,35 @@ export const preferredRegion = 'sin1';
 import { NextResponse } from 'next/server';
 import { genSalt, hash, compare } from 'bcrypt-ts';
 const bcrypt = { genSalt, hash, compare };
+import { logger } from '@/lib/logger';
+import { rateLimit } from '@/lib/rate-limit';
 
-const supabaseUrl = 'https://wtnnvlibowwffgtjzoou.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind0bm52bGlib3d3ZmZndGp6b291Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzODM2MzgsImV4cCI6MjA4ODk1OTYzOH0.XxR1BNfFpVhId1nOSMfmvxvcVPi5SBE3JQG-BZJIvwU';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
 export async function POST(request: Request) {
     try {
+        // Rate limiting: max 3 register attempts per minute per IP
+        const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+        const limiter = rateLimit(`register:${ip}`, 3, 60_000);
+        if (!limiter.success) {
+            return NextResponse.json(
+                { message: 'Terlalu banyak percobaan registrasi. Silakan coba lagi nanti.' },
+                {
+                    status: 429,
+                    headers: {
+                        'Retry-After': String(Math.ceil(limiter.resetIn / 1000)),
+                    },
+                }
+            );
+        }
+
+        if (!supabaseUrl || !supabaseAnonKey) {
+            return NextResponse.json(
+                { message: 'Konfigurasi database/Supabase tidak lengkap pada server.' },
+                { status: 500 }
+            );
+        }
         const { email, password, confirmPassword, fullName, noInduk } = await request.json();
 
         if (!email || !password || !fullName || !noInduk) {
@@ -75,7 +98,7 @@ export async function POST(request: Request) {
 
         if (!insertResponse.ok) {
             const err = await insertResponse.text();
-            console.error('Insert user error:', err);
+            logger.error('Insert user error', err);
             return NextResponse.json(
                 { message: 'Berhasil membuat akun, tapi gagal menyimpan profil.' },
                 { status: 500 }
@@ -91,7 +114,7 @@ export async function POST(request: Request) {
         );
 
     } catch (error: any) {
-        console.error('Register Error:', error);
+        logger.error('Register Error', error);
         return NextResponse.json(
             { message: 'Terjadi kesalahan pada server.' },
             { status: 500 }

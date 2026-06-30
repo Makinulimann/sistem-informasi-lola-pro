@@ -2,15 +2,16 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'edge';
 
 import { NextResponse } from 'next/server';
+import { logger } from '@/lib/logger';
 
-const SUPABASE_URL = 'https://wtnnvlibowwffgtjzoou.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind0bm52bGlib3d3ZmZndGp6b291Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzODM2MzgsImV4cCI6MjA4ODk1OTYzOH0.XxR1BNfFpVhId1nOSMfmvxvcVPi5SBE3JQG-BZJIvwU';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-const HEADERS = {
+const getHeaders = () => ({
     'apikey': SUPABASE_KEY,
     'Authorization': `Bearer ${SUPABASE_KEY}`,
     'Content-Type': 'application/json',
-};
+});
 
 interface TabRow { id: number; product_slug: string; tab_name?: string; nama?: string; jenis_produk?: string; kemasan?: string; }
 interface RkoRow { id?: number; product_slug: string; tab_name: string; tahun: number; bulan: number; target_volume: number; target_kemasan: number; }
@@ -19,19 +20,22 @@ async function sbGet(table: string, params: string): Promise<any[]> {
     try {
         const url = `${SUPABASE_URL}/rest/v1/${table}?${params}`;
         const res = await fetch(url, { 
-            headers: HEADERS, 
+            headers: getHeaders(), 
             cache: 'no-store' 
         });
         if (!res.ok) return [];
         return await res.json();
     } catch (e) {
-        console.error(`sbGet error for ${table}:`, e);
+        logger.error(`sbGet error for ${table}`, e);
         return [];
     }
 }
 
 export async function GET(request: Request) {
     try {
+        if (!SUPABASE_URL || !SUPABASE_KEY) {
+            return NextResponse.json({ message: 'Konfigurasi database tidak lengkap.' }, { status: 500 });
+        }
         const { searchParams } = new URL(request.url);
         const tahun = searchParams.get('tahun');
         const mode = searchParams.get('mode');
@@ -138,13 +142,16 @@ export async function GET(request: Request) {
 
         return NextResponse.json(merged);
     } catch (error: any) {
-        console.error('Error in GET /api/rko-targets:', error);
+        logger.error('Error in GET /api/rko-targets', error);
         return NextResponse.json({ message: error.message || 'Internal Server Error' }, { status: 500 });
     }
 }
 
 export async function POST(request: Request) {
     try {
+        if (!SUPABASE_URL || !SUPABASE_KEY) {
+            return NextResponse.json({ message: 'Konfigurasi database tidak lengkap.' }, { status: 500 });
+        }
         const data: RkoRow[] = await request.json();
         if (!Array.isArray(data) || data.length === 0) {
             return NextResponse.json({ message: 'Invalid data' }, { status: 400 });
@@ -170,7 +177,7 @@ export async function POST(request: Request) {
             method: 'POST',
             cache: 'no-store',
             headers: {
-                ...HEADERS,
+                ...getHeaders(),
                 'Prefer': 'resolution=merge-duplicates',
             },
             body: JSON.stringify(payload),
@@ -183,7 +190,7 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ message: 'Success', rowsAffected: payload.length });
     } catch (error: any) {
-        console.error('Error in POST /api/rko-targets:', error);
+        logger.error('Error in POST /api/rko-targets', error);
         return NextResponse.json({ message: error.message || 'Internal Server Error' }, { status: 500 });
     }
 }

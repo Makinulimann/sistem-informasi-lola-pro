@@ -27,8 +27,7 @@ export default function HealthPage() {
                                     Error: {rest.error}
                                 </p>
                                 <p style={{ color: 'var(--foreground-muted)', marginBottom: 'var(--space-lg)', fontSize: 'var(--text-sm)' }}>
-                                    Make sure the backend is running on{' '}
-                                    {process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5062'}
+                                    Pastikan koneksi jaringan aktif dan server backend berjalan dengan benar.
                                 </p>
                                 <Button variant="secondary" size="sm" onClick={refetch}>
                                     Retry
