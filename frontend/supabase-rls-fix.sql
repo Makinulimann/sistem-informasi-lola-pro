@@ -2,7 +2,7 @@
 -- SIPPro — Supabase RLS (Row Level Security) Fix Script
 -- ============================================================
 -- Jalankan script ini di Supabase SQL Editor (Dashboard > SQL Editor)
--- Script ini mengaktifkan RLS dan membuat policy dasar untuk 4 tabel
+-- Script ini mengaktifkan RLS dan membuat policy dasar untuk 5 tabel
 -- yang saat ini masih terbuka tanpa perlindungan.
 --
 -- PENTING: Semua API route SIPPro menggunakan `anon key` melalui 
@@ -11,13 +11,14 @@
 -- ============================================================
 
 -- ┌─────────────────────────────────────────────┐
--- │ 1. ENABLE RLS ON ALL 4 TABLES               │
+-- │ 1. ENABLE RLS ON ALL 5 TABLES               │
 -- └─────────────────────────────────────────────┘
 
 ALTER TABLE public.rko_targets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bill_of_materials ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.raw_materials ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.production_plans ENABLE ROW LEVEL SECURITY;
 
 -- ┌─────────────────────────────────────────────┐
 -- │ 2. CREATE RLS POLICIES                       │
@@ -114,6 +115,28 @@ CREATE POLICY "Authenticated users can delete raw_materials"
   TO authenticated
   USING (true);
 
+-- ── production_plans ─────────────────────────
+CREATE POLICY "Authenticated users can read production_plans"
+  ON public.production_plans FOR SELECT
+  TO authenticated
+  USING (true);
+
+CREATE POLICY "Authenticated users can insert production_plans"
+  ON public.production_plans FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can update production_plans"
+  ON public.production_plans FOR UPDATE
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can delete production_plans"
+  ON public.production_plans FOR DELETE
+  TO authenticated
+  USING (true);
+
 -- ┌─────────────────────────────────────────────┐
 -- │ 3. VERIFIKASI                                │
 -- └─────────────────────────────────────────────┘
@@ -122,6 +145,6 @@ CREATE POLICY "Authenticated users can delete raw_materials"
 SELECT tablename, rowsecurity 
 FROM pg_tables 
 WHERE schemaname = 'public' 
-  AND tablename IN ('rko_targets', 'products', 'bill_of_materials', 'raw_materials');
+  AND tablename IN ('rko_targets', 'products', 'bill_of_materials', 'raw_materials', 'production_plans');
 
--- Expected output: rowsecurity = true untuk semua 4 tabel
+-- Expected output: rowsecurity = true untuk semua 5 tabel

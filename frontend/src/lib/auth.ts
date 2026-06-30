@@ -1,12 +1,15 @@
 import { SignJWT, jwtVerify } from 'jose'
 
-const secretKey = process.env.JWT_SECRET;
-if (!secretKey) {
-    throw new Error('JWT_SECRET environment variable is missing/not configured.');
+function getSecretKey() {
+    const secretKey = process.env.JWT_SECRET;
+    if (!secretKey) {
+        throw new Error('JWT_SECRET environment variable is missing/not configured.');
+    }
+    return new TextEncoder().encode(secretKey);
 }
-const key = new TextEncoder().encode(secretKey)
 
 export async function signToken(payload: any) {
+    const key = getSecretKey();
     return await new SignJWT(payload)
         .setProtectedHeader({ alg: 'HS256' })
         .setIssuedAt()
@@ -18,12 +21,14 @@ export async function signToken(payload: any) {
 
 export async function verifyToken(token: string) {
     try {
+        const key = getSecretKey();
         const { payload } = await jwtVerify(token, key, {
             issuer: 'SIPPro',
             audience: 'SIPProUser',
         })
         return payload
     } catch (error) {
-        return null
+        return null;
     }
 }
+
