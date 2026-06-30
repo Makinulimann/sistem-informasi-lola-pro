@@ -46,15 +46,27 @@ export default async function proxy(request: NextRequest) {
     const token = request.cookies.get('sippro_token')?.value;
     const publicRoutes = ['/', '/register', '/forgot-password'];
 
-    // If user has token and tries to access login/register, redirect to dashboard
-    if (token && publicRoutes.includes(pathname)) {
+    // Verify token validity
+    let isTokenValid = false;
+    if (token) {
+        const decoded = await verifyToken(token);
+        isTokenValid = !!decoded;
+    }
+
+    // If user has valid token and tries to access login/register, redirect to dashboard
+    if (isTokenValid && publicRoutes.includes(pathname)) {
         return NextResponse.redirect(new URL('/dashboard', request.url));
     }
 
-    // If user has NO token and tries to access protected route, redirect to login
-    if (!token && !publicRoutes.includes(pathname)) {
+    // If user has invalid token or no token, and tries to access protected page route, redirect to login
+    if (!isTokenValid && !publicRoutes.includes(pathname)) {
         const loginUrl = new URL('/', request.url);
-        return NextResponse.redirect(loginUrl);
+        const response = NextResponse.redirect(loginUrl);
+        if (token) {
+            // Delete the invalid/expired token cookie
+            response.cookies.delete('sippro_token');
+        }
+        return response;
     }
 
     return NextResponse.next();

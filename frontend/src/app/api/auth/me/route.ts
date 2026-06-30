@@ -1,22 +1,23 @@
 export const dynamic = 'force-dynamic';
-// Using Node.js runtime for Prisma compatibility
-// Edge runtime now supported with Supabase!
 export const runtime = 'edge';
-import { NextResponse } from 'next/server';
+
+import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
     try {
-        const authHeader = request.headers.get('Authorization');
+        let token = request.headers.get('Authorization')?.split(' ')[1];
+        if (!token) {
+            token = request.cookies.get('sippro_token')?.value;
+        }
 
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        if (!token) {
             return NextResponse.json(
                 { message: 'Unauthorized' },
                 { status: 401 }
             );
         }
 
-        const token = authHeader.split(' ')[1];
         const decoded = await verifyToken(token);
 
         if (!decoded) {

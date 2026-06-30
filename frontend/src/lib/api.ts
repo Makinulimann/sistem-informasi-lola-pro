@@ -84,7 +84,10 @@ async function request<T>(
     if (res.status === 401) {
         auth.removeToken();
         if (typeof window !== 'undefined' && window.location.pathname !== '/') {
-            window.location.href = '/';
+            // Call server-side logout to destroy the HttpOnly cookie
+            fetch('/api/auth/logout', { method: 'POST' }).finally(() => {
+                window.location.href = '/';
+            });
         }
     }
 
