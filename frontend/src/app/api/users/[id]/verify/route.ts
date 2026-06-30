@@ -34,7 +34,7 @@ export async function POST(
 
         // 3. Send email via Resend API
         const resendApiKey = process.env.RESEND_API_KEY;
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sistem-informasi-pp.vercel.app';
         const loginUrl = `${appUrl}/`;
 
         const emailSubject = 'Akun SIPPro Anda Telah Diverifikasi';
