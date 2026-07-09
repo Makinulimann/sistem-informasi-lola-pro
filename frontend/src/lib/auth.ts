@@ -32,3 +32,27 @@ export async function verifyToken(token: string) {
     }
 }
 
+export async function signResetToken(payload: any) {
+    const key = getSecretKey();
+    return await new SignJWT(payload)
+        .setProtectedHeader({ alg: 'HS256' })
+        .setIssuedAt()
+        .setIssuer('SIPPro')
+        .setAudience('SIPProReset')
+        .setExpirationTime('1h')
+        .sign(key)
+}
+
+export async function verifyResetToken(token: string) {
+    try {
+        const key = getSecretKey();
+        const { payload } = await jwtVerify(token, key, {
+            issuer: 'SIPPro',
+            audience: 'SIPProReset',
+        })
+        return payload
+    } catch (error) {
+        return null;
+    }
+}
+

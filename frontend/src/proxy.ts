@@ -27,6 +27,8 @@ export default async function proxy(request: NextRequest) {
             '/api/auth/login',
             '/api/auth/register',
             '/api/auth/logout',
+            '/api/auth/forgot-password',
+            '/api/auth/reset-password',
             '/api/health',
             '/api/version'
         ];

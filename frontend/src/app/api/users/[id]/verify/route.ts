@@ -1,8 +1,8 @@
 export const dynamic = 'force-dynamic';
-export const runtime = 'edge';
 
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/supabase';
+import { sendMail } from '@/lib/mailer';
 
 export async function POST(
     request: Request,
@@ -32,8 +32,7 @@ export async function POST(
             return NextResponse.json({ message: 'Gagal memverifikasi pengguna' }, { status: 500 });
         }
 
-        // 3. Send email via Resend API
-        const resendApiKey = process.env.RESEND_API_KEY;
+        // 3. Send email via SMTP
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sistem-informasi-pp.vercel.app';
         const loginUrl = `${appUrl}/`;
 
@@ -58,37 +57,15 @@ export async function POST(
             </div>
         `;
 
-        if (resendApiKey) {
-            try {
-                const emailResponse = await fetch('https://api.resend.com/emails', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${resendApiKey}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        from: 'SIPPro <onboarding@resend.dev>',
-                        to: user.email,
-                        subject: emailSubject,
-                        html: emailHtml
-                    })
-                });
-
-                if (!emailResponse.ok) {
-                    const errResult = await emailResponse.json();
-                    console.error('Failed to send email via Resend API:', errResult);
-                } else {
-                    console.log(`Verification email sent successfully via Resend to: ${user.email}`);
-                }
-            } catch (err) {
-                console.error('Error occurred while sending email:', err);
-            }
-        } else {
-            console.log('=== MOCK EMAIL SENT (RESEND_API_KEY not configured) ===');
-            console.log('To:', user.email);
-            console.log('Subject:', emailSubject);
-            console.log('Body:', emailHtml);
-            console.log('======================================================');
+        try {
+            await sendMail({
+                to: user.email,
+                subject: emailSubject,
+                html: emailHtml,
+            });
+            console.log(`Verification email sent successfully via SMTP to: ${user.email}`);
+        } catch (err) {
+            console.error('Failed to send verification email via SMTP:', err);
         }
 
         return NextResponse.json({ message: 'Pengguna berhasil diverifikasi dan notifikasi email telah dikirim.' });
