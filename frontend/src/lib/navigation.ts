@@ -35,6 +35,7 @@ export const navigation: NavSection[] = [
         roleAccess: 'Admin',
         children: [
             { label: 'Manajemen User', href: '/dashboard/admin/users' },
+            { label: 'Manajemen Produk', href: '/dashboard/admin/products' },
             { label: 'Manajemen Sidebar', href: '/dashboard/admin/sidebar' },
         ]
     },

@@ -47,8 +47,16 @@ export async function GET(request: Request) {
 
         // Take 50
         const items = filtered.slice(0, 50);
+        const formattedItems = items.map((item: any) => ({
+            id: item.id || item.Id,
+            nama: item.nama || item.Nama,
+            kode: item.kode || item.Kode,
+            satuanDefault: item.satuan_default || item.SatuanDefault,
+            scopeProductSlug: item.scope_product_slug || item.ScopeProductSlug,
+            isActive: item.is_active || item.IsActive
+        }));
 
-        return NextResponse.json(items);
+        return NextResponse.json(formattedItems);
     } catch (error) {
         console.error('Error fetching master items:', error);
         return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
@@ -86,7 +94,16 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'Failed to create' }, { status: 500 });
         }
 
-        return NextResponse.json(item, { status: 201 });
+        const formattedItem = {
+            id: item.id || item.Id,
+            nama: item.nama || item.Nama,
+            kode: item.kode || item.Kode,
+            satuanDefault: item.satuan_default || item.SatuanDefault,
+            scopeProductSlug: item.scope_product_slug || item.ScopeProductSlug,
+            isActive: item.is_active || item.IsActive
+        };
+
+        return NextResponse.json(formattedItem, { status: 201 });
     } catch (error) {
         console.error('Error creating master item:', error);
         return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });

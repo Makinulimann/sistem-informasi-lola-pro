@@ -23,6 +23,7 @@ import {
     type ProduksiRow,
     type ProduksiSummary,
 } from '@/lib/produksiService';
+import { sidebarService } from '@/lib/sidebarService';
 import { BelumSamplingModal } from './BelumSamplingModal';
 import { AppSelect } from '@/components/ui/app-select';
 import { AppSearchBar } from '@/components/ui/app-search-bar';
@@ -116,12 +117,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
     const [tabs, setTabs] = useState<ProduksiTab[]>([]);
     const [activeTabId, setActiveTabId] = useState<number | null>(null);
     const [tabsLoading, setTabsLoading] = useState(true);
-    const [showTabConfig, setShowTabConfig] = useState(false);
 
-    // Tab Config
-    const [newTabName, setNewTabName] = useState('');
-    const [editingTabId, setEditingTabId] = useState<number | null>(null);
-    const [editTabValue, setEditTabValue] = useState('');
 
     // Data
     const [data, setData] = useState<ProduksiRow[]>([]);
@@ -173,7 +169,23 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
         try {
             let result = await getTabs(slug);
             if (result.length === 0) {
-                const defaultTab = await createTab(slug, 'Padat');
+                // Determine default tab name based on product configuration
+                let defaultTabName = 'Padat';
+                try {
+                    const menus = await sidebarService.getAllFlat();
+                    const childMenu = menus.find(m => m.href && m.href.includes(`/${slug}/`));
+                    const parentMenu = childMenu ? menus.find(m => m.id === childMenu.parentId) : null;
+                    if (parentMenu) {
+                        const isCair = parentMenu.satuan 
+                            ? ['liter', 'ml', 'kl', 'l', 'lt'].includes(parentMenu.satuan.toLowerCase())
+                            : false;
+                        defaultTabName = parentMenu.jenis || (isCair ? 'Cair' : 'Padat');
+                    }
+                } catch (configErr) {
+                    console.error('Failed to load product configuration for default tab name:', configErr);
+                }
+
+                const defaultTab = await createTab(slug, defaultTabName);
                 result = [defaultTab];
             }
             setTabs(result);
@@ -296,42 +308,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
         }
     };
 
-    // ─── Tab Management ───
-    const handleAddTab = async () => {
-        if (!newTabName.trim()) return;
-        try {
-            await createTab(slug, newTabName);
-            setNewTabName('');
-            fetchTabs();
-        } catch (err) {
-            console.error(err);
-            alert('Gagal menambah jenis');
-        }
-    };
 
-    const handleRenameTab = async (tabId: number) => {
-        if (!editTabValue.trim()) return;
-        try {
-            await renameTabApi(tabId, editTabValue);
-            setEditingTabId(null);
-            fetchTabs();
-        } catch (err) {
-            console.error(err);
-            alert('Gagal mengubah nama jenis');
-        }
-    };
-
-    const handleDeleteTab = async (tabId: number) => {
-        if (!confirm('Hapus jenis ini beserta seluruh datanya?')) return;
-        try {
-            await deleteTabApi(tabId);
-            if (activeTabId === tabId) setActiveTabId(null);
-            fetchTabs();
-        } catch (err) {
-            console.error(err);
-            alert('Gagal menghapus jenis');
-        }
-    };
 
     // ─── Export ───
     const handleExportExcel = () => {
@@ -496,13 +473,6 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                         )}
                     </div>
                     <div className="px-6 py-3 flex items-center gap-3 shrink-0">
-                        <button
-                            onClick={() => setShowTabConfig(!showTabConfig)}
-                            className={`p-2.5 rounded-lg transition-colors ${showTabConfig ? 'bg-emerald-100 text-emerald-700' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
-                            title="Konfigurasi Jenis"
-                        >
-                            <SettingsIcon />
-                        </button>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <button className="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 text-base font-medium rounded-lg border border-gray-200 hover:bg-gray-50 shadow-sm transition-colors">
@@ -516,41 +486,6 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                         </DropdownMenu>
                     </div>
                 </div>
-
-                {/* Tab Config Panel */}
-                {showTabConfig && (
-                    <div className="border-b border-gray-100 bg-gray-50/70 p-6">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-base font-semibold text-gray-700">Konfigurasi Jenis</h3>
-                            <button onClick={() => setShowTabConfig(false)} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-white"><XIcon /></button>
-                        </div>
-                        <div className="space-y-3 mb-4">
-                            {tabs.map(tab => (
-                                <div key={tab.id} className="flex items-center gap-3 bg-white border border-gray-200 px-4 py-3 shadow-sm">
-                                    {editingTabId === tab.id ? (
-                                        <>
-                                            <input autoFocus value={editTabValue} onChange={e => setEditTabValue(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleRenameTab(tab.id); if (e.key === 'Escape') setEditingTabId(null); }} className="flex-1 text-base px-3 py-1.5 border border-emerald-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-500" />
-                                            <button onClick={() => handleRenameTab(tab.id)} className="text-emerald-600 hover:text-emerald-700 p-2 text-sm font-medium">Simpan</button>
-                                            <button onClick={() => setEditingTabId(null)} className="text-gray-400 hover:text-gray-600 p-2"><XIcon /></button>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <span className="flex-1 text-base text-gray-700 font-medium">{tab.nama}</span>
-                                            <button onClick={() => { setEditingTabId(tab.id); setEditTabValue(tab.nama); }} className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded" title="Rename"><PencilIcon /></button>
-                                            <button onClick={() => handleDeleteTab(tab.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded" title="Hapus"><TrashIcon /></button>
-                                        </>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <input value={newTabName} onChange={e => setNewTabName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleAddTab(); }} className="flex-1 text-base px-4 py-2.5 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500" placeholder="Nama jenis baru..." />
-                            <button onClick={handleAddTab} disabled={!newTabName.trim()} className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-base font-medium hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                                <PlusIcon /> Tambah
-                            </button>
-                        </div>
-                    </div>
-                )}
 
                 {/* Filter Row */}
                 <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex flex-col md:flex-row gap-4 justify-between items-end">

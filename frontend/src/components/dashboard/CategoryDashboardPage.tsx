@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, Fragment } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { getCategorySummary, type CategorySummaryResponse } from '@/lib/dashboardService';
 import { getMaintenanceSummary, type MaintenanceSummary } from '@/lib/maintenanceService';
 import {
@@ -249,8 +249,9 @@ export function CategoryDashboardPage({
                 let cairBs = 0; let cairPg = 0;
 
                 (p.production.tabs || []).forEach(t => {
-                    const fullName = `${p.label} ${t.tabName}`.toLowerCase();
-                    const isCair = fullName.includes('cair') || fullName.includes('liquid');
+                    const isCair = p.satuan 
+                        ? ['liter', 'ml', 'kl', 'l', 'lt'].includes(p.satuan.toLowerCase())
+                        : (`${p.label} ${t.tabName}`.toLowerCase().includes('cair') || `${p.label} ${t.tabName}`.toLowerCase().includes('liquid'));
                     if (isCair) {
                         cairBs += t.totalProduksi || 0;
                         cairPg += t.pengirimanGudang || 0;
@@ -260,21 +261,28 @@ export function CategoryDashboardPage({
                     }
                 });
 
-                if (padatBs > 0 || padatPg > 0) {
+                const isCairProd = p.satuan 
+                    ? ['liter', 'ml', 'kl', 'l', 'lt'].includes(p.satuan.toLowerCase())
+                    : (padatBs === 0 && (cairBs > 0 || cairPg > 0));
+
+                const defaultBaseUnit = isCairProd ? 'Liter' : 'Kg';
+                const baseUnit = p.satuan || defaultBaseUnit;
+
+                if (padatBs > 0 || padatPg > 0 || (!isCairProd && (p.satuan || padatBs > 0 || padatPg > 0))) {
                     padatData.push({
                         name: p.label.length > 12 ? p.label.substring(0, 12) + '…' : p.label,
                         fullName: p.label,
-                        produksi: convertValue(padatBs, 'Kg', padatUnit),
-                        pengiriman: convertValue(padatPg, 'Kg', padatUnit),
+                        produksi: convertValue(padatBs, baseUnit, getUnitFamily(baseUnit).includes(padatUnit) ? padatUnit : baseUnit),
+                        pengiriman: convertValue(padatPg, baseUnit, getUnitFamily(baseUnit).includes(padatUnit) ? padatUnit : baseUnit),
                     });
                 }
                 
-                if (cairBs > 0 || cairPg > 0) {
+                if (cairBs > 0 || cairPg > 0 || (isCairProd && (p.satuan || cairBs > 0 || cairPg > 0))) {
                     cairData.push({
                         name: p.label.length > 12 ? p.label.substring(0, 12) + '…' : p.label,
                         fullName: p.label,
-                        produksi: convertValue(cairBs, 'Liter', cairUnit),
-                        pengiriman: convertValue(cairPg, 'Liter', cairUnit),
+                        produksi: convertValue(cairBs, baseUnit, getUnitFamily(baseUnit).includes(cairUnit) ? cairUnit : baseUnit),
+                        pengiriman: convertValue(cairPg, baseUnit, getUnitFamily(baseUnit).includes(cairUnit) ? cairUnit : baseUnit),
                     });
                 }
             });
@@ -374,21 +382,31 @@ export function CategoryDashboardPage({
         
         const exportData: any[] = [];
         paginatedProduksiProducts.forEach(product => {
+            const isCair = product.satuan 
+                ? ['liter', 'ml', 'kl', 'l', 'lt'].includes(product.satuan.toLowerCase())
+                : false;
+            const baseUnit = product.satuan || (isCair ? 'Liter' : 'Kg');
+            const currentUnit = getUnitFamily(baseUnit).includes(isCair ? cairUnit : padatUnit) 
+                ? (isCair ? cairUnit : padatUnit) 
+                : baseUnit;
+
+            let tProduksi = 0, tBs = 0, tPs = 0, tCoa = 0, tPg = 0;
             product.production.tabs.forEach(tab => {
-                const isCair = `${product.label} ${tab.tabName}`.toLowerCase().includes('cair') || `${product.label} ${tab.tabName}`.toLowerCase().includes('liquid');
-                const baseUnit = isCair ? 'Liter' : 'Kg';
-                const currentUnit = isCair ? cairUnit : padatUnit;
-                
-                exportData.push({
-                    'Produk': product.label,
-                    'Jenis': tab.tabName,
-                    'Total Produksi': fmt(convertValue(tab.totalProduksi || 0, baseUnit, currentUnit)),
-                    'Belum Sampling': fmt(convertValue(tab.belumSampling || 0, baseUnit, currentUnit)),
-                    'Proses Sampling': fmt(convertValue(tab.prosesSampling || 0, baseUnit, currentUnit)),
-                    'COA': fmt(convertValue(tab.coa || 0, baseUnit, currentUnit)),
-                    'Pengiriman Gudang': fmt(convertValue(tab.pengirimanGudang || 0, baseUnit, currentUnit)),
-                    'Satuan': currentUnit,
-                });
+                tProduksi += tab.totalProduksi || 0;
+                tBs += tab.belumSampling || 0;
+                tPs += tab.prosesSampling || 0;
+                tCoa += tab.coa || 0;
+                tPg += tab.pengirimanGudang || 0;
+            });
+
+            exportData.push({
+                'Produk': product.label,
+                'Total Produksi': fmt(convertValue(tProduksi, baseUnit, currentUnit)),
+                'Belum Sampling': fmt(convertValue(tBs, baseUnit, currentUnit)),
+                'Proses Sampling': fmt(convertValue(tPs, baseUnit, currentUnit)),
+                'COA': fmt(convertValue(tCoa, baseUnit, currentUnit)),
+                'Pengiriman Gudang': fmt(convertValue(tPg, baseUnit, currentUnit)),
+                'Satuan': currentUnit,
             });
         });
 
@@ -406,21 +424,31 @@ export function CategoryDashboardPage({
 
         const exportData: any[] = [];
         paginatedProduksiProducts.forEach(product => {
+            const isCair = product.satuan 
+                ? ['liter', 'ml', 'kl', 'l', 'lt'].includes(product.satuan.toLowerCase())
+                : false;
+            const baseUnit = product.satuan || (isCair ? 'Liter' : 'Kg');
+            const currentUnit = getUnitFamily(baseUnit).includes(isCair ? cairUnit : padatUnit) 
+                ? (isCair ? cairUnit : padatUnit) 
+                : baseUnit;
+
+            let tProduksi = 0, tBs = 0, tPs = 0, tCoa = 0, tPg = 0;
             product.production.tabs.forEach(tab => {
-                const isCair = `${product.label} ${tab.tabName}`.toLowerCase().includes('cair') || `${product.label} ${tab.tabName}`.toLowerCase().includes('liquid');
-                const baseUnit = isCair ? 'Liter' : 'Kg';
-                const currentUnit = isCair ? cairUnit : padatUnit;
-                
-                exportData.push({
-                    produk: product.label,
-                    jenis: tab.tabName,
-                    totalProduksi: fmt(convertValue(tab.totalProduksi || 0, baseUnit, currentUnit)),
-                    belumSampling: fmt(convertValue(tab.belumSampling || 0, baseUnit, currentUnit)),
-                    prosesSampling: fmt(convertValue(tab.prosesSampling || 0, baseUnit, currentUnit)),
-                    coa: fmt(convertValue(tab.coa || 0, baseUnit, currentUnit)),
-                    pengiriman: fmt(convertValue(tab.pengirimanGudang || 0, baseUnit, currentUnit)),
-                    satuan: currentUnit,
-                });
+                tProduksi += tab.totalProduksi || 0;
+                tBs += tab.belumSampling || 0;
+                tPs += tab.prosesSampling || 0;
+                tCoa += tab.coa || 0;
+                tPg += tab.pengirimanGudang || 0;
+            });
+
+            exportData.push({
+                produk: product.label,
+                totalProduksi: fmt(convertValue(tProduksi, baseUnit, currentUnit)),
+                belumSampling: fmt(convertValue(tBs, baseUnit, currentUnit)),
+                prosesSampling: fmt(convertValue(tPs, baseUnit, currentUnit)),
+                coa: fmt(convertValue(tCoa, baseUnit, currentUnit)),
+                pengiriman: fmt(convertValue(tPg, baseUnit, currentUnit)),
+                satuan: currentUnit,
             });
         });
 
@@ -432,7 +460,6 @@ export function CategoryDashboardPage({
                 data: exportData,
                 columns: [
                     { key: 'produk', label: 'Produk' },
-                    { key: 'jenis', label: 'Jenis' },
                     { key: 'totalProduksi', label: 'Total Produksi' },
                     { key: 'belumSampling', label: 'Belum Sampling' },
                     { key: 'prosesSampling', label: 'Proses Sampling' },
@@ -564,7 +591,7 @@ export function CategoryDashboardPage({
                         <table className="w-full text-sm border-collapse">
                             <thead>
                                 <tr className="bg-gray-50/80">
-                                    {['Produk', 'Jenis', 'Total Produksi', 'Belum Sampling', 'Proses Sampling', 'COA', 'Pengiriman Gudang', 'Satuan'].map(h => (
+                                    {['Produk', 'Total Produksi', 'Belum Sampling', 'Proses Sampling', 'COA', 'Pengiriman Gudang', 'Satuan'].map(h => (
                                         <th key={h} className={`px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider border border-gray-200 ${['Total Produksi', 'Belum Sampling', 'Proses Sampling', 'COA', 'Pengiriman Gudang'].includes(h) ? 'text-right' : 'text-left'}`}>{h}</th>
                                     ))}
                                 </tr>
@@ -574,78 +601,53 @@ export function CategoryDashboardPage({
                                     const tabs = product.production.tabs;
                                     if (tabs.length === 0) return null;
                                     const color = PRODUCT_COLORS[productIdx % PRODUCT_COLORS.length];
-                                    return (
-                                        <Fragment key={product.slug}>
-                                            {tabs.map((tab, idx) => {
-                                                const isCair = `${product.label} ${tab.tabName}`.toLowerCase().includes('cair') || `${product.label} ${tab.tabName}`.toLowerCase().includes('liquid');
-                                                const baseUnit = isCair ? 'Liter' : 'Kg';
-                                                const currentUnit = isCair ? cairUnit : padatUnit;
-                                                
-                                                const vTotalProduksi = convertValue(tab.totalProduksi || 0, baseUnit, currentUnit);
-                                                const vBelumSampling = convertValue(tab.belumSampling || 0, baseUnit, currentUnit);
-                                                const vProsesSampling = convertValue(tab.prosesSampling || 0, baseUnit, currentUnit);
-                                                const vCoa = convertValue(tab.coa || 0, baseUnit, currentUnit);
-                                                const vPengirimanGudang = convertValue(tab.pengirimanGudang || 0, baseUnit, currentUnit);
 
-                                                return (
-                                                    <tr key={`${product.slug}-${tab.tabName}-${idx}`} className="hover:bg-gray-50/50 transition-colors">
-                                                        {idx === 0 && (
-                                                            <td className={`px-4 py-3 align-middle border border-gray-200 border-l-[3px] ${color.border} ${color.bg}`} rowSpan={tabs.length + 1}>
-                                                                <div className="flex items-center gap-3">
-                                                                    {PRODUCT_IMAGES[product.slug] ? (
-                                                                        <div className={`w-10 h-10 rounded-lg ring-2 ${color.ring} ring-offset-1 overflow-hidden flex-shrink-0 shadow-sm`}>
-                                                                            <img
-                                                                                src={PRODUCT_IMAGES[product.slug]}
-                                                                                alt={product.label}
-                                                                                className="w-full h-full object-cover"
-                                                                            />
-                                                                        </div>
-                                                                    ) : (
-                                                                        <div className={`w-10 h-10 bg-gradient-to-br ${color.gradientFrom} ${color.gradientTo} flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-sm`}>
-                                                                            {product.label.charAt(0)}
-                                                                        </div>
-                                                                    )}
-                                                                    <span className={`font-semibold text-sm ${color.text}`}>{product.label}</span>
-                                                                </div>
-                                                            </td>
-                                                        )}
-                                                        <td className="px-4 py-3 text-gray-600 text-xs border border-gray-200">{tab.tabName}</td>
-                                                        <td className="px-4 py-3 text-right font-mono text-gray-700 border border-gray-200">{fmt(vTotalProduksi)}</td>
-                                                        <td className="px-4 py-3 text-right font-mono text-gray-700 border border-gray-200">{fmt(vBelumSampling)}</td>
-                                                        <td className="px-4 py-3 text-right font-mono text-gray-700 border border-gray-200">{fmt(vProsesSampling)}</td>
-                                                        <td className="px-4 py-3 text-right font-mono text-gray-700 border border-gray-200">{fmt(vCoa)}</td>
-                                                        <td className="px-4 py-3 text-right font-mono text-gray-700 border border-gray-200">{fmt(vPengirimanGudang)}</td>
-                                                        <td className="px-4 py-3 text-xs text-center border border-gray-200 bg-gray-50/50 text-gray-500 font-medium">{currentUnit}</td>
-                                                    </tr>
-                                                );
-                                            })}
-                                            {/* Subtotal row */}
-                                            {(() => {
-                                                let tProduksi = 0, tBs = 0, tPs = 0, tCoa = 0, tPg = 0;
-                                                tabs.forEach(tab => {
-                                                    const isCair = `${product.label} ${tab.tabName}`.toLowerCase().includes('cair') || `${product.label} ${tab.tabName}`.toLowerCase().includes('liquid');
-                                                    const baseUnit = isCair ? 'Liter' : 'Kg';
-                                                    const currentUnit = isCair ? cairUnit : padatUnit;
-                                                    
-                                                    tProduksi += convertValue(tab.totalProduksi || 0, baseUnit, currentUnit);
-                                                    tBs += convertValue(tab.belumSampling || 0, baseUnit, currentUnit);
-                                                    tPs += convertValue(tab.prosesSampling || 0, baseUnit, currentUnit);
-                                                    tCoa += convertValue(tab.coa || 0, baseUnit, currentUnit);
-                                                    tPg += convertValue(tab.pengirimanGudang || 0, baseUnit, currentUnit);
-                                                });
-                                                return (
-                                                    <tr key={`${product.slug}-total`} className={color.totalBg}>
-                                                        <td className={`px-4 py-2 text-xs font-semibold ${color.text} uppercase border border-gray-200`}>Total</td>
-                                                        <td className="px-4 py-2 text-right font-mono font-bold text-gray-900 border border-gray-200">{fmt(tProduksi)}</td>
-                                                        <td className="px-4 py-2 text-right font-mono font-bold text-gray-900 border border-gray-200">{fmt(tBs)}</td>
-                                                        <td className="px-4 py-2 text-right font-mono font-bold text-gray-900 border border-gray-200">{fmt(tPs)}</td>
-                                                        <td className={`px-4 py-2 text-right font-mono font-bold ${color.text} border border-gray-200`}>{fmt(tCoa)}</td>
-                                                        <td className="px-4 py-2 text-right font-mono font-bold text-gray-900 border border-gray-200">{fmt(tPg)}</td>
-                                                        <td className="px-4 py-2 text-xs bg-transparent border border-gray-200"></td>
-                                                    </tr>
-                                                );
-                                            })()}
-                                        </Fragment>
+                                    const isCair = product.satuan 
+                                        ? ['liter', 'ml', 'kl', 'l', 'lt'].includes(product.satuan.toLowerCase())
+                                        : false;
+                                    const baseUnit = product.satuan || (isCair ? 'Liter' : 'Kg');
+                                    const currentUnit = getUnitFamily(baseUnit).includes(isCair ? cairUnit : padatUnit) 
+                                        ? (isCair ? cairUnit : padatUnit) 
+                                        : baseUnit;
+
+                                    let tProduksi = 0, tBs = 0, tPs = 0, tCoa = 0, tPg = 0;
+                                    tabs.forEach(tab => {
+                                        tProduksi += convertValue(tab.totalProduksi || 0, baseUnit, currentUnit);
+                                        tBs += convertValue(tab.belumSampling || 0, baseUnit, currentUnit);
+                                        tPs += convertValue(tab.prosesSampling || 0, baseUnit, currentUnit);
+                                        tCoa += convertValue(tab.coa || 0, baseUnit, currentUnit);
+                                        tPg += convertValue(tab.pengirimanGudang || 0, baseUnit, currentUnit);
+                                    });
+
+                                    const displayImage = product.imageUrl || PRODUCT_IMAGES[product.slug];
+
+                                    return (
+                                        <tr key={product.slug} className={`hover:bg-gray-50/50 transition-colors ${color.bg}`}>
+                                            <td className={`px-4 py-3 align-middle border border-gray-200 border-l-[3px] ${color.border}`}>
+                                                <div className="flex items-center gap-3">
+                                                    {displayImage ? (
+                                                        <div className={`w-10 h-10 rounded-lg ring-2 ${color.ring} ring-offset-1 overflow-hidden flex-shrink-0 shadow-sm`}>
+                                                            <img
+                                                                src={displayImage}
+                                                                alt={product.label}
+                                                                className="w-full h-full object-cover"
+                                                            />
+                                                        </div>
+                                                    ) : (
+                                                        <div className={`w-10 h-10 bg-gradient-to-br ${color.gradientFrom} ${color.gradientTo} flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-sm`}>
+                                                            {product.label.charAt(0)}
+                                                        </div>
+                                                    )}
+                                                    <span className={`font-semibold text-sm ${color.text}`}>{product.label}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-right font-mono text-gray-700 border border-gray-200">{fmt(tProduksi)}</td>
+                                            <td className="px-4 py-3 text-right font-mono text-gray-700 border border-gray-200">{fmt(tBs)}</td>
+                                            <td className="px-4 py-3 text-right font-mono text-gray-700 border border-gray-200">{fmt(tPs)}</td>
+                                            <td className="px-4 py-3 text-right font-mono text-gray-700 border border-gray-200">{fmt(tCoa)}</td>
+                                            <td className="px-4 py-3 text-right font-mono text-gray-700 border border-gray-200">{fmt(tPg)}</td>
+                                            <td className="px-4 py-3 text-xs text-center border border-gray-200 bg-gray-50/50 text-gray-500 font-medium">{currentUnit}</td>
+                                        </tr>
                                     );
                                 })}
                             </tbody>

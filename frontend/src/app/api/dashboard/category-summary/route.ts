@@ -125,7 +125,8 @@ export async function GET(request: Request) {
         }
 
         // 2. Product labels
-        const productLabels: { [key: string]: string } = {};
+        // 2. Product labels and details
+        const productDetailsMap: { [key: string]: { label: string, jenis: string, satuan: string, imageUrl: string } } = {};
         for (const menu of allMenus || []) {
             const href = menu.href || menu.Href;
             const parentId = menu.parent_id || menu.ParentId;
@@ -133,8 +134,13 @@ export async function GET(request: Request) {
             for (const slug of productSlugs) {
                 if (href && href.includes(`/${slug}/`)) {
                     const parent = (allMenus || []).find((m: any) => (m.id || m.Id) === parentId);
-                    if (parent && !productLabels[slug]) {
-                        productLabels[slug] = parent.label || parent.Label;
+                    if (parent && !productDetailsMap[slug]) {
+                        productDetailsMap[slug] = {
+                            label: parent.label || parent.Label || '',
+                            jenis: parent.jenis || parent.Jenis || '',
+                            satuan: parent.satuan || parent.Satuan || '',
+                            imageUrl: parent.image_url || parent.ImageUrl || '',
+                        };
                     }
                 }
             }
@@ -304,9 +310,13 @@ export async function GET(request: Request) {
                 };
             });
 
+            const details = productDetailsMap[slug] || { label: titleCase(slug), jenis: '', satuan: '', imageUrl: '' };
             results.push({
                 slug,
-                label: productLabels[slug] || titleCase(slug),
+                label: details.label,
+                jenis: details.jenis,
+                satuan: details.satuan,
+                imageUrl: details.imageUrl,
                 materials: materialSummary,
                 production: {
                     tabs: tabSummaries,

@@ -16,8 +16,14 @@ export async function GET(
         // Fetch all and filter
         const { data: allAssignments } = await db.from<any>('product_materials').select('*').execute();
         const assignments = (allAssignments || []).filter((a: any) => (a.master_item_id || a.MasterItemId) === id);
+        const formattedAssignments = assignments.map((a: any) => ({
+            id: a.id || a.Id,
+            productSlug: a.product_slug || a.ProductSlug,
+            masterItemId: a.master_item_id || a.MasterItemId,
+            jenis: a.jenis || a.Jenis
+        }));
 
-        return NextResponse.json(assignments);
+        return NextResponse.json(formattedAssignments);
     } catch (error) {
         console.error('Error fetching assignments:', error);
         return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });

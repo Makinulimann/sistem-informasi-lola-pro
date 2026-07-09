@@ -10,6 +10,9 @@ export interface SidebarMenu {
     order: number;
     isActive: boolean;
     roleAccess?: string;
+    imageUrl?: string | null;
+    jenis?: string | null;
+    satuan?: string | null;
 }
 
 export const sidebarService = {
@@ -32,9 +35,12 @@ export const sidebarService = {
         parentId?: number | null;
         order: number;
         roleAccess?: string;
+        imageUrl?: string | null;
+        jenis?: string | null;
+        satuan?: string | null;
         children?: { label: string; icon?: string; href?: string }[];
     }) => {
-        return api.post<SidebarMenu>('/sidebar/create-with-children', data);
+        return api.post<SidebarMenu>('/sidebar', data);
     },
 
     update: async (id: number, menu: Partial<SidebarMenu>) => {

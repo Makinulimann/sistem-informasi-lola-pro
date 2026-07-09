@@ -175,7 +175,8 @@ export default function SidebarManagementPage() {
         const siblings = menus.filter(m =>
             parentId ? m.parentId === parentId : !m.parentId
         );
-        return siblings.length > 0 ? Math.max(...siblings.map(s => s.order)) + 1 : 1;
+        const productSiblings = siblings.filter(s => s.order < 1000);
+        return productSiblings.length > 0 ? Math.max(...productSiblings.map(s => s.order)) + 1 : 1;
     };
 
     // Helper: build href based on level and parent chain

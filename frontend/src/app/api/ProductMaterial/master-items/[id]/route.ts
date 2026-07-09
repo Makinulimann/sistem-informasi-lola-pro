@@ -42,7 +42,16 @@ export async function PUT(
             return NextResponse.json({ message: 'Failed to update' }, { status: 500 });
         }
 
-        return NextResponse.json(updated);
+        const formattedUpdated = {
+            id: updated.id || updated.Id,
+            nama: updated.nama || updated.Nama,
+            kode: updated.kode || updated.Kode,
+            satuanDefault: updated.satuan_default || updated.SatuanDefault,
+            scopeProductSlug: updated.scope_product_slug || updated.ScopeProductSlug,
+            isActive: updated.is_active || updated.IsActive
+        };
+
+        return NextResponse.json(formattedUpdated);
     } catch (error) {
         console.error('Error updating master item:', error);
         return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });

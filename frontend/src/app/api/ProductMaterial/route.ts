@@ -1,6 +1,4 @@
 export const dynamic = 'force-dynamic';
-// Using Node.js runtime for Prisma compatibility
-// Edge runtime now supported with Supabase!
 export const runtime = 'edge';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/supabase';
@@ -40,7 +38,14 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'Failed to assign material' }, { status: 500 });
         }
 
-        return NextResponse.json(pm);
+        const formattedPm = {
+            id: pm.id || pm.Id,
+            productSlug: pm.product_slug || pm.ProductSlug,
+            masterItemId: pm.master_item_id || pm.MasterItemId,
+            jenis: pm.jenis || pm.Jenis
+        };
+
+        return NextResponse.json(formattedPm);
     } catch (error) {
         console.error('Error assigning material:', error);
         return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });

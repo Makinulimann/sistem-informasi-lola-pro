@@ -33,6 +33,9 @@ export interface ProductionSummary {
 export interface ProductSummary {
     slug: string;
     label: string;
+    jenis?: string;
+    satuan?: string;
+    imageUrl?: string;
     materials: MaterialSummary[];
     production: ProductionSummary;
 }

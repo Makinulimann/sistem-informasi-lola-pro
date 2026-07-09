@@ -17,7 +17,21 @@ export async function GET() {
             return (a.parent_id || 0) - (b.parent_id || 0);
         });
         
-        return NextResponse.json(sortedMenus);
+        const mappedMenus = sortedMenus.map((m: any) => ({
+            id: m.id,
+            label: m.label,
+            icon: m.icon || '',
+            href: m.href || '#',
+            parentId: m.parent_id,
+            order: m.order,
+            isActive: m.is_active,
+            roleAccess: m.role_access,
+            imageUrl: m.image_url || null,
+            jenis: m.jenis || null,
+            satuan: m.satuan || null,
+        }));
+        
+        return NextResponse.json(mappedMenus);
     } catch (error) {
         console.error('Error fetching all sidebar menus:', error);
         return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });

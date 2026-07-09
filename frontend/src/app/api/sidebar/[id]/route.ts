@@ -33,6 +33,9 @@ export async function PUT(
         if (body.order !== undefined || body.Order !== undefined) updateData.order = body.order || body.Order;
         if (body.isActive !== undefined || body.IsActive !== undefined) updateData.is_active = body.isActive ?? body.IsActive;
         if (body.roleAccess !== undefined || body.RoleAccess !== undefined) updateData.role_access = body.roleAccess || body.RoleAccess;
+        if (body.imageUrl !== undefined || body.ImageUrl !== undefined) updateData.image_url = body.imageUrl || body.ImageUrl;
+        if (body.jenis !== undefined || body.Jenis !== undefined) updateData.jenis = body.jenis || body.Jenis;
+        if (body.satuan !== undefined || body.Satuan !== undefined) updateData.satuan = body.satuan || body.Satuan;
 
         const { data: updated, error: updateError } = await db.from<any>('sidebar_menus').update(updateData).eq('id', id);
 
@@ -41,7 +44,19 @@ export async function PUT(
             return NextResponse.json({ message: 'Failed to update' }, { status: 500 });
         }
 
-        return NextResponse.json(updated);
+        return NextResponse.json(updated ? {
+            id: updated.id,
+            label: updated.label,
+            icon: updated.icon,
+            href: updated.href,
+            parentId: updated.parent_id,
+            order: updated.order,
+            isActive: updated.is_active,
+            roleAccess: updated.role_access,
+            imageUrl: updated.image_url,
+            jenis: updated.jenis,
+            satuan: updated.satuan,
+        } : null);
     } catch (error) {
         console.error('Error updating sidebar menu:', error);
         return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });

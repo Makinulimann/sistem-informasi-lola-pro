@@ -339,8 +339,8 @@ function EditMaterialModal({ isOpen, onClose, initialData, jenis, productSlug, o
                 // Filter only assignments of the SAME TYPE (jenis) to avoid confusion
                 // e.g. If editing "Bahan Baku", only show "Bahan Baku" assignments.
                 const currentTypeAssignments = assignments
-                    .filter(a => a.jenis === jenis)
-                    .map(a => a.productSlug);
+                    .filter(a => (a.jenis || (a as any).Jenis) === jenis)
+                    .map(a => a.productSlug || (a as any).product_slug || (a as any).ProductSlug);
 
                 setOriginalAssignments(currentTypeAssignments);
                 setSelectedProductSlugs(currentTypeAssignments);
@@ -391,7 +391,7 @@ function EditMaterialModal({ isOpen, onClose, initialData, jenis, productSlug, o
                 // We re-fetch assignments to get correct IDs (safest way)
                 const freshAssignments = await masterItemService.getMasterItemAssignments(initialData.id);
                 const toRemoveIds = freshAssignments
-                    .filter(a => removed.some(r => normalizeSlug(r) === normalizeSlug(a.productSlug)) && a.jenis === jenis)
+                    .filter(a => removed.some(r => normalizeSlug(r) === normalizeSlug(a.productSlug || (a as any).product_slug || (a as any).ProductSlug)) && (a.jenis || (a as any).Jenis) === jenis)
                     .map(a => a.id);
 
                 await Promise.all(toRemoveIds.map(id =>
