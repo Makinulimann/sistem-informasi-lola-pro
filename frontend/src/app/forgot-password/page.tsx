@@ -202,7 +202,7 @@ function ForgotPasswordContent() {
                     </button>
                     <Link
                         href="/"
-                        className="inline-flex items-center justify-center w-full px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
+                        className="inline-flex items-center justify-center w-full px-4 py-3 bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200 transition-colors"
                     >
                         Kembali ke halaman Login
                     </Link>
