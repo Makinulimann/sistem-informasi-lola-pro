@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { bahanBakuService, type BalanceStokRow } from '@/lib/bahanBakuService';
-import { saveProduksiWithMaterials, getMutasiForProduksi, type MaterialUsage } from '@/lib/produksiService';
+import { saveProduksiWithMaterials, getMutasiForProduksi, getBOM, type MaterialUsage } from '@/lib/produksiService';
+import { api } from '@/lib/api';
 
 /* ─── Icons ─── */
 function CloseIcon() {
@@ -182,8 +183,8 @@ export function BelumSamplingModal({
     const loadMaterials = async () => {
         setLoadingMaterials(true);
         try {
-            // Fetch balance stok and existing mutasi in parallel
-            const [balanceData, existingMutasi] = await Promise.all([
+            // Fetch balance stok, existing mutasi, product materials, and BOM in parallel
+            const [balanceData, existingMutasi, productMaterials, bomConfig] = await Promise.all([
                 bahanBakuService.getBalanceStok({
                     productSlug,
                     bulan: String(bulan).padStart(2, '0'),
@@ -192,12 +193,33 @@ export function BelumSamplingModal({
                 currentBs > 0
                     ? getMutasiForProduksi(productSlug, tanggal)
                     : Promise.resolve([]),
+                api.get<any[]>(`/ProductMaterial/${productSlug}`).catch(() => []),
+                getBOM(productSlug, tabId).catch(() => null),
             ]);
 
             // Build a lookup of existing mutasi by namaBahan
             const mutasiMap = new Map<string, { kuantum: number; satuan: string }>();
             for (const m of existingMutasi) {
                 mutasiMap.set(m.namaBahan, { kuantum: m.kuantum, satuan: m.satuan });
+            }
+
+            // Map masterItemId to BOM material quantity
+            const bomMap = new Map<number, number>();
+            if (bomConfig && Array.isArray(bomConfig.items)) {
+                bomConfig.items.forEach((item: any) => {
+                    bomMap.set(item.materialId, Number(item.quantity || 0));
+                });
+            }
+
+            // Map material name to BOM quantity using ProductMaterial mapping
+            const bomQtyByName = new Map<string, number>();
+            if (Array.isArray(productMaterials)) {
+                productMaterials.forEach((pm: any) => {
+                    const bomQty = bomMap.get(pm.masterItemId);
+                    if (bomQty !== undefined && bomQty > 0) {
+                        bomQtyByName.set(pm.nama, bomQty);
+                    }
+                });
             }
 
             setMaterials(
@@ -208,13 +230,24 @@ export function BelumSamplingModal({
                     const stokWithRestore = existing
                         ? row.stok + convertUnit(existing.kuantum, normalizeUnit(existing.satuan), base)
                         : row.stok;
+
+                    // Auto calculate based on BOM if it is a new production input
+                    let defaultKuantum = 0;
+                    if (existing) {
+                        defaultKuantum = existing.kuantum;
+                    } else if (bomConfig && bomConfig.baseQuantity > 0 && bomQtyByName.has(row.nama)) {
+                        const bomQty = bomQtyByName.get(row.nama) || 0;
+                        const calculatedVal = (Number(bsValue) / bomConfig.baseQuantity) * bomQty;
+                        defaultKuantum = Math.round(calculatedVal * 1000) / 1000;
+                    }
+
                     return {
                         namaBahan: row.nama,
                         jenis: row.jenis === 'Baku' ? 'Bahan Baku' : 'Bahan Penolong',
                         baseSatuan: base,
                         displaySatuan: existing ? normalizeUnit(existing.satuan) : base,
                         stokTersedia: stokWithRestore,
-                        kuantum: existing ? existing.kuantum : 0,
+                        kuantum: defaultKuantum,
                     };
                 })
             );

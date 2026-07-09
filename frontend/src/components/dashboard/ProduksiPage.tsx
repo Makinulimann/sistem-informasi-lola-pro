@@ -29,6 +29,7 @@ import { AppSelect } from '@/components/ui/app-select';
 import { AppSearchBar } from '@/components/ui/app-search-bar';
 import { AppButton } from '@/components/ui/app-button';
 import { AppPeriodFilter } from '@/components/ui/app-period-filter';
+import { BomConfigTab } from './BomConfigTab';
 
 /* ─── Unit Conversion ─── */
 const MASS_UNITS = ['Ton', 'Kwintal', 'Kg', 'Gram', 'Mg'];
@@ -117,6 +118,11 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
     const [tabs, setTabs] = useState<ProduksiTab[]>([]);
     const [activeTabId, setActiveTabId] = useState<number | null>(null);
     const [tabsLoading, setTabsLoading] = useState(true);
+    const [subTab, setSubTab] = useState<'produksi' | 'bom'>('produksi');
+
+    useEffect(() => {
+        setSubTab('produksi');
+    }, [activeTabId]);
 
 
     // Data
@@ -457,38 +463,50 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                 {/* Tabs Row */}
                 <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50/30">
                     <div className="flex overflow-x-auto scrollbar-hide items-center">
-                        {tabsLoading ? (
-                            <div className="px-6 py-4 text-gray-400">Memuat tab...</div>
-                        ) : (
-                            tabs.map(tab => (
-                                <button
-                                    key={tab.id}
-                                    onClick={() => setActiveTabId(tab.id)}
-                                    className={`px-6 py-4 text-base font-medium transition-colors relative whitespace-nowrap
-                                    ${activeTabId === tab.id ? 'text-emerald-700 bg-white border-b-2 border-emerald-600' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}
-                                >
-                                    {tab.nama}
-                                </button>
-                            ))
-                        )}
+                        <button
+                            onClick={() => setSubTab('produksi')}
+                            className={`px-6 py-4 text-base font-semibold transition-colors relative whitespace-nowrap
+                            ${subTab === 'produksi' ? 'text-emerald-700 bg-white border-b-2 border-emerald-600' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}
+                        >
+                            Data Produksi
+                        </button>
+                        <button
+                            onClick={() => setSubTab('bom')}
+                            className={`px-6 py-4 text-base font-semibold transition-colors relative whitespace-nowrap
+                            ${subTab === 'bom' ? 'text-emerald-700 bg-white border-b-2 border-emerald-600' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}
+                        >
+                            Konfigurasi BOM
+                        </button>
                     </div>
-                    <div className="px-6 py-3 flex items-center gap-3 shrink-0">
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <button className="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 text-base font-medium rounded-lg border border-gray-200 hover:bg-gray-50 shadow-sm transition-colors">
-                                    <DownloadIcon /> Export
-                                </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={handleExportExcel} className="py-2 px-4 text-base cursor-pointer">Excel</DropdownMenuItem>
-                                <DropdownMenuItem onClick={handleExportPDF} className="py-2 px-4 text-base cursor-pointer">PDF</DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    </div>
+                    {subTab === 'produksi' && (
+                        <div className="px-6 py-3 flex items-center gap-3 shrink-0">
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <button className="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 text-base font-medium rounded-lg border border-gray-200 hover:bg-gray-50 shadow-sm transition-colors">
+                                        <DownloadIcon /> Export
+                                    </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={handleExportExcel} className="py-2 px-4 text-base cursor-pointer">Excel</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={handleExportPDF} className="py-2 px-4 text-base cursor-pointer">PDF</DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+                    )}
                 </div>
 
+                {subTab === 'bom' && activeTabId && activeTabObj && (
+                    <BomConfigTab
+                        productSlug={slug}
+                        tabId={activeTabId}
+                        productName={productName}
+                        variantName={activeTabObj.nama}
+                        baseUnit={baseUnit}
+                    />
+                )}
+
                 {/* Filter Row */}
-                <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex flex-col md:flex-row gap-4 justify-between items-end">
+                <div className={`${subTab === 'produksi' ? '' : 'hidden'} p-4 border-b border-gray-100 bg-gray-50/50 flex flex-col md:flex-row gap-4 justify-between items-end`}>
                     <div className="flex flex-wrap items-center gap-3">
                         <AppPeriodFilter
                             month={bulan}
@@ -513,7 +531,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                 </div>
 
                 {/* ═══════════════════ TABLE ═══════════════════ */}
-                {loading ? (
+                {subTab === 'produksi' && (loading ? (
                     <div className="p-12 text-center text-gray-400 text-lg">Memuat data...</div>
                 ) : (
                     <div className="overflow-x-auto">
@@ -691,7 +709,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                             </tbody>
                         </table>
                     </div>
-                )}
+                ))}
             </div>
 
             {/* Belum Sampling Modal */}

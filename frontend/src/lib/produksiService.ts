@@ -173,3 +173,30 @@ export async function updateCOA(data: UpdateCOARequest): Promise<void> {
     return api.post<void>('/Produksi/update-coa', data);
 }
 
+// ─── BOM Configuration ───
+
+export interface BOMItem {
+    id?: number;
+    materialId: number;
+    quantity: number;
+}
+
+export interface BOMConfig {
+    baseQuantity: number;
+    items: BOMItem[];
+}
+
+export async function getBOM(productSlug: string, tabId: number): Promise<BOMConfig> {
+    return api.get<BOMConfig>(`/Produksi/bom?productSlug=${encodeURIComponent(productSlug)}&tabId=${tabId}`);
+}
+
+export async function saveBOM(data: {
+    productSlug: string;
+    tabId: number;
+    baseQuantity: number;
+    items: BOMItem[];
+}): Promise<{ success: boolean; message: string }> {
+    return api.post<{ success: boolean; message: string }>('/Produksi/bom', data);
+}
+
+
