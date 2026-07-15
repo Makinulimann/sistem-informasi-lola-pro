@@ -19,6 +19,7 @@ import {
     type AnalisaRow,
     type SaveAnalisaRequest
 } from '@/lib/analisaService';
+import { getProduksi } from '@/lib/produksiService';
 import { AppModal } from '@/components/ui/app-modal';
 import { AppButton } from '@/components/ui/app-button';
 import { AppPeriodFilter } from '@/components/ui/app-period-filter';
@@ -85,65 +86,271 @@ function StatusBadge({ status }: { status: string }) {
 /*  Form Modal                                 */
 /* ═══════════════════════════════════════════ */
 
+/* ─── SearchableSelect Component ─── */
+interface SearchableSelectProps {
+    value: string;
+    onChange: (value: string) => void;
+    options: string[];
+    placeholder: string;
+    disabled?: boolean;
+}
+
+function SearchableSelect({ value, onChange, options, placeholder, disabled }: SearchableSelectProps) {
+    const [isOpen, setIsOpen] = useState(false);
+    const [search, setSearch] = useState('');
+
+    const filteredOptions = useMemo(() => {
+        if (!search) return options.slice(0, 10);
+        return options.filter(opt => opt.toLowerCase().includes(search.toLowerCase()));
+    }, [options, search]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const handleOutsideClick = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            if (!target.closest('.searchable-select-container')) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('click', handleOutsideClick);
+        return () => document.removeEventListener('click', handleOutsideClick);
+    }, [isOpen]);
+
+    return (
+        <div className="relative searchable-select-container w-full">
+            <button
+                type="button"
+                disabled={disabled}
+                onClick={() => setIsOpen(!isOpen)}
+                className={`w-full px-3 py-2.5 bg-white border border-gray-200 text-sm text-left text-gray-700 flex items-center justify-between transition-all focus:outline-none rounded-lg ${
+                    disabled ? "bg-gray-50 text-gray-400 cursor-not-allowed" : "cursor-pointer hover:border-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/40"
+                }`}
+            >
+                <span className={!value ? "text-gray-400" : ""}>
+                    {value || placeholder}
+                </span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 font-bold">
+                    <polyline points="6 9 12 15 18 9" />
+                </svg>
+            </button>
+
+            {isOpen && (
+                <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 shadow-xl rounded-lg z-50 p-2 space-y-2 max-h-72 overflow-hidden">
+                    <input
+                        type="text"
+                        autoFocus
+                        placeholder="Ketik untuk mencari..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="w-full px-3 py-1.5 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 rounded-md transition-all"
+                    />
+                    <div className="max-h-48 overflow-y-auto divide-y divide-gray-50">
+                        {filteredOptions.length === 0 ? (
+                            <div className="px-3 py-2 text-xs text-gray-400 italic">
+                                Tidak ada hasil pencarian
+                            </div>
+                        ) : (
+                            filteredOptions.map((opt) => (
+                                <button
+                                    key={opt}
+                                    type="button"
+                                    onClick={() => {
+                                        onChange(opt);
+                                        setIsOpen(false);
+                                        setSearch('');
+                                    }}
+                                    className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 transition-all font-medium"
+                                >
+                                    {opt}
+                                </button>
+                            ))
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
 interface ModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSave: (data: SaveAnalisaRequest) => Promise<void>;
     initialData?: AnalisaRow | null;
     productSlug: string;
+    userRole: string | null;
 }
 
-const fieldCls = 'w-full px-3 py-2.5 border border-gray-200 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition-all bg-white';
+const fieldCls = 'w-full px-3 py-2.5 border border-gray-200 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition-all bg-white rounded-lg';
 
-function AnalisaFormModal({ isOpen, onClose, onSave, initialData, productSlug }: ModalProps) {
+function AnalisaFormModal({ isOpen, onClose, onSave, initialData, productSlug, userRole }: ModalProps) {
     const [tanggalSampling, setTanggalSampling] = useState('');
     const [noBAPC, setNoBAPC] = useState('');
     const [kuantum, setKuantum] = useState('');
-    const [lembaga, setLembaga] = useState('');
-    const [hasilAnalisa, setHasilAnalisa] = useState('Pending');
-    const [tanggalAnalisa, setTanggalAnalisa] = useState('');
+    const [hasilAnalisa, setHasilAnalisa] = useState('Lolos');
+    const [existingDokumen, setExistingDokumen] = useState('');
+    const [file, setFile] = useState<File | null>(null);
+    const [dragActive, setDragActive] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
+
+    const [batches, setBatches] = useState<{ kode: string; bsWip: number }[]>([]);
+    const [isLoadingBatches, setIsLoadingBatches] = useState(false);
+
+    // Fetch batches when modal is opened
+    useEffect(() => {
+        if (isOpen) {
+            const fetchBatches = async () => {
+                setIsLoadingBatches(true);
+                try {
+                    const res = await getProduksi(productSlug);
+                    if (res && res.availableBatches) {
+                        setBatches(res.availableBatches.map(b => ({ kode: b.kode, bsWip: b.bsWip })));
+                    } else if (res && res.data) {
+                        const seen = new Set<string>();
+                        const list: { kode: string; bsWip: number }[] = [];
+                        res.data.forEach(row => {
+                            if (row.batchKode && !seen.has(row.batchKode)) {
+                                seen.add(row.batchKode);
+                                list.push({ kode: row.batchKode, bsWip: row.bs || 0 });
+                            }
+                        });
+                        setBatches(list);
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch batches:', error);
+                } finally {
+                    setIsLoadingBatches(false);
+                }
+            };
+            fetchBatches();
+        }
+    }, [isOpen, productSlug]);
 
     useEffect(() => {
         if (isOpen) {
             setFormError(null);
+            setFile(null);
             if (initialData) {
                 setTanggalSampling(formatDateForInput(initialData.tanggalSampling));
                 setNoBAPC(initialData.noBAPC);
                 setKuantum(initialData.kuantum.toString());
-                setLembaga(initialData.lembaga);
                 setHasilAnalisa(initialData.hasilAnalisa);
-                setTanggalAnalisa(formatDateForInput(initialData.tanggalAnalisa));
+                setExistingDokumen(initialData.dokumen || '');
             } else {
                 setTanggalSampling(formatDateForInput(new Date().toISOString()));
                 setNoBAPC('');
                 setKuantum('');
-                setLembaga('');
-                setHasilAnalisa('Pending');
-                setTanggalAnalisa('');
+                setHasilAnalisa('Lolos');
+                setExistingDokumen('');
             }
         }
     }, [isOpen, initialData]);
 
+    // Automatically sync Kuantum with the selected Batch
+    useEffect(() => {
+        if (noBAPC) {
+            const matched = batches.find(b => b.kode === noBAPC);
+            if (matched) {
+                setKuantum(matched.bsWip.toString());
+            }
+        } else {
+            setKuantum('');
+        }
+    }, [noBAPC, batches]);
+
+    const handleDrag = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.type === "dragenter" || e.type === "dragover") {
+            setDragActive(true);
+        } else if (e.type === "dragleave") {
+            setDragActive(false);
+        }
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragActive(false);
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            validateAndSetFile(e.dataTransfer.files[0]);
+        }
+    };
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            validateAndSetFile(e.target.files[0]);
+        }
+    };
+
+    const validateAndSetFile = (f: File) => {
+        const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
+        if (!allowedTypes.includes(f.type)) {
+            alert('File harus berupa JPG, PNG, atau PDF.');
+            return;
+        }
+        if (f.size > 5 * 1024 * 1024) {
+            alert('Ukuran file maksimal 5MB.');
+            return;
+        }
+        setFile(f);
+    };
+
+    const uploadToCloudinary = async (fileToUpload: File): Promise<string> => {
+        const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+        const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+
+        if (!cloudName || !uploadPreset) {
+            console.warn("Cloudinary configuration missing. Using mock Cloudinary URL.");
+            return `https://res.cloudinary.com/demo/image/upload/v1700000000/${encodeURIComponent(fileToUpload.name)}`;
+        }
+
+        const formData = new FormData();
+        formData.append('file', fileToUpload);
+        formData.append('upload_preset', uploadPreset);
+
+        const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/upload`, {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (!res.ok) {
+            throw new Error('Gagal mengunggah berkas ke Cloudinary');
+        }
+
+        const data = await res.json();
+        return data.secure_url;
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setFormError(null);
+        if (!noBAPC) {
+            setFormError('Batch harus dipilih.');
+            return;
+        }
         try {
             setIsSaving(true);
+            let docName = existingDokumen;
+            if (file) {
+                docName = await uploadToCloudinary(file);
+            }
+
             await onSave({
                 productSlug,
                 tanggalSampling: new Date(tanggalSampling).toISOString(),
                 noBAPC,
-                kuantum: parseFloat(kuantum),
-                lembaga,
+                kuantum: parseFloat(kuantum || '0'),
+                lembaga: '-',
                 hasilAnalisa,
-                tanggalAnalisa: tanggalAnalisa ? new Date(tanggalAnalisa).toISOString() : null,
+                tanggalAnalisa: null,
+                dokumen: docName
             });
             onClose();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Save failed', error);
-            setFormError('Gagal menyimpan data.');
+            setFormError(error.message || 'Gagal menyimpan data.');
         } finally {
             setIsSaving(false);
         }
@@ -159,11 +366,13 @@ function AnalisaFormModal({ isOpen, onClose, onSave, initialData, productSlug }:
         </>
     );
 
+    const batchOptions = batches.map(b => b.kode);
+
     return (
         <AppModal
             isOpen={isOpen}
             onClose={onClose}
-            title={initialData ? 'Edit Data Analisa' : 'Tambah Data Analisa'}
+            title={userRole === 'Riset' ? 'Verifikasi Hasil Analisa' : (initialData ? 'Edit Data Analisa' : 'Tambah Data Analisa')}
             footer={footer}
         >
             <form id="analisa-form" onSubmit={handleSubmit} className="space-y-4">
@@ -173,6 +382,7 @@ function AnalisaFormModal({ isOpen, onClose, onSave, initialData, productSlug }:
                         <input
                             type="date"
                             required
+                            disabled={userRole === 'Riset'}
                             value={tanggalSampling}
                             onChange={e => setTanggalSampling(e.target.value)}
                             className={fieldCls}
@@ -180,44 +390,23 @@ function AnalisaFormModal({ isOpen, onClose, onSave, initialData, productSlug }:
                     </div>
                     <div className="space-y-1.5">
                         <label className="block text-sm font-medium text-gray-700">Batch</label>
-                        <input
-                            type="text"
-                            required
-                            placeholder="Misal: Batch1"
+                        <SearchableSelect
                             value={noBAPC}
-                            onChange={e => setNoBAPC(e.target.value)}
-                            className={fieldCls}
+                            onChange={setNoBAPC}
+                            options={batchOptions}
+                            placeholder={isLoadingBatches ? "Memuat batch..." : "Pilih Batch"}
+                            disabled={isLoadingBatches || userRole === 'Riset'}
                         />
                     </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                        <label className="block text-base font-semibold text-gray-800">Kuantum</label>
-                        <input
-                            type="number"
-                            step="0.01"
-                            required
-                            placeholder="0.00"
-                            value={kuantum}
-                            onChange={e => setKuantum(e.target.value)}
-                            className={fieldCls}
-                        />
+                        <label className="block text-sm font-medium text-gray-700">Kuantum</label>
+                        <div className="w-full px-3 py-2.5 border border-gray-200 text-sm text-gray-500 bg-gray-50/50 font-mono">
+                            {kuantum ? fmt(parseFloat(kuantum)) : '0.0'} Kg
+                        </div>
                     </div>
-                    <div className="space-y-1.5">
-                        <label className="block text-base font-semibold text-gray-800">Lembaga Sampling</label>
-                        <input
-                            type="text"
-                            required
-                            placeholder="Misal: Petrokimia Gresik"
-                            value={lembaga}
-                            onChange={e => setLembaga(e.target.value)}
-                            className={fieldCls}
-                        />
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                         <label className="block text-sm font-medium text-gray-700">Hasil Analisa</label>
                         <select
@@ -225,20 +414,72 @@ function AnalisaFormModal({ isOpen, onClose, onSave, initialData, productSlug }:
                             onChange={e => setHasilAnalisa(e.target.value)}
                             className={fieldCls}
                         >
-                            <option value="Pending">Pending</option>
+                            {hasilAnalisa === 'Pending' && <option value="Pending">Pending</option>}
                             <option value="Lolos">Lolos</option>
                             <option value="Tidak Lolos">Tidak Lolos</option>
                         </select>
                     </div>
-                    <div className="space-y-1.5">
-                        <label className="block text-sm font-medium text-gray-700">Tanggal Analisa</label>
-                        <input
-                            type="date"
-                            value={tanggalAnalisa}
-                            onChange={e => setTanggalAnalisa(e.target.value)}
-                            className={fieldCls}
-                        />
-                    </div>
+                </div>
+
+                <div className="space-y-1.5">
+                    <label className="block text-sm font-medium text-gray-700">Dokumen Analisa (JPG, PNG, PDF max 5MB)</label>
+                    {file || existingDokumen ? (
+                        <div className="flex items-center justify-between p-3 border border-emerald-200 bg-emerald-50/30">
+                            <div className="flex items-center gap-2 overflow-hidden">
+                                <svg className="text-emerald-600 shrink-0" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                <span className="text-sm font-medium text-gray-700 truncate">
+                                    {file ? file.name : existingDokumen}
+                                </span>
+                                {file && (
+                                    <span className="text-xs text-gray-400 font-mono shrink-0">
+                                        ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                                    </span>
+                                )}
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setFile(null);
+                                    setExistingDokumen('');
+                                }}
+                                className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                            >
+                                <XIcon />
+                            </button>
+                        </div>
+                    ) : (
+                        <div
+                            onDragEnter={handleDrag}
+                            onDragOver={handleDrag}
+                            onDragLeave={handleDrag}
+                            onDrop={handleDrop}
+                            onClick={() => document.getElementById('analisa-file-input')?.click()}
+                            className={`border-2 border-dashed p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center space-y-1.5 ${
+                                dragActive
+                                    ? 'border-emerald-500 bg-emerald-50/50'
+                                    : 'border-gray-300 hover:border-emerald-400 hover:bg-gray-50/50'
+                            }`}
+                        >
+                            <input
+                                id="analisa-file-input"
+                                type="file"
+                                accept=".jpg,.jpeg,.png,.pdf"
+                                className="hidden"
+                                onChange={handleFileChange}
+                            />
+                            <svg className="text-gray-400 mb-1" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                <polyline points="17 8 12 3 7 8" />
+                                <line x1="12" y1="3" x2="12" y2="15" />
+                            </svg>
+                            <p className="text-sm font-semibold text-gray-700">
+                                Pilih file atau drop disini
+                            </p>
+                            <p className="text-xs text-gray-400">
+                                JPG, PNG, atau PDF hingga 5MB
+                            </p>
+                        </div>
+                    )}
                 </div>
             </form>
         </AppModal>
@@ -266,6 +507,7 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
 
     const [data, setData] = useState<AnalisaRow[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [userRole, setUserRole] = useState<string | null>(null);
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingData, setEditingData] = useState<AnalisaRow | null>(null);
@@ -273,6 +515,21 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
     const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; id: number | null }>({ isOpen: false, id: null });
     const [isDeleting, setIsDeleting] = useState(false);
     const [pageError, setPageError] = useState<string | null>(null);
+
+    useEffect(() => {
+        const fetchUser = async () => {
+            try {
+                const res = await fetch('/api/auth/me');
+                if (res.ok) {
+                    const info = await res.json();
+                    setUserRole(info.role || null);
+                }
+            } catch (err) {
+                console.error('Failed to fetch user info', err);
+            }
+        };
+        fetchUser();
+    }, []);
 
     const fetchData = useCallback(async () => {
         try {
@@ -333,8 +590,8 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
             const s = search.toLowerCase();
             list = list.filter(r =>
                 r.noBAPC.toLowerCase().includes(s) ||
-                r.lembaga.toLowerCase().includes(s) ||
-                r.hasilAnalisa.toLowerCase().includes(s)
+                r.hasilAnalisa.toLowerCase().includes(s) ||
+                (r.dokumen && r.dokumen.toLowerCase().includes(s))
             );
         }
 
@@ -352,11 +609,12 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
                 onSave={handleSave}
                 initialData={editingData}
                 productSlug={slug}
+                userRole={userRole}
             />
 
             {deleteModal.isOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="bg-white shadow-xl max-w-sm w-full p-6 animate-in fade-in zoom-in-95 duration-200">
                         <div className="flex flex-col items-center text-center">
                             <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-4">
                                 <AlertTriangleIcon />
@@ -365,8 +623,8 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
                             <p className="text-sm text-gray-500 mb-6">Data yang dihapus tidak dapat dikembalikan. Lanjutkan?</p>
                         </div>
                         <div className="flex gap-3 w-full">
-                            <button onClick={() => setDeleteModal({ isOpen: false, id: null })} className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors">Batal</button>
-                            <button onClick={executeDelete} disabled={isDeleting} className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50">
+                            <button onClick={() => setDeleteModal({ isOpen: false, id: null })} className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium transition-colors">Batal</button>
+                            <button onClick={executeDelete} disabled={isDeleting} className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium transition-colors disabled:opacity-50">
                                 {isDeleting ? 'Menghapus...' : 'Ya, Hapus'}
                             </button>
                         </div>
@@ -375,9 +633,9 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
             )}
 
             {pageError && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center justify-between shadow-sm">
+                <div className="bg-red-50 border border-red-200 p-4 flex items-center justify-between shadow-sm">
                     <span className="text-sm font-medium text-red-800">{pageError}</span>
-                    <button onClick={() => setPageError(null)} className="px-3 py-1.5 text-sm font-semibold text-red-700 bg-red-100 hover:bg-red-200 rounded-lg transition-colors">Tutup</button>
+                    <button onClick={() => setPageError(null)} className="px-3 py-1.5 text-sm font-semibold text-red-700 bg-red-100 hover:bg-red-200 transition-colors">Tutup</button>
                 </div>
             )}
 
@@ -410,14 +668,16 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
                     <div className="text-sm font-semibold text-gray-700"></div>
 
                     {/* Actions */}
-                    <AppButton
-                        variant="primary"
-                        size="md"
-                        icon={<PlusIcon />}
-                        onClick={openAddModal}
-                    >
-                        Tambah Data
-                    </AppButton>
+                    {userRole !== 'Riset' && (
+                        <AppButton
+                            variant="primary"
+                            size="md"
+                            icon={<PlusIcon />}
+                            onClick={openAddModal}
+                        >
+                            Tambah Data
+                        </AppButton>
+                    )}
                 </div>
 
                 {/* Filters Row */}
@@ -461,14 +721,14 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
                                             <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-left whitespace-nowrap">Tanggal Sampling</th>
                                             <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-left whitespace-nowrap">Batch</th>
                                             <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-right whitespace-nowrap">Kuantum</th>
-                                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-left whitespace-nowrap">Lembaga Sampling</th>
+                                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-left whitespace-nowrap">Dokumen</th>
                                             <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-center whitespace-nowrap">Hasil Analisa</th>
                                             <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-center w-24">Aksi</th>
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white">
                                         {paginatedSlice.length === 0 ? (
-                                            <tr><td colSpan={8} className="p-12 text-center text-gray-400 text-sm border border-gray-200">Tidak ada data analisa</td></tr>
+                                            <tr><td colSpan={7} className="p-12 text-center text-gray-400 text-sm border border-gray-200">Tidak ada data analisa</td></tr>
                                         ) : (
                                             paginatedSlice.map((row, idx) => (
                                                 <tr key={row.id} className="hover:bg-emerald-50/10 transition-colors">
@@ -476,18 +736,48 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
                                                     <td className="px-4 py-3 text-gray-700 border border-gray-200">{formatDateShort(row.tanggalSampling)}</td>
                                                     <td className="px-4 py-3 text-gray-700 border border-gray-200">{row.noBAPC}</td>
                                                     <td className="px-4 py-3 text-right font-mono tabular-nums text-gray-700 border border-gray-200">{fmt(row.kuantum)}</td>
-                                                    <td className="px-4 py-3 text-gray-700 border border-gray-200">{row.lembaga}</td>
+                                                    <td className="px-4 py-3 text-gray-700 border border-gray-200">
+                                                        {row.dokumen ? (
+                                                            <a 
+                                                                href={row.dokumen} 
+                                                                target="_blank" 
+                                                                rel="noopener noreferrer"
+                                                                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 text-xs font-semibold hover:bg-emerald-100 hover:text-emerald-800 transition-all cursor-pointer"
+                                                                title={row.dokumen}
+                                                            >
+                                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                                                {row.dokumen.startsWith('http') ? 'Lihat Dokumen' : (row.dokumen.length > 15 ? `${row.dokumen.slice(0, 12)}...` : row.dokumen)}
+                                                            </a>
+                                                        ) : (
+                                                            <span className="text-gray-400 font-medium">—</span>
+                                                        )}
+                                                    </td>
                                                     <td className="px-4 py-3 text-center border border-gray-200"><StatusBadge status={row.hasilAnalisa} /></td>
 
                                                     <td className="px-4 py-3 text-center border border-gray-200">
-                                                        <div className="flex items-center justify-center gap-1">
-                                                            <button onClick={() => openEditModal(row)} className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors" title="Edit">
-                                                                <PencilIcon />
-                                                            </button>
-                                                            <button onClick={() => setDeleteModal({ isOpen: true, id: row.id })} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors" title="Hapus">
-                                                                <TrashIcon />
-                                                            </button>
-                                                        </div>
+                                                        {userRole === 'Riset' ? (
+                                                            <div className="flex items-center justify-center">
+                                                                <button
+                                                                    onClick={() => openEditModal(row)}
+                                                                    className={`inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold shadow-sm transition-all cursor-pointer ${
+                                                                        row.hasilAnalisa === 'Pending'
+                                                                            ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                                                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200'
+                                                                    }`}
+                                                                >
+                                                                    {row.hasilAnalisa === 'Pending' ? 'Verifikasi' : 'Edit Verifikasi'}
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex items-center justify-center gap-1">
+                                                                <button onClick={() => openEditModal(row)} className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors" title="Edit">
+                                                                    <PencilIcon />
+                                                                </button>
+                                                                <button onClick={() => setDeleteModal({ isOpen: true, id: row.id })} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Hapus">
+                                                                    <TrashIcon />
+                                                                </button>
+                                                            </div>
+                                                        )}
                                                     </td>
                                                 </tr>
                                             ))
@@ -496,7 +786,7 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
                                 </table>
                             </div>
 
-                            {/* Mobile view omitted for brevity but mimics desktop fields */}
+                            {/* Mobile view */}
                             <div className="sm:hidden divide-y divide-gray-100">
                                 {paginatedSlice.length === 0 ? (
                                     <div className="px-4 py-12 text-center text-gray-400">Tidak ada data analisa</div>
@@ -509,9 +799,17 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
                                                     <p className="text-xs text-gray-500 font-mono mt-0.5">{row.noBAPC}</p>
                                                 </div>
                                                 <StatusBadge status={row.hasilAnalisa} />
-                                                <div className="absolute top-2 right-2 flex gap-1 bg-white opacity-0 group-hover:opacity-100 transition-opacity rounded-md border border-gray-100 shadow-sm px-1 py-0.5">
-                                                    <button onClick={() => openEditModal(row)} className="text-xs text-blue-600 px-2 py-1 hover:bg-blue-50 rounded">Edit</button>
-                                                    <button onClick={() => setDeleteModal({ isOpen: true, id: row.id })} className="text-xs text-red-600 px-2 py-1 hover:bg-red-50 rounded">Hapus</button>
+                                                <div className="absolute top-2 right-2 flex gap-1 bg-white opacity-0 group-hover:opacity-100 transition-opacity border border-gray-100 shadow-sm px-1 py-0.5">
+                                                    {userRole === 'Riset' ? (
+                                                        <button onClick={() => openEditModal(row)} className="text-xs text-amber-600 px-2 py-1 hover:bg-amber-50 rounded">
+                                                            {row.hasilAnalisa === 'Pending' ? 'Verifikasi' : 'Edit'}
+                                                        </button>
+                                                    ) : (
+                                                        <>
+                                                            <button onClick={() => openEditModal(row)} className="text-xs text-blue-600 px-2 py-1 hover:bg-blue-50 rounded">Edit</button>
+                                                            <button onClick={() => setDeleteModal({ isOpen: true, id: row.id })} className="text-xs text-red-600 px-2 py-1 hover:bg-red-50 rounded">Hapus</button>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-2 gap-2 text-sm">
@@ -520,8 +818,20 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
                                                     <p className="font-mono text-gray-700">{fmt(row.kuantum)}</p>
                                                 </div>
                                                 <div>
-                                                    <span className="text-[11px] text-gray-400 uppercase">Lembaga</span>
-                                                    <p className="text-gray-700">{row.lembaga}</p>
+                                                    <span className="text-[11px] text-gray-400 uppercase">Dokumen</span>
+                                                    {row.dokumen ? (
+                                                        <a 
+                                                            href={row.dokumen} 
+                                                            target="_blank" 
+                                                            rel="noopener noreferrer"
+                                                            className="block text-emerald-600 font-medium hover:underline text-xs truncate max-w-[120px]" 
+                                                            title={row.dokumen}
+                                                        >
+                                                            {row.dokumen.startsWith('http') ? 'Lihat Dokumen' : row.dokumen}
+                                                        </a>
+                                                    ) : (
+                                                        <p className="text-gray-400 font-mono">—</p>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>

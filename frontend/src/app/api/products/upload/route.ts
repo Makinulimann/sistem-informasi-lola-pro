@@ -4,8 +4,6 @@ export const runtime = 'edge';
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 
-const imagekitPrivateKey = process.env.IMAGEKIT_PRIVATE_KEY || '';
-
 export async function POST(request: NextRequest) {
     try {
         // 1. Verify User Session
@@ -43,40 +41,60 @@ export async function POST(request: NextRequest) {
         }
 
         // 5. Configuration check
-        if (!imagekitPrivateKey) {
-            return NextResponse.json({ message: 'Konfigurasi ImageKit privat tidak ditemukan di server.' }, { status: 500 });
+        const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || '';
+        const apiKey = process.env.CLOUDINARY_API_KEY || '';
+        const apiSecret = process.env.CLOUDINARY_API_SECRET || '';
+
+        if (!cloudName || !apiKey || !apiSecret) {
+            return NextResponse.json({ message: 'Konfigurasi Cloudinary tidak lengkap di server.' }, { status: 500 });
         }
 
-        // 6. Setup ImageKit Upload request (passing binary file directly)
-        const ikFormData = new FormData();
-        ikFormData.append('file', file);
-        ikFormData.append('fileName', `product_${Date.now()}.${file.name.split('.').pop() || 'png'}`);
-        ikFormData.append('useUniqueFileName', 'true');
-        ikFormData.append('folder', '/sippro_products');
+        // 6. Setup Cloudinary Signed Upload
+        const timestamp = Math.round(Date.now() / 1000).toString();
+        const folder = 'sippro_products';
+        const publicId = `product_${Date.now()}`;
 
-        // Create Basic Auth Header (privateKey:emptyPassword)
-        const authString = btoa(`${imagekitPrivateKey}:`);
+        const paramsToSign = {
+            folder,
+            public_id: publicId,
+            timestamp,
+        };
 
-        const ikResponse = await fetch('https://upload.imagekit.io/api/v1/files/upload', {
+        const sortedKeys = Object.keys(paramsToSign).sort() as Array<keyof typeof paramsToSign>;
+        const signatureString = sortedKeys.map(key => `${key}=${paramsToSign[key]}`).join('&') + apiSecret;
+
+        // Generate SHA-1 Hash using Web Crypto API for Edge runtime compatibility
+        const encoder = new TextEncoder();
+        const dataBuffer = encoder.encode(signatureString);
+        const hashBuffer = await crypto.subtle.digest('SHA-1', dataBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+        const cloudinaryFormData = new FormData();
+        cloudinaryFormData.append('file', file);
+        cloudinaryFormData.append('api_key', apiKey);
+        cloudinaryFormData.append('timestamp', timestamp);
+        cloudinaryFormData.append('folder', folder);
+        cloudinaryFormData.append('public_id', publicId);
+        cloudinaryFormData.append('signature', signature);
+
+        const cloudinaryResponse = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
             method: 'POST',
-            headers: {
-                'Authorization': `Basic ${authString}`,
-            },
-            body: ikFormData,
+            body: cloudinaryFormData,
         });
 
-        const ikResult = await ikResponse.json();
+        const cloudinaryResult = await cloudinaryResponse.json();
 
-        if (!ikResponse.ok) {
-            console.error('ImageKit Upload Error:', ikResult);
-            const errMsg = ikResult.message || 'Gagal mengunggah gambar ke server CDN ImageKit.';
+        if (!cloudinaryResponse.ok) {
+            console.error('Cloudinary Upload Error:', cloudinaryResult);
+            const errMsg = cloudinaryResult.error?.message || 'Gagal mengunggah gambar ke server CDN Cloudinary.';
             return NextResponse.json({ message: errMsg }, { status: 502 });
         }
 
-        // Return the secure URL from ImageKit
+        // Return the secure URL from Cloudinary
         return NextResponse.json({
-            url: ikResult.url,
-            fileId: ikResult.fileId,
+            url: cloudinaryResult.secure_url,
+            fileId: cloudinaryResult.public_id,
         });
 
     } catch (error: any) {

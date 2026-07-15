@@ -203,7 +203,7 @@ export default function UsersPage() {
                                                 </DropdownMenuItem>
 
                                                 <DropdownMenuLabel className="text-xs font-normal text-gray-500 mt-2">Atur Peran</DropdownMenuLabel>
-                                                {['Admin', 'VP', 'KPP', 'KP', 'KNP', 'user'].map((role) => (
+                                                {['Admin', 'VP', 'KPP', 'KP', 'KNP', 'Riset', 'user'].map((role) => (
                                                     <DropdownMenuItem
                                                         key={role}
                                                         onClick={() => handleRoleUpdate(user.id, role)}

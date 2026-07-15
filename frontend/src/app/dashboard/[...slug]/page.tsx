@@ -1,10 +1,11 @@
 'use client';
 
 export const runtime = 'edge';
-import { use } from 'react';
+import { use, useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
+import { api } from '@/lib/api';
 
-const BahanBakuPage = dynamic(() => import('@/components/dashboard/BahanBakuPage').then(mod => mod.BahanBakuPage), { ssr: false });
+const BahanBakuAllPage = dynamic(() => import('@/components/dashboard/BahanBakuAllPage').then(mod => mod.BahanBakuAllPage), { ssr: false });
 const ProduksiPage = dynamic(() => import('@/components/dashboard/ProduksiPage').then(mod => mod.ProduksiPage), { ssr: false });
 const AnalisaPage = dynamic(() => import('@/components/dashboard/AnalisaPage').then(mod => mod.AnalisaPage), { ssr: false });
 const CategoryDashboardPage = dynamic(() => import('@/components/dashboard/CategoryDashboardPage').then(mod => mod.CategoryDashboardPage), { ssr: false });
@@ -15,7 +16,6 @@ interface PageProps {
 
 // Map of known page types to their components
 const PAGE_COMPONENT_MAP: Record<string, React.ComponentType<any>> = {
-    'bahan-baku': BahanBakuPage,
     'produksi': ProduksiPage,
     'analisa': AnalisaPage,
 };
@@ -34,6 +34,33 @@ export default function CatchAllPage({ params }: PageProps) {
     const { slug } = use(params);
     const lastSegment = slug[slug.length - 1];
 
+    const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
+
+    useEffect(() => {
+        const checkAuth = async () => {
+            try {
+                const data = await api.get<{ role: string }>('/auth/me');
+                if (data.role === 'Riset') {
+                    const isAllowed = slug.length === 1 || lastSegment === 'analisa' || lastSegment === 'produksi';
+                    if (!isAllowed) {
+                        window.location.href = '/dashboard/produk-pengembangan/petro-gladiator/analisa';
+                    } else {
+                        setIsAuthorized(true);
+                    }
+                } else {
+                    setIsAuthorized(true);
+                }
+            } catch (error) {
+                setIsAuthorized(true);
+            }
+        };
+        checkAuth();
+    }, [slug, lastSegment]);
+
+    if (isAuthorized === null) {
+        return <div className="p-8 flex justify-center text-gray-500">Memeriksa hak akses...</div>;
+    }
+
     // ── Category Dashboard (single segment like "produk-pengembangan") ──
     if (slug.length === 1 && CATEGORY_SLUGS.includes(slug[0])) {
         return (
@@ -42,6 +69,11 @@ export default function CatchAllPage({ params }: PageProps) {
                 categoryName={titleCase(slug[0])}
             />
         );
+    }
+
+    // ── Standalone Bahan Baku page (2 segments: "produk-pengembangan/bahan-baku") ──
+    if (slug.length === 2 && slug[0] === 'produk-pengembangan' && slug[1] === 'bahan-baku') {
+        return <BahanBakuAllPage />;
     }
 
     // Check if the last segment matches a known page type

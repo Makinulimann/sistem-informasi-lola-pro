@@ -302,6 +302,48 @@ export function Sidebar({
 
                         return section;
                     });
+
+                    // ── Post-process: Extract "Bahan Baku" from product sub-items ──
+                    // Move it to a standalone menu entry under the parent section
+                    for (const section of mapped) {
+                        if (!section.children) continue;
+                        // Check if any child has a "Bahan Baku" sub-item
+                        const hasBahanBaku = section.children.some(
+                            c => c.children?.some(s => s.label === 'Bahan Baku')
+                        );
+                        if (!hasBahanBaku) continue;
+
+                        // Determine the base path for the standalone Bahan Baku page
+                        // e.g., from /dashboard/produk-pengembangan/petro-gladiator/bahan-baku
+                        // => /dashboard/produk-pengembangan/bahan-baku
+                        let basePath = '';
+                        for (const child of section.children) {
+                            const bbItem = child.children?.find(s => s.label === 'Bahan Baku');
+                            if (bbItem?.href) {
+                                const parts = bbItem.href.split('/');
+                                // Remove product slug and page type, keep category path
+                                // e.g., ['', 'dashboard', 'produk-pengembangan', 'petro-gladiator', 'bahan-baku']
+                                // => /dashboard/produk-pengembangan/bahan-baku
+                                basePath = parts.slice(0, -2).join('/') + '/bahan-baku';
+                                break;
+                            }
+                        }
+
+                        // Remove "Bahan Baku" from each product's sub-items
+                        for (const child of section.children) {
+                            if (child.children) {
+                                child.children = child.children.filter(s => s.label !== 'Bahan Baku');
+                            }
+                        }
+
+                        // Insert standalone "Bahan Baku" at the top of children
+                        if (basePath) {
+                            section.children.unshift({
+                                label: 'Bahan Baku',
+                                href: basePath,
+                            });
+                        }
+                    }
                     setMenuItems(mapped);
                 } else {
                     setMenuItems(navigation);
@@ -316,6 +358,9 @@ export function Sidebar({
 
     // Filter navigation items based on RoleAccess from DB
     const filteredNavigation = menuItems.filter((item: any) => {
+        if (role === 'Riset') {
+            return item.label !== 'Portal Admin';
+        }
         const roleAccess = item.roleAccess;
         if (roleAccess && roleAccess !== 'All') {
             const allowedRoles = roleAccess.split(',').map((r: string) => r.trim());
@@ -323,6 +368,25 @@ export function Sidebar({
         }
         return true;
     });
+
+    const filterMenuForRiset = (items: any[]): any[] => {
+        return items
+            .map(item => {
+                const newItem = { ...item };
+                if (newItem.children && newItem.children.length > 0) {
+                    newItem.children = filterMenuForRiset(newItem.children);
+                }
+                return newItem;
+            })
+            .filter(item => {
+                if (!item.children || item.children.length === 0) {
+                    return item.href && item.href.includes('/analisa');
+                }
+                return item.children.length > 0;
+            });
+    };
+
+    const displayNavigation = role === 'Riset' ? filterMenuForRiset(filteredNavigation) : filteredNavigation;
 
     return (
         <>
@@ -359,7 +423,7 @@ export function Sidebar({
 
                 {/* Navigation */}
                 <nav className="flex-1 overflow-y-auto py-4 space-y-1 scrollbar-dark">
-                    {filteredNavigation.map((section) => (
+                    {displayNavigation.map((section) => (
                         <SectionItem key={section.label} section={section} pathname={pathname} />
                     ))}
                 </nav>

@@ -11,6 +11,7 @@ export interface AnalisaRow {
     lembaga: string;
     hasilAnalisa: string;
     tanggalAnalisa: string | null;
+    dokumen?: string;
 }
 
 export interface SaveAnalisaRequest {
@@ -21,6 +22,7 @@ export interface SaveAnalisaRequest {
     lembaga: string;
     hasilAnalisa: string;
     tanggalAnalisa?: string | null;
+    dokumen?: string;
 }
 
 export interface UpdateAnalisaRequest {
@@ -31,6 +33,7 @@ export interface UpdateAnalisaRequest {
     lembaga?: string;
     hasilAnalisa?: string;
     tanggalAnalisa?: string | null;
+    dokumen?: string;
 }
 
 // ─── Fetch Analisa Data ───

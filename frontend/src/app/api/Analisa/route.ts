@@ -49,7 +49,8 @@ export async function GET(request: Request) {
             kuantum: item.kuantum,
             lembaga: item.lembaga,
             hasilAnalisa: item.hasil_analisa,
-            tanggalAnalisa: item.tanggal_analisa
+            tanggalAnalisa: item.tanggal_analisa,
+            dokumen: item.lembaga
         }));
 
         return NextResponse.json({ data: formattedData });
@@ -63,7 +64,7 @@ export async function POST(request: Request) {
     try {
         const body = await request.json();
 
-        if (!body.productSlug || !body.tanggalSampling || !body.noBAPC || !body.kuantum || !body.lembaga || !body.hasilAnalisa) {
+        if (!body.productSlug || !body.tanggalSampling || !body.noBAPC || !body.kuantum || !body.hasilAnalisa) {
              return NextResponse.json({ message: 'Missing required fields.' }, { status: 400 });
         }
 
@@ -78,7 +79,7 @@ export async function POST(request: Request) {
             tanggal_sampling: body.tanggalSampling,
             no_bapc: body.noBAPC,
             kuantum: parseFloat(body.kuantum),
-            lembaga: body.lembaga,
+            lembaga: body.dokumen || '',
             hasil_analisa: body.hasilAnalisa,
             tanggal_analisa: body.tanggalAnalisa || new Date().toISOString()
         };

@@ -275,7 +275,7 @@ function MaterialTableSection({ title, description, items, jenis, productSlug, o
 // Edit Material Modal (With Product Integration)
 // ----------------------------------------------------------------------
 
-interface EditMaterialModalProps {
+export interface EditMaterialModalProps {
     isOpen: boolean;
     onClose: () => void;
     initialData: { id: number, name: string, unit: string };
@@ -284,7 +284,7 @@ interface EditMaterialModalProps {
     onSuccess: () => void;
 }
 
-function EditMaterialModal({ isOpen, onClose, initialData, jenis, productSlug, onSuccess }: EditMaterialModalProps) {
+export function EditMaterialModal({ isOpen, onClose, initialData, jenis, productSlug, onSuccess }: EditMaterialModalProps) {
     const [name, setName] = useState(initialData.name);
     const [unit, setUnit] = useState(initialData.unit);
     const [isSaving, setIsSaving] = useState(false);
@@ -493,7 +493,7 @@ function EditMaterialModal({ isOpen, onClose, initialData, jenis, productSlug, o
 // Add Material Modal (Includes Master Search & Deletion)
 // ----------------------------------------------------------------------
 
-interface AddMaterialModalProps {
+export interface AddMaterialModalProps {
     isOpen: boolean;
     onClose: () => void;
     jenis: 'Baku' | 'Penolong';
@@ -502,7 +502,7 @@ interface AddMaterialModalProps {
     colorTheme: 'emerald' | 'amber';
 }
 
-function AddMaterialModal({ isOpen, onClose, jenis, productSlug, onSuccess, colorTheme }: AddMaterialModalProps) {
+export function AddMaterialModal({ isOpen, onClose, jenis, productSlug, onSuccess, colorTheme }: AddMaterialModalProps) {
     const [search, setSearch] = useState('');
     const [searchResults, setSearchResults] = useState<MasterItem[]>([]);
     const [isSearching, setIsSearching] = useState(false);

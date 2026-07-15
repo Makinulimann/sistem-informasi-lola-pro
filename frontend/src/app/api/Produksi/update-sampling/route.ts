@@ -88,6 +88,39 @@ export async function POST(request: Request) {
             }
         }
 
+        // Sync to analisas table (Create or update pending sampling request)
+        try {
+            const { data: existingAnalisaList } = await db.from<any>('analisas').select('*').eq('product_slug', productSlug).execute();
+            const existingAnalisa = (existingAnalisaList || []).find((a: any) => a.no_bapc === batchKode);
+
+            if (existingAnalisa) {
+                // If it exists and is still pending, update the kuantum
+                if (existingAnalisa.hasil_analisa === 'Pending') {
+                    await db.from<any>('analisas').update({
+                        kuantum: parseFloat(ps),
+                        tanggal_sampling: targetUtcDate.toISOString(),
+                        bulan: targetUtcDate.getMonth() + 1,
+                        tahun: targetUtcDate.getFullYear()
+                    }).eq('id', existingAnalisa.id);
+                }
+            } else {
+                // Create a new pending record
+                await db.from<any>('analisas').insert({
+                    product_slug: productSlug,
+                    bulan: targetUtcDate.getMonth() + 1,
+                    tahun: targetUtcDate.getFullYear(),
+                    tanggal_sampling: targetUtcDate.toISOString(),
+                    no_bapc: batchKode,
+                    kuantum: parseFloat(ps),
+                    lembaga: '', // Maps to dokumen
+                    hasil_analisa: 'Pending',
+                    tanggal_analisa: null
+                });
+            }
+        } catch (analisaErr) {
+            console.error('Failed to sync with analisas table:', analisaErr);
+        }
+
         return NextResponse.json({
             success: true,
             batchKode: batchKode,

@@ -18,7 +18,6 @@ export interface NavSection {
 }
 
 const subItems = (basePath: string): NavSubItem[] => [
-    { label: 'Bahan Baku', href: `${basePath}/bahan-baku` },
     { label: 'Produksi', href: `${basePath}/produksi` },
     { label: 'Analisa', href: `${basePath}/analisa` },
 ];
@@ -43,6 +42,7 @@ export const navigation: NavSection[] = [
         label: 'Produk Pengembangan',
         icon: 'flask',
         children: [
+            { label: 'Bahan Baku', href: '/dashboard/produk-pengembangan/bahan-baku' },
             { label: 'PetroGladiator', children: subItems('/dashboard/produk-pengembangan/petro-gladiator') },
             { label: 'BioFertil', children: subItems('/dashboard/produk-pengembangan/bio-fertil') },
             { label: 'PetroFish', children: subItems('/dashboard/produk-pengembangan/petro-fish') },

@@ -158,7 +158,7 @@ export default function SidebarManagementPage() {
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const availableRoles = ['Admin', 'VP', 'KPP', 'KP', 'KNP'];
+    const availableRoles = ['Admin', 'VP', 'KPP', 'KP', 'KNP', 'Riset'];
 
     const defaultLevel3Labels = ['Bahan Baku', 'Produksi', 'Analisa'];
 

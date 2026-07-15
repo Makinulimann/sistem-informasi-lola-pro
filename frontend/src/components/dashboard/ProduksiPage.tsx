@@ -119,6 +119,22 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
     const [activeTabId, setActiveTabId] = useState<number | null>(null);
     const [tabsLoading, setTabsLoading] = useState(true);
     const [subTab, setSubTab] = useState<'produksi' | 'bom'>('produksi');
+    const [userRole, setUserRole] = useState<string | null>(null);
+
+    useEffect(() => {
+        const fetchUser = async () => {
+            try {
+                const res = await fetch('/api/auth/me');
+                if (res.ok) {
+                    const info = await res.json();
+                    setUserRole(info.role || null);
+                }
+            } catch (err) {
+                console.error('Failed to fetch user info', err);
+            }
+        };
+        fetchUser();
+    }, []);
 
     useEffect(() => {
         setSubTab('produksi');
@@ -454,7 +470,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
             {error && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center justify-between shadow-sm">
                     <span className="text-sm font-medium text-red-800">{error}</span>
-                    <button onClick={() => { setError(null); fetchTabs(); }} className="px-4 py-2 text-sm font-semibold text-red-700 bg-red-100 hover:bg-red-200 rounded-lg">Coba Lagi</button>
+                    <button onClick={() => { setError(null); fetchTabs(); }} className="px-4 py-2 text-sm font-semibold text-red-700 bg-red-100 hover:bg-red-200">Coba Lagi</button>
                 </div>
             )}
 
@@ -482,7 +498,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                         <div className="px-6 py-3 flex items-center gap-3 shrink-0">
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <button className="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 text-base font-medium rounded-lg border border-gray-200 hover:bg-gray-50 shadow-sm transition-colors">
+                                    <button className="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 text-base font-medium border border-gray-200 hover:bg-gray-50 transition-colors">
                                         <DownloadIcon /> Export
                                     </button>
                                 </DropdownMenuTrigger>
@@ -548,7 +564,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                     <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-center w-32">Produksi (Pengiriman Gudang)</th>
                                     <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-right w-28">Stok Akhir</th>
                                     <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-left w-44">Keterangan</th>
-                                    <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-center w-20">Aksi</th>
+                                    {userRole !== 'Riset' && <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-center w-20">Aksi</th>}
                                 </tr>
 
                             </thead>
@@ -584,6 +600,57 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                             const kumulatif = convertValue(row.kumulatif, baseUnit, currentUnit);
                                             const stokAkhir = convertValue(row.stokAkhir, baseUnit, currentUnit);
 
+                                            if (userRole === 'Riset') {
+                                                return (
+                                                    <tr key={row.tanggal} className={`${highlight ? 'bg-amber-50/50' : 'hover:bg-emerald-50/10'} transition-colors`}>
+                                                        {/* Tanggal */}
+                                                        <td className={`px-4 py-3 font-medium sticky left-0 z-10 border border-gray-200 ${highlight ? 'text-amber-700 bg-amber-50/90' : 'text-gray-700 bg-white'}`}>
+                                                            {formatDateShort(row.tanggal)}
+                                                        </td>
+
+                                                        {/* Produksi (Belum Sampling) */}
+                                                        <td className="px-4 py-3 text-right font-mono text-gray-700 border border-gray-200">
+                                                            {bs > 0 ? fmt(bs) : '0'}
+                                                        </td>
+
+                                                        {/* Belum Sampling */}
+                                                        <td className="px-4 py-3 text-right font-mono text-gray-700 border border-gray-200">
+                                                            {bsDisplay > 0 ? fmt(bsDisplay) : '0'}
+                                                        </td>
+
+                                                        {/* Proses Sampling */}
+                                                        <td className="px-4 py-3 text-right font-mono text-gray-700 border border-gray-200">
+                                                            {psDisplay > 0 ? fmt(psDisplay) : '0'}
+                                                        </td>
+
+                                                        {/* COA */}
+                                                        <td className="px-4 py-3 text-right font-mono text-gray-700 border border-gray-200">
+                                                            {coa > 0 ? fmt(coa) : '0'}
+                                                        </td>
+
+                                                        {/* Kumulatif Produksi */}
+                                                        <td className="px-4 py-3 text-right font-mono text-gray-700 tabular-nums border border-gray-200">
+                                                            {fmt(kumulatif)}
+                                                        </td>
+
+                                                        {/* Pengiriman Gudang */}
+                                                        <td className="px-4 py-3 text-right font-mono text-gray-700 border border-gray-200">
+                                                            {pg > 0 ? fmt(pg) : '0'}
+                                                        </td>
+
+                                                        {/* Stok Akhir */}
+                                                        <td className="px-4 py-3 text-right font-mono font-semibold text-emerald-700 tabular-nums border border-gray-200">
+                                                            {fmt(stokAkhir)}
+                                                        </td>
+
+                                                        {/* Keterangan */}
+                                                        <td className="px-4 py-3 text-gray-700 border border-gray-200 truncate max-w-[200px]" title={getTextValue(row, 'keterangan')}>
+                                                            {getTextValue(row, 'keterangan') || '-'}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            }
+
                                             return (
                                             <tr key={row.tanggal} className={`${highlight ? 'bg-amber-50/50' : 'hover:bg-emerald-50/10'} transition-colors`}>
                                                 {/* Tanggal */}
@@ -597,7 +664,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                                     <div className="flex items-center gap-0.5">
                                                         <button
                                                             onClick={() => setBsModal({ isOpen: true, tanggal: row.tanggal, currentBs: bsRaw })}
-                                                            className={`flex-1 h-9 px-3 text-right font-mono text-sm rounded-lg transition-all outline-none cursor-pointer
+                                                            className={`flex-1 h-9 px-3 text-right font-mono text-sm transition-all outline-none cursor-pointer
                                                                 ${bs > 0
                                                                     ? 'text-emerald-700 font-semibold bg-emerald-50/50 hover:bg-emerald-100 border border-emerald-200 hover:border-emerald-300'
                                                                     : 'text-gray-400 bg-transparent hover:bg-gray-50 border border-transparent hover:border-gray-200'}`}
@@ -622,7 +689,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                                             setPsBatchKode(row.psBatchKode || '');
                                                             setPsError(null);
                                                         }}
-                                                        className={`w-full h-9 px-3 text-right font-mono text-sm rounded-lg transition-all outline-none cursor-pointer
+                                                        className={`w-full h-9 px-3 text-right font-mono text-sm transition-all outline-none cursor-pointer
                                                             ${psDisplay > 0
                                                                 ? 'text-amber-700 font-semibold bg-amber-50/50 hover:bg-amber-100 border border-amber-200 hover:border-amber-300'
                                                                 : 'text-gray-400 bg-transparent hover:bg-gray-50 border border-transparent hover:border-gray-200'}`}
@@ -641,7 +708,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                                             setCoaBatchKode(row.coaBatchKode || '');
                                                             setCoaError(null);
                                                         }}
-                                                        className={`w-full h-9 px-3 text-right font-mono text-sm rounded-lg transition-all outline-none cursor-pointer
+                                                        className={`w-full h-9 px-3 text-right font-mono text-sm transition-all outline-none cursor-pointer
                                                             ${coa > 0
                                                                 ? 'text-blue-700 font-semibold bg-blue-50/50 hover:bg-blue-100 border border-blue-200 hover:border-blue-300'
                                                                 : 'text-gray-400 bg-transparent hover:bg-gray-50 border border-transparent hover:border-gray-200'}`}
@@ -674,7 +741,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                                         type="text"
                                                         value={getTextValue(row, 'keterangan')}
                                                         onChange={e => handleInputChange(row.tanggal, 'keterangan', e.target.value)}
-                                                        className="w-full px-3 py-2 text-sm border border-transparent bg-transparent hover:bg-white hover:border-gray-200 focus:bg-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 rounded-lg transition-all outline-none text-gray-600 truncate focus:text-clip"
+                                                        className="w-full px-3 py-2 text-sm border border-transparent bg-transparent hover:bg-white hover:border-gray-200 focus:bg-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all outline-none text-gray-600 truncate focus:text-clip"
                                                         placeholder="-"
                                                     />
                                                 </td>
@@ -683,8 +750,8 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                                 <td className="px-4 py-3 text-center border border-gray-200">
                                                     {dirty ? (
                                                         <div className="flex items-center justify-center gap-2">
-                                                            <button onClick={() => setConfirmModal({ isOpen: true, rowDate: row.tanggal })} className="p-1.5 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 transition-colors shadow-sm" title="Simpan"><CheckIcon /></button>
-                                                            <button onClick={() => handleCancelRow(row.tanggal)} className="p-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors shadow-sm" title="Batal"><XIcon /></button>
+                                                            <button onClick={() => setConfirmModal({ isOpen: true, rowDate: row.tanggal })} className="p-1.5 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors shadow-sm" title="Simpan"><CheckIcon /></button>
+                                                            <button onClick={() => handleCancelRow(row.tanggal)} className="p-1.5 bg-red-100 text-red-700 hover:bg-red-200 transition-colors shadow-sm" title="Batal"><XIcon /></button>
                                                         </div>
                                                     ) : (bs > 0 || ps > 0 || coa > 0 || pg > 0 || getTextValue(row, 'keterangan')) ? (
                                                         <button 
@@ -694,7 +761,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                                                 availableFields: { bs: bs > 0, ps: ps > 0, coa: coa > 0, pg: pg > 0 },
                                                                 selectedFields: { bs: bs > 0, ps: ps > 0, coa: coa > 0, pg: pg > 0 }
                                                             })}
-                                                            className="flex items-center justify-center w-8 h-8 mx-auto text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                            className="flex items-center justify-center w-8 h-8 mx-auto text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                                                             title="Hapus Data Produksi Pada Hari Ini"
                                                         >
                                                             <TrashIcon />
@@ -730,7 +797,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
             {/* Confirmation Modal */}
             {confirmModal.isOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-xl shadow-xl border border-gray-100 max-w-sm w-full p-6 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="bg-white shadow-xl border border-gray-100 max-w-sm w-full p-6 animate-in fade-in zoom-in-95 duration-200">
                         <h3 className="text-lg font-bold text-gray-900 mb-2">Simpan Perubahan?</h3>
                         <p className="text-gray-600 mb-6">Apakah anda yakin ingin menyimpan perubahan data ini? Data produksi akan diperbarui.</p>
                         <div className="flex justify-end gap-3">
@@ -744,9 +811,9 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
             {/* Cancel Produksi Confirmation Modal */}
             {cancelConfirm.isOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-xl shadow-xl border border-gray-100 max-w-sm w-full p-6 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="bg-white shadow-xl border border-gray-100 max-w-sm w-full p-6 animate-in fade-in zoom-in-95 duration-200">
                         <div className="flex items-center gap-3 mb-3">
-                            <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center text-red-600">
+                            <div className="w-10 h-10 bg-red-100 flex items-center justify-center text-red-600">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <path d="M3 6h18" /><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" /><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
                                 </svg>
@@ -756,7 +823,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                         <p className="text-sm text-gray-600 mb-4">
                             Pilih data yang ingin Anda hapus (dikosongkan) pada tanggal ini:
                         </p>
-                        <div className="space-y-2 mb-6 text-sm text-gray-700 bg-gray-50 border border-gray-100 rounded-xl p-4">
+                        <div className="space-y-2 mb-6 text-sm text-gray-700 bg-gray-50 border border-gray-100 p-4">
                             {cancelConfirm.availableFields.bs && (
                                 <label className="flex items-center gap-3 cursor-pointer p-0.5">
                                     <input type="checkbox" checked={cancelConfirm.selectedFields.bs} onChange={e => setCancelConfirm(prev => ({...prev, selectedFields: {...prev.selectedFields, bs: e.target.checked}}))} className="w-4 h-4 rounded text-red-600 bg-white border-gray-300 focus:ring-red-500" />
@@ -828,9 +895,9 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
             {/* ── PS (Proses Sampling) Modal ── */}
             {psModal.isOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => { setPsModal({ isOpen: false, tanggal: '' }); setPsDropdownOpen(false); }}>
-                    <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 max-w-md w-full p-6 animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                    <div className="bg-white shadow-2xl border border-gray-100 max-w-md w-full p-6 animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center gap-3 mb-5">
-                            <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
+                            <div className="w-10 h-10 bg-amber-100 flex items-center justify-center">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6" /><path d="M10 9V3" /><path d="M14 9V3" /><path d="M6.864 18.364 10 9h4l3.136 9.364a2 2 0 0 1-1.894 2.636H8.758a2 2 0 0 1-1.894-2.636Z" /></svg>
                             </div>
                             <h3 className="text-lg font-bold text-gray-900">Input Proses Sampling</h3>
@@ -841,7 +908,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                             <button
                                 type="button"
                                 onClick={() => setPsDropdownOpen(!psDropdownOpen)}
-                                className="w-full flex items-center justify-between text-left text-base text-gray-900 px-4 py-3 bg-white border-2 border-amber-200 rounded-xl hover:border-amber-400 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all"
+                                className="w-full flex items-center justify-between text-left text-base text-gray-900 px-4 py-3 bg-white border-2 border-amber-200 hover:border-amber-400 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all"
                             >
                                 {psBatchKode ? (
                                     <span className="font-medium">{psBatchKode}</span>
@@ -851,7 +918,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`text-gray-400 transition-transform duration-200 ${psDropdownOpen ? 'rotate-180' : ''}`}><polyline points="6 9 12 15 18 9" /></svg>
                             </button>
                             {psDropdownOpen && (
-                                <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+                                <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 shadow-lg overflow-hidden max-h-48 overflow-y-auto">
                                     {psAvailableBatches.length === 0 ? (
                                         <div className="px-4 py-3 text-sm text-gray-400 text-center">Tidak ada batch tersedia</div>
                                     ) : (
@@ -877,7 +944,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                             step="any"
                             value={psValue}
                             onChange={e => { setPsValue(e.target.value); setPsError(null); }}
-                            className="w-full text-xl font-mono font-bold text-gray-900 px-4 py-3 border-2 border-amber-200 rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all placeholder:text-gray-300 mb-4"
+                            className="w-full text-xl font-mono font-bold text-gray-900 px-4 py-3 border-2 border-amber-200 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all placeholder:text-gray-300 mb-4"
                             placeholder="0"
                         />
 
@@ -930,9 +997,9 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
             {/* ── COA Modal ── */}
             {coaModal.isOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => { setCoaModal({ isOpen: false, tanggal: '' }); setCoaDropdownOpen(false); }}>
-                    <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 max-w-md w-full p-6 animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                    <div className="bg-white shadow-2xl border border-gray-100 max-w-md w-full p-6 animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center gap-3 mb-5">
-                            <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                            <div className="w-10 h-10 bg-blue-100 flex items-center justify-center">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
                             </div>
                             <h3 className="text-lg font-bold text-gray-900">Input COA</h3>
@@ -943,7 +1010,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                             <button
                                 type="button"
                                 onClick={() => setCoaDropdownOpen(!coaDropdownOpen)}
-                                className="w-full flex items-center justify-between text-left text-base text-gray-900 px-4 py-3 bg-white border-2 border-blue-200 rounded-xl hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                                className="w-full flex items-center justify-between text-left text-base text-gray-900 px-4 py-3 bg-white border-2 border-blue-200 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                             >
                                 {coaBatchKode ? (
                                     <span className="font-medium">{coaBatchKode}</span>
@@ -953,7 +1020,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`text-gray-400 transition-transform duration-200 ${coaDropdownOpen ? 'rotate-180' : ''}`}><polyline points="6 9 12 15 18 9" /></svg>
                             </button>
                             {coaDropdownOpen && (
-                                <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+                                <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 shadow-lg overflow-hidden max-h-48 overflow-y-auto">
                                     {coaAvailableBatches.length === 0 ? (
                                         <div className="px-4 py-3 text-sm text-gray-400 text-center">Tidak ada batch tersedia</div>
                                     ) : (
@@ -979,7 +1046,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                             step="any"
                             value={coaValue}
                             onChange={e => { setCoaValue(e.target.value); setCoaError(null); }}
-                            className="w-full text-xl font-mono font-bold text-gray-900 px-4 py-3 border-2 border-blue-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all placeholder:text-gray-300 mb-4"
+                            className="w-full text-xl font-mono font-bold text-gray-900 px-4 py-3 border-2 border-blue-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all placeholder:text-gray-300 mb-4"
                             placeholder="0"
                         />
                         {coaError && <p className="text-sm text-red-600 mb-3">{coaError}</p>}
@@ -1039,7 +1106,7 @@ function InputCell({ value, onChange }: { value: string | number, onChange: (val
             step="any"
             value={value === 0 ? '' : value}
             onChange={e => onChange(e.target.value)}
-            className="w-full h-10 px-3 text-right font-mono text-base border border-transparent bg-transparent hover:bg-white hover:border-gray-200 focus:bg-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 rounded-lg transition-all outline-none placeholder-gray-300 text-gray-700"
+            className="w-full h-10 px-3 text-right font-mono text-base border border-transparent bg-transparent hover:bg-white hover:border-gray-200 focus:bg-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all outline-none placeholder-gray-300 text-gray-700"
             placeholder="0"
         />
     );
@@ -1057,7 +1124,7 @@ function SummaryCard({ label, value, icon, color }: { label: string; value: stri
     };
     const c = COLOR_MAP[color] ?? COLOR_MAP.emerald;
     return (
-        <div className={`${c.bg} ${c.border} border rounded-xl p-5 sm:p-6`}>
+        <div className={`${c.bg} ${c.border} border p-5 sm:p-6`}>
             <div className="flex items-center gap-3 mb-3">
                 <div className={`${c.iconBg} ${c.text} p-2.5 rounded-lg`}>{icon}</div>
                 <span className={`text-sm font-semibold uppercase tracking-wider ${c.text}`}>{label}</span>

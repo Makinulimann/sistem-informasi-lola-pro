@@ -29,6 +29,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
         if (body.tanggalAnalisa !== undefined) {
             updateData.tanggal_analisa = body.tanggalAnalisa ? new Date(body.tanggalAnalisa).toISOString() : null;
         }
+        if (body.dokumen !== undefined) updateData.lembaga = body.dokumen;
         updateData.updated_at = new Date().toISOString();
 
         const { data: updatedAnalisa, error } = await db.from<any>('analisas').update(updateData).eq('id', id);
@@ -36,6 +37,33 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
         if (error) {
             console.error('Error updating analisa:', error);
             return NextResponse.json({ message: 'Failed to update' }, { status: 500 });
+        }
+
+        // Sync with produksis table if hasil_analisa was modified
+        if (body.hasilAnalisa) {
+            try {
+                const { data: currentAnalisa } = await db.from<any>('analisas').select('*').eq('id', id).single();
+                if (currentAnalisa) {
+                    const { data: produksisList } = await db.from<any>('produksis').select('*').eq('product_slug', currentAnalisa.product_slug).execute();
+                    const targetProduksi = (produksisList || []).find((p: any) => p.ps_batch_kode === currentAnalisa.no_bapc);
+
+                    if (targetProduksi) {
+                        if (body.hasilAnalisa === 'Lolos') {
+                            await db.from<any>('produksis').update({
+                                coa: targetProduksi.ps,
+                                coa_batch_kode: currentAnalisa.no_bapc
+                            }).eq('id', targetProduksi.id);
+                        } else {
+                            await db.from<any>('produksis').update({
+                                coa: 0,
+                                coa_batch_kode: ''
+                            }).eq('id', targetProduksi.id);
+                        }
+                    }
+                }
+            } catch (syncError) {
+                console.error('Error syncing analisa verification to produksis:', syncError);
+            }
         }
 
         return NextResponse.json({ success: true, data: { id: updatedAnalisa?.Id } });

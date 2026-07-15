@@ -17,8 +17,35 @@ export async function GET(request: Request) {
             return NextResponse.json({ message: 'productSlug is required.' }, { status: 400 });
         }
 
+        // Fetch data from Supabase
+        const { data: allRecords, error } = await db.from<any>('produksis').select('*').execute();
+
+        if (error) {
+            console.error('Error fetching produksi:', error);
+            return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
+        }
+
+        // Filter for this product
+        const filteredRecords = (allRecords || []).filter((r: any) => 
+            r.product_slug === productSlug
+        );
+
         if (!tabIdStr || !bulanStr || !tahunStr) {
-            return NextResponse.json({ summary: {}, data: [] });
+            const batchMap: { [kode: string]: { bs: number } } = {};
+            for (const r of filteredRecords) {
+                if (r.batch_kode && r.bs > 0) {
+                    if (!batchMap[r.batch_kode]) batchMap[r.batch_kode] = { bs: 0 };
+                    batchMap[r.batch_kode].bs += r.bs;
+                }
+            }
+
+            const availableBatches = [];
+            for (const kode in batchMap) {
+                const b = batchMap[kode];
+                availableBatches.push({ kode, bsWip: b.bs, psWip: 0, coaWip: 0 });
+            }
+
+            return NextResponse.json({ summary: {}, data: [], availableBatches });
         }
 
         const tabId = parseInt(tabIdStr, 10);
@@ -31,21 +58,13 @@ export async function GET(request: Request) {
         const startUtc = new Date(localStart.getTime() - utcOffset);
         const endUtc = new Date(localEnd.getTime() - utcOffset);
 
-        // Fetch data from Supabase
-        const { data: allRecords, error } = await db.from<any>('produksis').select('*').execute();
-
-        if (error) {
-            console.error('Error fetching produksi:', error);
-            return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
-        }
-
-        // Filter for this product and tab
-        const filteredRecords = (allRecords || []).filter((r: any) => 
-            r.product_slug === productSlug && r.produksi_tab_id === tabId
+        // Filter for this tab
+        const tabFilteredRecords = filteredRecords.filter((r: any) => 
+            r.produksi_tab_id === tabId
         );
 
         // Filter for this month's grid display
-        const dbRecords = filteredRecords.filter(r => new Date(r.tanggal) >= startUtc && new Date(r.tanggal) < endUtc);
+        const dbRecords = tabFilteredRecords.filter(r => new Date(r.tanggal) >= startUtc && new Date(r.tanggal) < endUtc);
 
         const daysInMonth = new Date(tahun, bulan, 0).getDate();
         const fullList = [];
