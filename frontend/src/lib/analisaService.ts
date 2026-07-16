@@ -48,6 +48,18 @@ export async function getAnalisa(
     return api.get<{ data: AnalisaRow[] }>(`/Analisa?${params.toString()}`);
 }
 
+// ─── Fetch All Analisa Data (across all products) ───
+export async function getAllAnalisa(
+    bulan?: number,
+    tahun?: number
+): Promise<{ data: AnalisaRow[] }> {
+    const params = new URLSearchParams();
+    if (bulan !== undefined) params.append('bulan', String(bulan));
+    if (tahun !== undefined) params.append('tahun', String(tahun));
+    const qs = params.toString();
+    return api.get<{ data: AnalisaRow[] }>(`/Analisa/all${qs ? `?${qs}` : ''}`);
+}
+
 // ─── Save / Create Analisa ───
 export async function createAnalisa(data: SaveAnalisaRequest): Promise<{ success: boolean; data: { id: number } }> {
     return api.post<{ success: boolean; data: { id: number } }>('/Analisa', data);

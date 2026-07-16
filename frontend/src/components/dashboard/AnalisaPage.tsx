@@ -547,6 +547,24 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
         fetchData();
     }, [fetchData]);
 
+    // Mark verified results as seen for KPP role
+    useEffect(() => {
+        if (data.length > 0 && userRole === 'KPP') {
+            const verifiedIds = data.filter(d => d.hasilAnalisa === 'Lolos' || d.hasilAnalisa === 'Tidak Lolos').map(d => d.id);
+            if (verifiedIds.length > 0) {
+                try {
+                    const seenIds: number[] = JSON.parse(localStorage.getItem('sippro_seen_kpp_analisa') || '[]');
+                    const allIds = [...new Set([...seenIds, ...verifiedIds])];
+                    localStorage.setItem('sippro_seen_kpp_analisa', JSON.stringify(allIds));
+                    // Notify Sidebar bell icon
+                    window.dispatchEvent(new Event('analisa-seen'));
+                } catch (e) {
+                    console.error('Failed to save seen notification IDs', e);
+                }
+            }
+        }
+    }, [data, userRole]);
+
     const handleSave = async (payload: SaveAnalisaRequest) => {
         if (editingData) {
             await updateAnalisa({ id: editingData.id, ...payload });
@@ -655,9 +673,6 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
                 <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
                     Analisa {productName}
                 </h1>
-                <p className="text-sm text-gray-500 mt-1">
-                    Kelola kegiatan sampling dan hasil analisa produk
-                </p>
             </div>
 
             {/* Main Content Card */}

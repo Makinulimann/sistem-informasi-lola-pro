@@ -90,7 +90,7 @@ export async function POST(request: Request) {
                     password_hash: passwordHash,
                     full_name: fullName,
                     no_induk: noInduk,
-                    role: 'user', // Default role
+                    role: 'KPP', // Default role
                     is_verified: false
                 })
             }

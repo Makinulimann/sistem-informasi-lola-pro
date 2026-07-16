@@ -29,6 +29,7 @@ interface UserDto {
     role: string;
     isVerified: boolean;
     createdAt: string;
+    photoUrl?: string | null;
 }
 
 export default function UsersPage() {
@@ -142,8 +143,12 @@ export default function UsersPage() {
                                 <tr key={user.id} className="hover:bg-gray-50/50 transition-colors">
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 bg-emerald-100 text-emerald-600 flex items-center justify-center font-semibold text-sm">
-                                                {user.fullName.charAt(0).toUpperCase()}
+                                            <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-semibold text-sm overflow-hidden flex-shrink-0">
+                                                {user.photoUrl ? (
+                                                    <img src={user.photoUrl} alt={user.fullName} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    user.fullName.charAt(0).toUpperCase()
+                                                )}
                                             </div>
                                             <div>
                                                 <p className="font-medium text-gray-900">{user.fullName}</p>
@@ -203,7 +208,7 @@ export default function UsersPage() {
                                                 </DropdownMenuItem>
 
                                                 <DropdownMenuLabel className="text-xs font-normal text-gray-500 mt-2">Atur Peran</DropdownMenuLabel>
-                                                {['Admin', 'VP', 'KPP', 'KP', 'KNP', 'Riset', 'user'].map((role) => (
+                                                {['Admin', 'KPP', 'Riset'].map((role) => (
                                                     <DropdownMenuItem
                                                         key={role}
                                                         onClick={() => handleRoleUpdate(user.id, role)}

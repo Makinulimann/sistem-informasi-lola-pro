@@ -7,7 +7,7 @@ import { db } from '@/lib/supabase';
 
 export async function GET() {
     try {
-        const result = await db.from<any>('users').select('id,email,full_name,no_induk,role,is_verified,created_at,updated_at').execute();
+        const result = await db.from<any>('users').select('id,email,full_name,no_induk,role,is_verified,created_at,updated_at,photo_url').execute();
 
         if (result.error) {
             console.error('Error fetching users:', result.error);
@@ -23,7 +23,8 @@ export async function GET() {
             role: user.role,
             isVerified: user.is_verified,
             createdAt: user.created_at,
-            updatedAt: user.updated_at
+            updatedAt: user.updated_at,
+            photoUrl: user.photo_url || null
         }));
 
         return NextResponse.json(users);

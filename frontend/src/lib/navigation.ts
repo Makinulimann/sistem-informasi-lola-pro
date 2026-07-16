@@ -29,6 +29,12 @@ export const navigation: NavSection[] = [
         href: '/dashboard',
     },
     {
+        label: 'Analisa',
+        icon: 'flask',
+        href: '/dashboard/analisa',
+        roleAccess: 'Riset',
+    },
+    {
         label: 'Portal Admin',
         icon: 'users',
         roleAccess: 'Admin',

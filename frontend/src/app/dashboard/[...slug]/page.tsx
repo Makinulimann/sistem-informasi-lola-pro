@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 const BahanBakuAllPage = dynamic(() => import('@/components/dashboard/BahanBakuAllPage').then(mod => mod.BahanBakuAllPage), { ssr: false });
 const ProduksiPage = dynamic(() => import('@/components/dashboard/ProduksiPage').then(mod => mod.ProduksiPage), { ssr: false });
 const AnalisaPage = dynamic(() => import('@/components/dashboard/AnalisaPage').then(mod => mod.AnalisaPage), { ssr: false });
+const AnalisaAllPage = dynamic(() => import('@/components/dashboard/AnalisaAllPage').then(mod => mod.AnalisaAllPage), { ssr: false });
 const CategoryDashboardPage = dynamic(() => import('@/components/dashboard/CategoryDashboardPage').then(mod => mod.CategoryDashboardPage), { ssr: false });
 
 interface PageProps {
@@ -25,6 +26,12 @@ const CATEGORY_SLUGS = [
     'produk-pengembangan',
 ];
 
+// Routes allowed for Riset role (exact match on the full slug path)
+const RISET_ALLOWED_SLUGS = [
+    'analisa',     // /dashboard/analisa (combined analisa page)
+    'settings',    // /dashboard/settings (profile settings)
+];
+
 function titleCase(s: string) {
     if (s === 'phonska-oca') return 'Phonska Oca Plus';
     return s.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -35,18 +42,25 @@ export default function CatchAllPage({ params }: PageProps) {
     const lastSegment = slug[slug.length - 1];
 
     const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
+    const [userRole, setUserRole] = useState<string | null>(null);
 
     useEffect(() => {
         const checkAuth = async () => {
             try {
                 const data = await api.get<{ role: string }>('/auth/me');
+                setUserRole(data.role);
+
                 if (data.role === 'Riset') {
-                    const isAllowed = slug.length === 1 || lastSegment === 'analisa' || lastSegment === 'produksi';
+                    // Riset role: only allow /dashboard/analisa and /dashboard/settings
+                    const fullPath = slug.join('/');
+                    const isAllowed = RISET_ALLOWED_SLUGS.some(allowed => fullPath === allowed);
+
                     if (!isAllowed) {
-                        window.location.href = '/dashboard/produk-pengembangan/petro-gladiator/analisa';
-                    } else {
-                        setIsAuthorized(true);
+                        // Redirect to combined analisa page
+                        window.location.href = '/dashboard/analisa';
+                        return;
                     }
+                    setIsAuthorized(true);
                 } else {
                     setIsAuthorized(true);
                 }
@@ -59,6 +73,11 @@ export default function CatchAllPage({ params }: PageProps) {
 
     if (isAuthorized === null) {
         return <div className="p-8 flex justify-center text-gray-500">Memeriksa hak akses...</div>;
+    }
+
+    // ── Combined Analisa page for Riset (single segment: "analisa") ──
+    if (slug.length === 1 && slug[0] === 'analisa') {
+        return <AnalisaAllPage />;
     }
 
     // ── Category Dashboard (single segment like "produk-pengembangan") ──
@@ -130,4 +149,3 @@ export default function CatchAllPage({ params }: PageProps) {
         </div>
     );
 }
-

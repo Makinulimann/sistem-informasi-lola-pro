@@ -369,24 +369,20 @@ export function Sidebar({
         return true;
     });
 
-    const filterMenuForRiset = (items: any[]): any[] => {
-        return items
-            .map(item => {
-                const newItem = { ...item };
-                if (newItem.children && newItem.children.length > 0) {
-                    newItem.children = filterMenuForRiset(newItem.children);
-                }
-                return newItem;
-            })
-            .filter(item => {
-                if (!item.children || item.children.length === 0) {
-                    return item.href && item.href.includes('/analisa');
-                }
-                return item.children.length > 0;
-            });
-    };
+    const risetNavigation: NavSection[] = [
+        {
+            label: 'Dashboard',
+            icon: 'dashboard',
+            href: '/dashboard',
+        },
+        {
+            label: 'Analisa',
+            icon: 'flask',
+            href: '/dashboard/analisa',
+        },
+    ];
 
-    const displayNavigation = role === 'Riset' ? filterMenuForRiset(filteredNavigation) : filteredNavigation;
+    const displayNavigation = role === 'Riset' ? risetNavigation : filteredNavigation;
 
     return (
         <>
@@ -448,6 +444,9 @@ export function Sidebar({
 export function DashboardHeader({ onMenuToggle }: { onMenuToggle: () => void }) {
     const router = useRouter();
     const [user, setUser] = useState<{ fullName: string; role: string; photoUrl?: string | null } | null>(null);
+    const [hasNewNotification, setHasNewNotification] = useState(false);
+    const [notifOpen, setNotifOpen] = useState(false);
+    const [notificationItems, setNotificationItems] = useState<{ id: number; productSlug: string; noBAPC: string; tanggalSampling: string; hasilAnalisa: string }[]>([]);
 
     const fetchUser = async () => {
         try {
@@ -458,6 +457,43 @@ export function DashboardHeader({ onMenuToggle }: { onMenuToggle: () => void }) 
                 return;
             }
             console.error('Failed to fetch user', err);
+        }
+    };
+
+    // Check for new pending or verified analisa data
+    const checkNotifications = async () => {
+        if (!user?.role) return;
+        try {
+            const res = await api.get<{ data: { id: number; productSlug: string; noBAPC: string; hasilAnalisa: string; tanggalSampling: string }[] }>('/Analisa/all');
+            const allData = res.data || [];
+
+            if (user.role === 'Riset') {
+                const pending = allData.filter(d => d.hasilAnalisa === 'Pending');
+                setNotificationItems(pending.map(p => ({
+                    id: p.id,
+                    productSlug: p.productSlug,
+                    noBAPC: p.noBAPC,
+                    tanggalSampling: p.tanggalSampling,
+                    hasilAnalisa: p.hasilAnalisa
+                })));
+                const seenIds: number[] = JSON.parse(localStorage.getItem('sippro_seen_analisa') || '[]');
+                const hasUnseen = pending.some(p => !seenIds.includes(p.id));
+                setHasNewNotification(hasUnseen);
+            } else if (user.role === 'KPP') {
+                const verified = allData.filter(d => d.hasilAnalisa === 'Lolos' || d.hasilAnalisa === 'Tidak Lolos');
+                setNotificationItems(verified.map(p => ({
+                    id: p.id,
+                    productSlug: p.productSlug,
+                    noBAPC: p.noBAPC,
+                    tanggalSampling: p.tanggalSampling,
+                    hasilAnalisa: p.hasilAnalisa
+                })));
+                const seenIds: number[] = JSON.parse(localStorage.getItem('sippro_seen_kpp_analisa') || '[]');
+                const hasUnseen = verified.some(p => !seenIds.includes(p.id));
+                setHasNewNotification(hasUnseen);
+            }
+        } catch (err) {
+            console.error('Failed to check notifications', err);
         }
     };
 
@@ -473,6 +509,49 @@ export function DashboardHeader({ onMenuToggle }: { onMenuToggle: () => void }) 
         }
     }, []);
 
+    // Poll notifications for Riset and KPP roles
+    useEffect(() => {
+        if (!user?.role || (user.role !== 'Riset' && user.role !== 'KPP')) return;
+
+        checkNotifications();
+        const interval = setInterval(checkNotifications, 60000); // every 60s
+
+        // Listen for analisa-seen events
+        const handleSeen = () => {
+            setHasNewNotification(false);
+        };
+        window.addEventListener('analisa-seen', handleSeen);
+
+        return () => {
+            clearInterval(interval);
+            window.removeEventListener('analisa-seen', handleSeen);
+        };
+    }, [user]);
+
+    const handleNotifClick = () => {
+        setNotifOpen(prev => !prev);
+        if (hasNewNotification && user?.role) {
+            const storageKey = user.role === 'Riset' ? 'sippro_seen_analisa' : 'sippro_seen_kpp_analisa';
+            const seenIds: number[] = JSON.parse(localStorage.getItem(storageKey) || '[]');
+            const allIds = [...new Set([...seenIds, ...notificationItems.map(p => p.id)])];
+            localStorage.setItem(storageKey, JSON.stringify(allIds));
+            setHasNewNotification(false);
+        }
+    };
+
+    // Close notif dropdown on outside click
+    useEffect(() => {
+        if (!notifOpen) return;
+        const handleClick = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            if (!target.closest('.notif-dropdown-container')) {
+                setNotifOpen(false);
+            }
+        };
+        document.addEventListener('click', handleClick);
+        return () => document.removeEventListener('click', handleClick);
+    }, [notifOpen]);
+
     const handleLogout = async () => {
         try {
             await api.post('/auth/logout', {});
@@ -483,6 +562,29 @@ export function DashboardHeader({ onMenuToggle }: { onMenuToggle: () => void }) 
         // Force full reload to clear any memory state
         window.location.href = '/';
     };
+
+    const formatDateShort = (dateStr: string | null): string => {
+        if (!dateStr) return '—';
+        const d = new Date(dateStr);
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const yyyy = d.getFullYear();
+        return `${dd}/${mm}/${yyyy}`;
+    };
+
+    const getProductLabel = (slug: string): string => {
+        const labels: Record<string, string> = {
+            'petro-gladiator': 'Petro Gladiator',
+            'bio-fertil': 'Bio Fertil',
+            'petro-fish': 'Petro Fish',
+            'phonska-oca': 'Phonska Oca Plus',
+            'petro-gladiator-cair': 'Petro Gladiator Cair',
+        };
+        return labels[slug] || slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    };
+
+    const isRiset = user?.role === 'Riset';
+    const isKpp = user?.role === 'KPP';
 
     return (
         <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-6 bg-white border-b border-gray-200 shadow-sm">
@@ -495,6 +597,111 @@ export function DashboardHeader({ onMenuToggle }: { onMenuToggle: () => void }) 
                 </button>
             </div>
             <div className="flex items-center gap-3">
+                {/* ─── Notification Bell (Riset & KPP only) ─── */}
+                {(isRiset || isKpp) && (
+                    <div className="relative notif-dropdown-container">
+                        <button
+                            onClick={handleNotifClick}
+                            className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
+                            title="Notifikasi"
+                        >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                            </svg>
+                            {/* Red dot indicator */}
+                            {hasNewNotification && (
+                                <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white animate-pulse" />
+                            )}
+                        </button>
+
+                        {/* Notification Dropdown */}
+                        {notifOpen && (
+                            <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-xl z-50 overflow-hidden">
+                                <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/50">
+                                    <h3 className="text-sm font-semibold text-gray-800">Notifikasi</h3>
+                                    <p className="text-xs text-gray-400 mt-0.5">
+                                        {isRiset ? 'Data analisa menunggu verifikasi' : 'Hasil analisa baru terverifikasi'}
+                                    </p>
+                                </div>
+                                <div className="max-h-72 overflow-y-auto">
+                                    {notificationItems.length === 0 ? (
+                                        <div className="px-4 py-8 text-center">
+                                            <div className="w-10 h-10 rounded-full bg-emerald-50 mx-auto mb-2 flex items-center justify-center">
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                                    <polyline points="22 4 12 14.01 9 11.01" />
+                                                </svg>
+                                            </div>
+                                            <p className="text-sm text-gray-500 font-medium">
+                                                {isRiset ? 'Semua data sudah diverifikasi' : 'Belum ada hasil analisa baru'}
+                                            </p>
+                                            <p className="text-xs text-gray-400 mt-0.5">
+                                                {isRiset ? 'Tidak ada data pending saat ini' : 'Semua update telah dibaca'}
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        notificationItems.slice(0, 10).map(item => (
+                                            <div
+                                                key={item.id}
+                                                className="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0 transition-colors"
+                                                onClick={() => {
+                                                    setNotifOpen(false);
+                                                    if (isRiset) {
+                                                        router.push('/dashboard/analisa');
+                                                    } else {
+                                                        router.push(`/dashboard/produk-pengembangan/${item.productSlug}/analisa`);
+                                                    }
+                                                }}
+                                            >
+                                                <div className="flex items-start gap-3">
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-medium text-gray-800 truncate">
+                                                            {getProductLabel(item.productSlug)}
+                                                        </p>
+                                                        <p className="text-xs text-gray-500 mt-0.5">
+                                                            Batch {item.noBAPC} · {formatDateShort(item.tanggalSampling)}
+                                                        </p>
+                                                    </div>
+                                                    <span className={`inline-flex items-center px-1.5 py-0.5 text-[10px] font-bold rounded-full flex-shrink-0 ${
+                                                        item.hasilAnalisa === 'Pending'
+                                                            ? 'bg-amber-100 text-amber-700'
+                                                            : item.hasilAnalisa === 'Lolos'
+                                                                ? 'bg-emerald-100 text-emerald-700'
+                                                                : 'bg-red-100 text-red-700'
+                                                    }`}>
+                                                        {item.hasilAnalisa}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                                {notificationItems.length > 0 && (
+                                    <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50/30">
+                                        <button
+                                            onClick={() => {
+                                                setNotifOpen(false);
+                                                if (isRiset) {
+                                                    router.push('/dashboard/analisa');
+                                                } else {
+                                                    router.push('/dashboard');
+                                                }
+                                            }}
+                                            className="w-full text-center text-xs font-semibold text-emerald-600 hover:text-emerald-700 transition-colors"
+                                        >
+                                            {isRiset 
+                                                ? `Lihat semua (${notificationItems.length} pending) →` 
+                                                : `Lihat dashboard →`}
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* ─── Profile Dropdown ─── */}
                 <DropdownMenu>
                     <DropdownMenuTrigger className="outline-none">
                         <div className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 transition-colors">
@@ -535,3 +742,4 @@ export function DashboardHeader({ onMenuToggle }: { onMenuToggle: () => void }) 
         </header>
     );
 }
+
