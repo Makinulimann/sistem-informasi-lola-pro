@@ -34,12 +34,10 @@ export async function GET(request: Request) {
         if (bulan || tahun) {
             const y = tahun ? parseInt(tahun, 10) : new Date().getFullYear();
             const m = bulan ? parseInt(bulan, 10) : 1;
-            const start = new Date(Date.UTC(y, m - 1, 1));
-            const end = new Date(Date.UTC(bulan ? y : y + 1, bulan ? m : 0, 1));
 
             filtered = filtered.filter((r: any) => {
                 const rDate = new Date(r.tanggal || r.Tanggal);
-                return rDate >= start && rDate < end;
+                return rDate.getFullYear() === y && (!bulan || rDate.getMonth() + 1 === m);
             });
         }
 

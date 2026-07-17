@@ -40,12 +40,10 @@ export async function GET(request: Request) {
         if (bulan || tahun) {
             const y = tahun ? parseInt(tahun, 10) : new Date().getFullYear();
             const m = bulan ? parseInt(bulan, 10) : 1;
-            const start = new Date(Date.UTC(y, m - 1, 1));
-            const end = new Date(Date.UTC(bulan ? y : y + 1, bulan ? m : 0, 1));
             
             filtered = filtered.filter(b => {
-                const bDate = new Date(b.Tanggal);
-                return bDate >= start && bDate < end;
+                const bDate = new Date(b.Tanggal || b.tanggal);
+                return bDate.getFullYear() === y && (!bulan || bDate.getMonth() + 1 === m);
             });
         }
 

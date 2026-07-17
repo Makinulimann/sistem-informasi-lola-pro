@@ -1814,12 +1814,10 @@ export function ConfigurationAllTab({ products, bakuList, penolongList, isLoadin
         const prodNames = row.products.map(p => p.name).join(', ');
         if (!confirm(`Hapus material "${row.nama}" dari produk: ${prodNames}?`)) return;
         try {
-            await Promise.all(
-                row.products.map(p => masterItemService.unassignMaterial(p.assignmentId))
-            );
+            await masterItemService.deleteMasterItem(row.masterItemId);
             onRefresh();
         } catch (error) {
-            console.error('Failed to unassign material:', error);
+            console.error('Failed to delete material:', error);
             alert('Gagal menghapus material: ' + error);
         }
     };

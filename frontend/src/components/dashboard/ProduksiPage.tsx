@@ -96,6 +96,14 @@ function formatDateShort(dateStr: string): string {
     return `${dd}-${mm}-${yyyy}`;
 }
 
+function getProductFullName(productName: string, tabName: string): string {
+    if (!tabName) return productName;
+    if (tabName.toLowerCase().includes(productName.toLowerCase())) {
+        return tabName.trim();
+    }
+    return `${productName} ${tabName}`.trim();
+}
+
 /* ═══════════════════════════════════════════ */
 /*  Main Component                             */
 /* ═══════════════════════════════════════════ */
@@ -335,7 +343,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
     // ─── Export ───
     const handleExportExcel = () => {
         const activeTabName = tabs.find(t => t.id === activeTabId)?.nama || '';
-        const fullProductName = `${productName} ${activeTabName}`.trim();
+        const fullProductName = getProductFullName(productName, activeTabName);
         const exportDate = format(new Date(), 'EEEE, dd MMMM yyyy', { locale: id });
         const period = bulan && tahun ? `${BULAN_NAMES[bulan]} ${tahun}` : 'Seluruh Periode';
 
@@ -366,7 +374,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
 
     const handleExportPDF = () => {
         const activeTabName = tabs.find(t => t.id === activeTabId)?.nama || '';
-        const fullProductName = `${productName} ${activeTabName}`.trim();
+        const fullProductName = getProductFullName(productName, activeTabName);
         const exportDate = format(new Date(), 'EEEE, dd MMMM yyyy', { locale: id });
         const period = bulan && tahun ? `${BULAN_NAMES[bulan]} ${tahun}` : 'Seluruh Periode';
 
@@ -437,7 +445,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
     /* ═══════════════════════════════════════════ */
     const activeTabObj = tabs.find(t => t.id === activeTabId);
     const activeTabName = activeTabObj?.nama || '';
-    const isActiveCair = `${productName} ${activeTabName}`.toLowerCase().includes('cair') || `${productName} ${activeTabName}`.toLowerCase().includes('liquid');
+    const isActiveCair = getProductFullName(productName, activeTabName).toLowerCase().includes('cair') || getProductFullName(productName, activeTabName).toLowerCase().includes('liquid');
     const baseUnit = isActiveCair ? 'Liter' : 'Kg';
     const unitFamily = getUnitFamily(baseUnit);
     const currentUnit = displayUnit && unitFamily.includes(displayUnit) ? displayUnit : baseUnit;
@@ -785,7 +793,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                 onClose={() => setBsModal({ isOpen: false, tanggal: '', currentBs: 0 })}
                 onSaved={() => fetchData()}
                 productSlug={slug}
-                productFullName={`${productName} ${tabs.find(t => t.id === activeTabId)?.nama || ''}`.trim()}
+                productFullName={getProductFullName(productName, tabs.find(t => t.id === activeTabId)?.nama || '')}
                 tabId={activeTabId || 0}
                 tanggal={bsModal.tanggal}
                 currentBs={bsModal.currentBs}
@@ -874,7 +882,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                         if (cancelConfirm.selectedFields.coa) fieldsToDelete.push('coa');
                                         if (cancelConfirm.selectedFields.pg) fieldsToDelete.push('pg');
 
-                                        const productFullName = `${productName} ${tabs.find(t => t.id === activeTabId)?.nama || ''}`.trim();
+                                        const productFullName = getProductFullName(productName, tabs.find(t => t.id === activeTabId)?.nama || '');
                                         await cancelProduksiWithMaterials(slug, activeTabId || 0, cancelConfirm.tanggal, fieldsToDelete, productFullName);
                                         setCancelConfirm({ isOpen: false, tanggal: '', availableFields: {bs:false,ps:false,coa:false,pg:false}, selectedFields: {bs:false,ps:false,coa:false,pg:false} });
                                         fetchData();

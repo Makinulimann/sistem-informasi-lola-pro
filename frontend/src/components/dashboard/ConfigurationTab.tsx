@@ -38,12 +38,21 @@ export function ConfigurationTab({ productSlug }: ConfigurationTabProps) {
     }, [fetchMaterials]);
 
     const handleUnassign = async (id: number) => {
-        if (!confirm('Hapus material ini dari produk?')) return;
+        const material = bakuList.find(m => m.id === id) || penolongList.find(m => m.id === id);
+        if (!material) return;
+
+        if (!confirm(`Hapus material "${material.nama}" dari produk?`)) return;
+
         try {
-            await masterItemService.unassignMaterial(id);
+            const assignments = await masterItemService.getMasterItemAssignments(material.masterItemId);
+            if (assignments.length <= 1) {
+                await masterItemService.deleteMasterItem(material.masterItemId);
+            } else {
+                await masterItemService.unassignMaterial(id);
+            }
             fetchMaterials();
         } catch (error) {
-            console.error('Failed to unassign material:', error);
+            console.error('Failed to delete material:', error);
             alert('Gagal menghapus material: ' + error);
         }
     };

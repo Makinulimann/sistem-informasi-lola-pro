@@ -96,7 +96,7 @@ export async function POST(request: Request) {
                     kuantum: mat.kuantum || mat.Kuantum || 0,
                     satuan: mat.satuan || mat.Satuan || 'Kg',
                     dokumen: '',
-                    keterangan: `produksi ${productLabel} sejumlah ${bsFormatted} ${bsSatuanValue}`.trim()
+                    keterangan: `Produksi ${bsFormatted} ${bsSatuanValue} ${productLabel}`.replace(/\s+/g, ' ').trim()
                 }));
 
             // Insert records one by one and log errors if any

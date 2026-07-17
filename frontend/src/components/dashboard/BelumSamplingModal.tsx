@@ -629,7 +629,7 @@ export function BelumSamplingModal({
                                                 <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center text-orange-700">
                                                     <FlaskIcon />
                                                 </div>
-                                                <p className="text-xs font-semibold text-orange-600 uppercase tracking-wider">
+                                                <p className="text-xs font-semibold uppercase tracking-wider">
                                                     Bahan Digunakan ({usedMaterials.length} item)
                                                 </p>
                                             </div>
@@ -640,7 +640,7 @@ export function BelumSamplingModal({
                                                             <div className={`w-1.5 h-1.5 rounded-full ${m.jenis === 'Bahan Baku' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
                                                             <span className="text-sm font-medium text-gray-800">{m.namaBahan}</span>
                                                         </div>
-                                                        <span className="text-sm font-bold font-mono text-orange-700">
+                                                        <span className="text-sm font-bold font-mono">
                                                             {fmt(m.kuantum)} <span className="text-xs font-normal text-gray-400">{m.displaySatuan}</span>
                                                         </span>
                                                     </div>
