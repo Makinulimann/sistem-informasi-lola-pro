@@ -558,21 +558,21 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                 {subTab === 'produksi' && (loading ? (
                     <div className="p-12 text-center text-gray-400 text-lg">Memuat data...</div>
                 ) : (
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)] relative">
                         <table className="w-full text-sm border-collapse border border-gray-200">
-                            <thead>
+                            <thead className="sticky top-0 z-20 bg-gray-100 shadow-xs">
                                 {/* Row 1: Flat headers */}
-                                <tr className="bg-gray-50/80">
-                                    <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 sticky left-0 bg-gray-50/80 z-10 text-left w-32">Tanggal</th>
-                                    <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-right w-28">Produksi (Belum Sampling)</th>
-                                    <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-right w-28">Belum Sampling</th>
-                                    <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-right w-28">Proses Sampling</th>
-                                    <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-right w-20">COA</th>
-                                    <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-right w-32">Kumulatif Produksi</th>
-                                    <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-center w-32">Produksi (Pengiriman Gudang)</th>
-                                    <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-right w-28">Stok Akhir</th>
-                                    <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-left w-44">Keterangan</th>
-                                    {userRole !== 'Riset' && <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-center w-20">Aksi</th>}
+                                <tr>
+                                    <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 sticky top-0 left-0 bg-gray-100 z-30 text-left w-32">Tanggal</th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 sticky top-0 bg-gray-100 z-20 text-right w-28">Produksi (Belum Sampling)</th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 sticky top-0 bg-gray-100 z-20 text-right w-28">Belum Sampling</th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 sticky top-0 bg-gray-100 z-20 text-right w-28">Proses Sampling</th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 sticky top-0 bg-gray-100 z-20 text-right w-20">COA</th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 sticky top-0 bg-gray-100 z-20 text-right w-32">Kumulatif Produksi</th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 sticky top-0 bg-gray-100 z-20 text-center w-32">Produksi (Pengiriman Gudang)</th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 sticky top-0 bg-gray-100 z-20 text-right w-28">Stok Akhir</th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 sticky top-0 bg-gray-100 z-20 text-left w-44">Keterangan</th>
+                                    {userRole !== 'Riset' && <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 sticky top-0 bg-gray-100 z-20 text-center w-20">Aksi</th>}
                                 </tr>
 
                             </thead>
@@ -581,7 +581,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                     <tr><td colSpan={9} className="p-12 text-center text-gray-400 text-sm border border-gray-200">Tidak ada data.</td></tr>
                                 ) : (
                                     (() => {
-                                        let runningBs = 0;
+                                        let runningBs = summary.initialBs || 0;
                                         return filtered.map(row => {
                                             const highlight = isToday(row.tanggal);
                                             const dirty = isRowDirty(row.tanggal);
@@ -693,8 +693,23 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                                     <button
                                                         onClick={() => {
                                                             setPsModal({ isOpen: true, tanggal: row.tanggal });
-                                                            setPsValue(psDisplay > 0 ? String(psDisplay) : '');
-                                                            setPsBatchKode(row.psBatchKode || '');
+                                                            const d = new Date(row.tanggal);
+                                                            const dd = String(d.getDate()).padStart(2, '0');
+                                                            const mm = String(d.getMonth() + 1).padStart(2, '0');
+                                                            const yy = String(d.getFullYear()).slice(-2);
+                                                            const fallbackBatch = `B-${dd}${mm}${yy}`;
+                                                            const initialBatch = row.psBatchKode || row.batchKode || (psAvailableBatches.length > 0 ? psAvailableBatches[0].kode : fallbackBatch);
+                                                            setPsBatchKode(initialBatch);
+                                                            const found = psAvailableBatches.find(b => b.kode === initialBatch);
+                                                            if (psDisplay > 0) {
+                                                                setPsValue(String(psDisplay));
+                                                            } else if (bsDisplay > 0) {
+                                                                setPsValue(String(bsDisplay));
+                                                            } else if (found) {
+                                                                setPsValue(String(Math.round(convertValue(found.bsWip, baseUnit, currentUnit) * 1000) / 1000));
+                                                            } else {
+                                                                setPsValue('');
+                                                            }
                                                             setPsError(null);
                                                         }}
                                                         className={`w-full h-9 px-3 text-right font-mono text-sm transition-all outline-none cursor-pointer
@@ -712,8 +727,25 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                                     <button
                                                         onClick={() => {
                                                             setCoaModal({ isOpen: true, tanggal: row.tanggal });
-                                                            setCoaValue(coaDisplay > 0 ? String(coaDisplay) : '');
-                                                            setCoaBatchKode(row.coaBatchKode || '');
+                                                            const d = new Date(row.tanggal);
+                                                            const dd = String(d.getDate()).padStart(2, '0');
+                                                            const mm = String(d.getMonth() + 1).padStart(2, '0');
+                                                            const yy = String(d.getFullYear()).slice(-2);
+                                                            const fallbackBatch = `B-${dd}${mm}${yy}`;
+                                                            const initialBatch = row.coaBatchKode || row.psBatchKode || row.batchKode || (coaAvailableBatches.length > 0 ? coaAvailableBatches[0].kode : fallbackBatch);
+                                                            setCoaBatchKode(initialBatch);
+                                                            const found = coaAvailableBatches.find(b => b.kode === initialBatch);
+                                                            if (coaDisplay > 0) {
+                                                                setCoaValue(String(coaDisplay));
+                                                            } else if (psDisplay > 0) {
+                                                                setCoaValue(String(psDisplay));
+                                                            } else if (bsDisplay > 0) {
+                                                                setCoaValue(String(bsDisplay));
+                                                            } else if (found) {
+                                                                setCoaValue(String(Math.round(convertValue(found.coaWip, baseUnit, currentUnit) * 1000) / 1000));
+                                                            } else {
+                                                                setCoaValue('');
+                                                            }
                                                             setCoaError(null);
                                                         }}
                                                         className={`w-full h-9 px-3 text-right font-mono text-sm transition-all outline-none cursor-pointer
@@ -927,21 +959,35 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                             </button>
                             {psDropdownOpen && (
                                 <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 shadow-lg overflow-hidden max-h-48 overflow-y-auto">
-                                    {psAvailableBatches.length === 0 ? (
-                                        <div className="px-4 py-3 text-sm text-gray-400 text-center">Tidak ada batch tersedia</div>
-                                    ) : (
-                                        psAvailableBatches.map(b => (
+                                    {(() => {
+                                        const list = [...psAvailableBatches];
+                                        if (psBatchKode && !list.find(b => b.kode === psBatchKode)) {
+                                            list.push({ kode: psBatchKode, bsWip: 999999, psWip: 0, coaWip: 0 });
+                                        }
+                                        if (list.length === 0) {
+                                            return <div className="px-4 py-3 text-sm text-gray-400 text-center">Tidak ada batch tersedia</div>;
+                                        }
+                                        return list.map(b => (
                                             <button
                                                 key={b.kode}
                                                 type="button"
-                                                onClick={() => { setPsBatchKode(b.kode); setPsDropdownOpen(false); setPsError(null); }}
+                                                onClick={() => {
+                                                    setPsBatchKode(b.kode);
+                                                    if (b.bsWip < 999999) {
+                                                        setPsValue(String(Math.round(convertValue(b.bsWip, baseUnit, currentUnit) * 1000) / 1000));
+                                                    }
+                                                    setPsDropdownOpen(false);
+                                                    setPsError(null);
+                                                }}
                                                 className={`w-full text-left px-4 py-3 flex items-center justify-between hover:bg-amber-50 transition-colors ${psBatchKode === b.kode ? 'bg-amber-50 border-l-3 border-amber-500' : ''}`}
                                             >
                                                 <span className="font-medium text-gray-800">{b.kode}</span>
-                                                <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">Tersedia: {fmt(convertValue(b.bsWip, baseUnit, currentUnit))}</span>
+                                                {b.bsWip < 999999 && (
+                                                    <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">Tersedia: {fmt(convertValue(b.bsWip, baseUnit, currentUnit))}</span>
+                                                )}
                                             </button>
-                                        ))
-                                    )}
+                                        ));
+                                    })()}
                                 </div>
                             )}
                         </div>
@@ -1036,7 +1082,12 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                             <button
                                                 key={b.kode}
                                                 type="button"
-                                                onClick={() => { setCoaBatchKode(b.kode); setCoaDropdownOpen(false); setCoaError(null); }}
+                                                onClick={() => {
+                                                    setCoaBatchKode(b.kode);
+                                                    setCoaValue(String(Math.round(convertValue(b.coaWip, baseUnit, currentUnit) * 1000) / 1000));
+                                                    setCoaDropdownOpen(false);
+                                                    setCoaError(null);
+                                                }}
                                                 className={`w-full text-left px-4 py-3 flex items-center justify-between hover:bg-blue-50 transition-colors ${coaBatchKode === b.kode ? 'bg-blue-50 border-l-3 border-blue-500' : ''}`}
                                             >
                                                 <span className="font-medium text-gray-800">{b.kode}</span>

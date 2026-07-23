@@ -39,22 +39,44 @@ export async function GET(request: Request) {
             // Return default clean state
             return NextResponse.json({
                 baseQuantity: 1000,
-                items: []
+                items: [],
+                variants: []
             });
         }
 
         const baseQuantity = Number(filtered[0].base_quantity || 1000);
-        const items = filtered
-            .filter((row: any) => row.material_id !== -1)
+        
+        // Standard items (variant_name is default or null/empty)
+        const defaultItems = filtered
+            .filter((row: any) => row.material_id !== -1 && (!row.variant_name || row.variant_name === 'default'))
             .map((row: any) => ({
                 id: row.id,
                 materialId: row.material_id,
                 quantity: Number(row.material_quantity || 0)
             }));
 
+        // Variant items grouped by variant_name
+        const variantMap: Record<string, any[]> = {};
+        filtered.forEach((row: any) => {
+            if (row.variant_name && row.variant_name !== 'default' && row.material_id !== -1) {
+                if (!variantMap[row.variant_name]) variantMap[row.variant_name] = [];
+                variantMap[row.variant_name].push({
+                    id: row.id,
+                    materialId: row.material_id,
+                    quantity: Number(row.material_quantity || 0)
+                });
+            }
+        });
+
+        const variants = Object.keys(variantMap).map(name => ({
+            name,
+            items: variantMap[name]
+        }));
+
         return NextResponse.json({
             baseQuantity,
-            items
+            items: defaultItems,
+            variants
         });
 
     } catch (error) {
@@ -67,7 +89,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { productSlug, tabId, baseQuantity, items } = body;
+        const { productSlug, tabId, baseQuantity, items, variants } = body;
 
         if (!productSlug || tabId === undefined || baseQuantity === undefined || !Array.isArray(items)) {
             return NextResponse.json({ message: 'Invalid request payload.' }, { status: 400 });
@@ -94,46 +116,107 @@ export async function POST(request: Request) {
             await db.from<any>('bill_of_materials').delete().eq('id', id);
         }
 
-        // 2. Insert new BOM items
+        // 2. Insert standard BOM items
         let insertedCount = 0;
         for (const item of items) {
             const matId = parseInt(item.materialId, 10);
             const matQty = parseFloat(item.quantity) || 0;
 
             if (!isNaN(matId)) {
-                const { error: insertError } = await db.from<any>('bill_of_materials').insert({
+                const insertObj: any = {
                     product_slug: productSlug,
                     produksi_tab_id: tabIdNum,
                     base_quantity: baseQtyNum,
                     material_id: matId,
                     material_quantity: matQty,
+                    variant_name: 'default',
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
-                });
+                };
+
+                let { error: insertError } = await db.from<any>('bill_of_materials').insert(insertObj);
+
+                // Fallback if variant_name column does not exist in schema yet
+                if (insertError && (insertError as any).code === 'PGRST204') {
+                    delete insertObj.variant_name;
+                    const retry = await db.from<any>('bill_of_materials').insert(insertObj);
+                    insertError = retry.error;
+                }
 
                 if (insertError) {
-                    console.error('Error inserting BOM item:', insertError);
+                    console.error('Error inserting standard BOM item:', insertError);
                 } else {
                     insertedCount++;
                 }
             }
         }
 
+        // 3. Insert variant BOM items (if any)
+        if (Array.isArray(variants)) {
+            for (const v of variants) {
+                if (v && v.name) {
+                    let vInserted = 0;
+                    if (Array.isArray(v.items)) {
+                        for (const item of v.items) {
+                            const matId = parseInt(item.materialId, 10);
+                            const matQty = parseFloat(item.quantity) || 0;
+                            if (!isNaN(matId) && matQty > 0) {
+                                const vInsertObj: any = {
+                                    product_slug: productSlug,
+                                    produksi_tab_id: tabIdNum,
+                                    base_quantity: baseQtyNum,
+                                    material_id: matId,
+                                    material_quantity: matQty,
+                                    variant_name: v.name,
+                                    created_at: new Date().toISOString(),
+                                    updated_at: new Date().toISOString()
+                                };
+                                let { error: vError } = await db.from<any>('bill_of_materials').insert(vInsertObj);
+                                if (vError && (vError as any).code === 'PGRST204') {
+                                    delete vInsertObj.variant_name;
+                                    const vRetry = await db.from<any>('bill_of_materials').insert(vInsertObj);
+                                    vError = vRetry.error;
+                                }
+                                if (!vError) {
+                                    insertedCount++;
+                                    vInserted++;
+                                }
+                            }
+                        }
+                    }
+                    if (vInserted === 0) {
+                        const vPlaceholderObj: any = {
+                            product_slug: productSlug,
+                            produksi_tab_id: tabIdNum,
+                            base_quantity: baseQtyNum,
+                            material_id: -1,
+                            material_quantity: 0,
+                            variant_name: v.name,
+                            created_at: new Date().toISOString(),
+                            updated_at: new Date().toISOString()
+                        };
+                        let { error: pError } = await db.from<any>('bill_of_materials').insert(vPlaceholderObj);
+                        if (pError && (pError as any).code === 'PGRST204') {
+                            delete vPlaceholderObj.variant_name;
+                            await db.from<any>('bill_of_materials').insert(vPlaceholderObj);
+                        }
+                    }
+                }
+            }
+        }
+
         // If no items were inserted, insert a dummy record to preserve base_quantity
         if (insertedCount === 0) {
-            const { error: insertError } = await db.from<any>('bill_of_materials').insert({
+            await db.from<any>('bill_of_materials').insert({
                 product_slug: productSlug,
                 produksi_tab_id: tabIdNum,
                 base_quantity: baseQtyNum,
                 material_id: -1,
                 material_quantity: 0,
+                variant_name: 'default',
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
             });
-
-            if (insertError) {
-                console.error('Error inserting placeholder BOM item:', insertError);
-            }
         }
 
         return NextResponse.json({ success: true, message: 'BOM configuration saved successfully.' });

@@ -185,6 +185,7 @@ const fieldCls = 'w-full px-3 py-2.5 border border-gray-200 text-sm text-gray-70
 
 function AnalisaFormModal({ isOpen, onClose, onSave, initialData, productSlug, userRole }: ModalProps) {
     const [tanggalSampling, setTanggalSampling] = useState('');
+    const [tanggalAnalisa, setTanggalAnalisa] = useState('');
     const [noBAPC, setNoBAPC] = useState('');
     const [kuantum, setKuantum] = useState('');
     const [hasilAnalisa, setHasilAnalisa] = useState('Lolos');
@@ -233,12 +234,15 @@ function AnalisaFormModal({ isOpen, onClose, onSave, initialData, productSlug, u
             setFile(null);
             if (initialData) {
                 setTanggalSampling(formatDateForInput(initialData.tanggalSampling));
+                setTanggalAnalisa(formatDateForInput(initialData.tanggalAnalisa || initialData.tanggalSampling || new Date().toISOString()));
                 setNoBAPC(initialData.noBAPC);
                 setKuantum(initialData.kuantum.toString());
                 setHasilAnalisa(initialData.hasilAnalisa);
                 setExistingDokumen(initialData.dokumen || '');
             } else {
-                setTanggalSampling(formatDateForInput(new Date().toISOString()));
+                const todayStr = formatDateForInput(new Date().toISOString());
+                setTanggalSampling(todayStr);
+                setTanggalAnalisa(todayStr);
                 setNoBAPC('');
                 setKuantum('');
                 setHasilAnalisa('Lolos');
@@ -344,7 +348,7 @@ function AnalisaFormModal({ isOpen, onClose, onSave, initialData, productSlug, u
                 kuantum: parseFloat(kuantum || '0'),
                 lembaga: '-',
                 hasilAnalisa,
-                tanggalAnalisa: null,
+                tanggalAnalisa: tanggalAnalisa ? new Date(tanggalAnalisa).toISOString() : new Date().toISOString(),
                 dokumen: docName
             });
             onClose();
@@ -420,6 +424,19 @@ function AnalisaFormModal({ isOpen, onClose, onSave, initialData, productSlug, u
                         </select>
                     </div>
                 </div>
+
+                {userRole === 'Riset' && (
+                    <div className="space-y-1.5">
+                        <label className="block text-sm font-medium text-gray-700">Tanggal Verifikasi (COA)</label>
+                        <input
+                            type="date"
+                            required
+                            value={tanggalAnalisa}
+                            onChange={e => setTanggalAnalisa(e.target.value)}
+                            className={fieldCls}
+                        />
+                    </div>
+                )}
 
                 <div className="space-y-1.5">
                     <label className="block text-sm font-medium text-gray-700">Dokumen Analisa (JPG, PNG, PDF max 5MB)</label>

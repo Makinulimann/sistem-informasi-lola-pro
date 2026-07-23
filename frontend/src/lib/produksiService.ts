@@ -29,6 +29,7 @@ export interface ProduksiSummary {
     totalBelumSampling: number;
     kumulatif: number;
     stokAkhir: number;
+    initialBs?: number;
 }
 
 export interface AvailableBatch {
@@ -181,9 +182,15 @@ export interface BOMItem {
     quantity: number;
 }
 
+export interface BOMVariant {
+    name: string;
+    items: BOMItem[];
+}
+
 export interface BOMConfig {
     baseQuantity: number;
     items: BOMItem[];
+    variants?: BOMVariant[];
 }
 
 export async function getBOM(productSlug: string, tabId: number): Promise<BOMConfig> {
@@ -195,6 +202,7 @@ export async function saveBOM(data: {
     tabId: number;
     baseQuantity: number;
     items: BOMItem[];
+    variants?: BOMVariant[];
 }): Promise<{ success: boolean; message: string }> {
     return api.post<{ success: boolean; message: string }>('/Produksi/bom', data);
 }

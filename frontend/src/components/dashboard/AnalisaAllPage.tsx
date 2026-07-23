@@ -109,7 +109,7 @@ function ProductBadge({ slug }: { slug: string }) {
 interface VerifyModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (data: { hasilAnalisa: string; dokumen?: string }) => Promise<void>;
+    onSave: (data: { hasilAnalisa: string; tanggalAnalisa?: string; dokumen?: string }) => Promise<void>;
     initialData: AnalisaRow | null;
 }
 
@@ -117,6 +117,7 @@ const fieldCls = 'w-full px-3 py-2.5 border border-gray-200 text-sm text-gray-70
 
 function VerifyModal({ isOpen, onClose, onSave, initialData }: VerifyModalProps) {
     const [hasilAnalisa, setHasilAnalisa] = useState('Lolos');
+    const [tanggalAnalisa, setTanggalAnalisa] = useState('');
     const [file, setFile] = useState<File | null>(null);
     const [existingDokumen, setExistingDokumen] = useState('');
     const [dragActive, setDragActive] = useState(false);
@@ -128,6 +129,7 @@ function VerifyModal({ isOpen, onClose, onSave, initialData }: VerifyModalProps)
             setFormError(null);
             setFile(null);
             setHasilAnalisa(initialData.hasilAnalisa === 'Pending' ? 'Lolos' : initialData.hasilAnalisa);
+            setTanggalAnalisa(formatDateForInput(initialData.tanggalAnalisa || initialData.tanggalSampling || new Date().toISOString()));
             setExistingDokumen(initialData.dokumen || '');
         }
     }, [isOpen, initialData]);
@@ -205,7 +207,11 @@ function VerifyModal({ isOpen, onClose, onSave, initialData }: VerifyModalProps)
             if (file) {
                 docName = await uploadToCloudinary(file);
             }
-            await onSave({ hasilAnalisa, dokumen: docName });
+            await onSave({
+                hasilAnalisa,
+                tanggalAnalisa: tanggalAnalisa ? new Date(tanggalAnalisa).toISOString() : new Date().toISOString(),
+                dokumen: docName
+            });
             onClose();
         } catch (error: any) {
             console.error('Save failed', error);
@@ -258,16 +264,28 @@ function VerifyModal({ isOpen, onClose, onSave, initialData }: VerifyModalProps)
                 </div>
 
                 {/* Editable fields */}
-                <div className="space-y-1.5">
-                    <label className="block text-sm font-medium text-gray-700">Hasil Analisa</label>
-                    <select
-                        value={hasilAnalisa}
-                        onChange={e => setHasilAnalisa(e.target.value)}
-                        className={fieldCls}
-                    >
-                        <option value="Lolos">Lolos</option>
-                        <option value="Tidak Lolos">Tidak Lolos</option>
-                    </select>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                        <label className="block text-sm font-medium text-gray-700">Hasil Analisa</label>
+                        <select
+                            value={hasilAnalisa}
+                            onChange={e => setHasilAnalisa(e.target.value)}
+                            className={fieldCls}
+                        >
+                            <option value="Lolos">Lolos</option>
+                            <option value="Tidak Lolos">Tidak Lolos</option>
+                        </select>
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="block text-sm font-medium text-gray-700">Tanggal Verifikasi (COA)</label>
+                        <input
+                            type="date"
+                            required
+                            value={tanggalAnalisa}
+                            onChange={e => setTanggalAnalisa(e.target.value)}
+                            className={fieldCls}
+                        />
+                    </div>
                 </div>
 
                 <div className="space-y-1.5">
@@ -433,11 +451,12 @@ export function AnalisaAllPage() {
         { label: 'Tidak Lolos', value: 'Tidak Lolos' },
     ];
 
-    const handleVerify = async (payload: { hasilAnalisa: string; dokumen?: string }) => {
+    const handleVerify = async (payload: { hasilAnalisa: string; tanggalAnalisa?: string; dokumen?: string }) => {
         if (!editingData) return;
         await updateAnalisa({
             id: editingData.id,
             hasilAnalisa: payload.hasilAnalisa,
+            ...(payload.tanggalAnalisa ? { tanggalAnalisa: payload.tanggalAnalisa } : {}),
             ...(payload.dokumen ? { dokumen: payload.dokumen } : {}),
         });
         fetchData();

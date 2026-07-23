@@ -29,7 +29,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
         if (body.tanggalAnalisa !== undefined) {
             updateData.tanggal_analisa = body.tanggalAnalisa ? new Date(body.tanggalAnalisa).toISOString() : null;
         }
-        if (body.dokumen !== undefined) updateData.lembaga = body.dokumen;
+        if (body.dokumen !== undefined) updateData.dokumen = body.dokumen;
         updateData.updated_at = new Date().toISOString();
 
         const { data: updatedAnalisa, error } = await db.from<any>('analisas').update(updateData).eq('id', id);
@@ -39,25 +39,57 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
             return NextResponse.json({ message: 'Failed to update' }, { status: 500 });
         }
 
-        // Sync with produksis table if hasil_analisa was modified
-        if (body.hasilAnalisa) {
+        // Sync with produksis table if hasil_analisa or tanggalAnalisa was modified
+        if (body.hasilAnalisa !== undefined || body.tanggalAnalisa !== undefined) {
             try {
                 const { data: currentAnalisa } = await db.from<any>('analisas').select('*').eq('id', id).single();
                 if (currentAnalisa) {
                     const { data: produksisList } = await db.from<any>('produksis').select('*').eq('product_slug', currentAnalisa.product_slug).execute();
-                    const targetProduksi = (produksisList || []).find((p: any) => p.ps_batch_kode === currentAnalisa.no_bapc);
 
-                    if (targetProduksi) {
-                        if (body.hasilAnalisa === 'Lolos') {
+                    // Clear any existing COA entry for this batch_kode across all rows of this product
+                    for (const p of (produksisList || [])) {
+                        if (p.coa_batch_kode === currentAnalisa.no_bapc) {
+                            await db.from<any>('produksis').update({ coa: 0, coa_batch_kode: '' }).eq('id', p.id);
+                        }
+                    }
+
+                    const targetHasil = body.hasilAnalisa || currentAnalisa.hasil_analisa;
+                    if (targetHasil === 'Lolos') {
+                        const targetProduksi = (produksisList || []).find((p: any) => p.ps_batch_kode === currentAnalisa.no_bapc || p.batch_kode === currentAnalisa.no_bapc);
+                        const targetDateStr = body.tanggalAnalisa || currentAnalisa.tanggal_analisa || currentAnalisa.tanggal_sampling;
+                        const localDate = new Date(targetDateStr);
+                        const utcOffset = 7 * 60 * 60 * 1000;
+                        const targetUtcDate = new Date(localDate.getTime() - utcOffset);
+
+                        const tabId = targetProduksi?.produksi_tab_id || 1;
+                        const coaAmount = currentAnalisa.kuantum || targetProduksi?.ps || 0;
+
+                        const existingRecordOnDate = (produksisList || []).find((p: any) => {
+                            const pDate = new Date(p.tanggal);
+                            return p.produksi_tab_id === tabId && pDate.getTime() === targetUtcDate.getTime();
+                        });
+
+                        if (existingRecordOnDate) {
                             await db.from<any>('produksis').update({
-                                coa: targetProduksi.ps,
+                                coa: coaAmount,
                                 coa_batch_kode: currentAnalisa.no_bapc
-                            }).eq('id', targetProduksi.id);
+                            }).eq('id', existingRecordOnDate.id);
                         } else {
-                            await db.from<any>('produksis').update({
-                                coa: 0,
-                                coa_batch_kode: ''
-                            }).eq('id', targetProduksi.id);
+                            await db.from<any>('produksis').insert({
+                                product_slug: currentAnalisa.product_slug,
+                                produksi_tab_id: tabId,
+                                tanggal: targetUtcDate.toISOString(),
+                                bs: 0,
+                                ps: 0,
+                                coa: coaAmount,
+                                pg: 0,
+                                kumulatif: 0,
+                                stok_akhir: 0,
+                                batch_kode: '',
+                                ps_batch_kode: '',
+                                coa_batch_kode: currentAnalisa.no_bapc,
+                                keterangan: ''
+                            });
                         }
                     }
                 }

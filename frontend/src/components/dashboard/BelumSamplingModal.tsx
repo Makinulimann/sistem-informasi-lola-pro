@@ -161,6 +161,11 @@ export function BelumSamplingModal({
     const [success, setSuccess] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // BOM & Sub-Product Packaging state
+    const [bomConfigData, setBomConfigData] = useState<any>(null);
+    const [productMaterialsData, setProductMaterialsData] = useState<any[]>([]);
+    const [selectedSubProduct, setSelectedSubProduct] = useState<string>('default');
+
     const isLiquid = productFullName.toLowerCase().includes('cair') || productFullName.toLowerCase().includes('liquid');
     const unitFamily = isLiquid ? ['Liter', 'mL', 'KL'] : ['Ton', 'Kwintal', 'Kg', 'Gram'];
 
@@ -173,6 +178,9 @@ export function BelumSamplingModal({
             setBatchKode(currentBatchKode || '');
             setKeterangan('');
             setMaterials([]);
+            setSelectedSubProduct('default');
+            setBomConfigData(null);
+            setProductMaterialsData([]);
             setSaving(false);
             setSuccess(false);
             setError(null);
@@ -196,6 +204,9 @@ export function BelumSamplingModal({
                 api.get<any[]>(`/ProductMaterial/${productSlug}`).catch(() => []),
                 getBOM(productSlug, tabId).catch(() => null),
             ]);
+
+            setBomConfigData(bomConfig);
+            setProductMaterialsData(productMaterials || []);
 
             // Build a lookup of existing mutasi by namaBahan
             const mutasiMap = new Map<string, { kuantum: number; satuan: string }>();
@@ -259,6 +270,61 @@ export function BelumSamplingModal({
         }
     };
 
+    // Sub-Product Packaging BOM recalculation
+    const handleSubProductChange = (variantName: string) => {
+        setSelectedSubProduct(variantName);
+        if (!bomConfigData) return;
+
+        const bomMap = new Map<number, number>();
+
+        if (variantName === 'default') {
+            if (Array.isArray(bomConfigData.items)) {
+                bomConfigData.items.forEach((item: any) => {
+                    bomMap.set(item.materialId, Number(item.quantity || 0));
+                });
+            }
+        } else {
+            // Include standard raw materials first
+            if (Array.isArray(bomConfigData.items)) {
+                bomConfigData.items.forEach((item: any) => {
+                    bomMap.set(item.materialId, Number(item.quantity || 0));
+                });
+            }
+            // Override/add variant items
+            const foundVariant = (bomConfigData.variants || []).find((v: any) => v.name === variantName);
+            if (foundVariant && Array.isArray(foundVariant.items)) {
+                foundVariant.items.forEach((item: any) => {
+                    bomMap.set(item.materialId, Number(item.quantity || 0));
+                });
+            }
+        }
+
+        const bomQtyByName = new Map<string, number>();
+        if (Array.isArray(productMaterialsData)) {
+            productMaterialsData.forEach((pm: any) => {
+                const bomQty = bomMap.get(pm.masterItemId);
+                if (bomQty !== undefined && bomQty > 0) {
+                    bomQtyByName.set(pm.nama, bomQty);
+                }
+            });
+        }
+
+        setMaterials(prev => prev.map(mat => {
+            let newKuantum = mat.kuantum;
+            if (bomConfigData.baseQuantity > 0 && bomQtyByName.has(mat.namaBahan)) {
+                const bomQty = bomQtyByName.get(mat.namaBahan) || 0;
+                const calc = (Number(bsValue) / bomConfigData.baseQuantity) * bomQty;
+                newKuantum = Math.round(calc * 1000) / 1000;
+            } else if (mat.jenis === 'Bahan Penolong' && variantName !== 'default' && !bomQtyByName.has(mat.namaBahan)) {
+                newKuantum = 0;
+            }
+            return {
+                ...mat,
+                kuantum: newKuantum
+            };
+        }));
+    };
+
     const handleNext = async () => {
         if (step === 0) {
             if (!bsValue || Number(bsValue) <= 0) {
@@ -273,16 +339,6 @@ export function BelumSamplingModal({
             await loadMaterials();
             setStep(1);
         } else if (step === 1) {
-            // Validate: no material should exceed available stock
-            const overStockItem = materials.find(m => {
-                if (m.kuantum <= 0) return false;
-                const stokInDisplay = convertUnit(m.stokTersedia, m.baseSatuan, m.displaySatuan);
-                return m.kuantum > stokInDisplay && stokInDisplay > 0;
-            });
-            if (overStockItem) {
-                setError(`Jumlah "${overStockItem.namaBahan}" melebihi stok yang tersedia`);
-                return;
-            }
             setError(null);
             setStep(2);
         }
@@ -423,24 +479,24 @@ export function BelumSamplingModal({
                             {/* Step 1: Input Produksi */}
                             {step === 0 && (
                                 <div className="space-y-6">
-                                    <div className="bg-gradient-to-br from-emerald-50 to-white rounded-xl border border-emerald-100 p-6">
+                                    <div className="bg-gradient-to-br from-emerald-50 to-white border border-emerald-100 p-6">
                                         <label className="block text-sm font-semibold text-gray-700 mb-3">
                                             Jumlah Produksi (Belum Sampling)
                                         </label>
-                                        <div className="relative flex shadow-sm rounded-xl">
+                                        <div className="relative flex">
                                             <input
                                                 type="number"
                                                 step="any"
                                                 value={bsValue}
                                                 onChange={e => { setBsValue(e.target.value); setError(null); }}
-                                                className="flex-1 text-2xl font-mono font-bold text-gray-900 pl-4 pr-3 py-4 border-2 border-emerald-200 rounded-l-xl border-r-0 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all bg-white placeholder:text-gray-300 relative z-10"
+                                                className="flex-1 text-2xl font-mono font-bold text-gray-900 pl-4 pr-3 py-4 border-2 border-emerald-200 border-r-0 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all bg-white placeholder:text-gray-300 relative z-10"
                                                 placeholder="0"
                                                 autoFocus
                                             />
                                             <select
                                                 value={bsSatuan}
                                                 onChange={e => setBsSatuan(e.target.value)}
-                                                className="w-24 bg-gray-50 border-2 border-emerald-200 rounded-r-xl text-sm font-semibold text-gray-700 px-3 py-4 cursor-pointer hover:bg-gray-100 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all text-center relative z-10"
+                                                className="w-24 bg-gray-50 border-2 border-emerald-200 text-sm font-semibold text-gray-700 px-3 py-4 cursor-pointer hover:bg-gray-100 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all text-center relative z-10"
                                             >
                                                 {unitFamily.map(u => (
                                                     <option key={u} value={u}>{u}</option>
@@ -455,7 +511,7 @@ export function BelumSamplingModal({
                                     </div>
 
                                     {/* Batch Code Input */}
-                                    <div className="bg-gradient-to-br from-blue-50 to-white rounded-xl border border-blue-100 p-6">
+                                    <div className="bg-gradient-to-br from-blue-50 to-white border border-blue-100 p-6">
                                         <label className="block text-sm font-semibold text-gray-700 mb-3">
                                             Kode Batch <span className="text-red-500">*</span>
                                         </label>
@@ -463,7 +519,7 @@ export function BelumSamplingModal({
                                             type="text"
                                             value={batchKode}
                                             onChange={e => { setBatchKode(e.target.value); setError(null); }}
-                                            className="w-full text-lg font-mono font-bold text-gray-900 px-4 py-3 border-2 border-blue-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all bg-white placeholder:text-gray-300 uppercase"
+                                            className="w-full text-lg font-mono font-bold text-gray-900 px-4 py-3 border-2 border-blue-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all bg-white placeholder:text-gray-300 uppercase"
                                             placeholder="Contoh: B001"
                                         />
                                         {currentBatchKode && (
@@ -475,7 +531,7 @@ export function BelumSamplingModal({
 
 
                                     {/* Keterangan / Notes */}
-                                    <div className="bg-gray-50/50 rounded-xl border border-gray-100 p-5">
+                                    <div className="bg-gray-50/50 border border-gray-100 p-5">
                                         <label className="block text-sm font-semibold text-gray-700 mb-2">
                                             Keterangan <span className="text-gray-400 font-normal">(opsional)</span>
                                         </label>
@@ -483,7 +539,7 @@ export function BelumSamplingModal({
                                             value={keterangan}
                                             onChange={e => setKeterangan(e.target.value)}
                                             rows={2}
-                                            className="w-full text-sm text-gray-800 px-4 py-3 border border-gray-200 rounded-xl focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all bg-white placeholder:text-gray-300 resize-none"
+                                            className="w-full text-sm text-gray-800 px-4 py-3 border border-gray-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all bg-white placeholder:text-gray-300 resize-none"
                                             placeholder="Tambahkan catatan jika diperlukan..."
                                         />
                                     </div>
@@ -493,12 +549,45 @@ export function BelumSamplingModal({
                             {/* Step 2: Input Bahan/Material */}
                             {step === 1 && (
                                 <div className="space-y-4">
-                                    <div className="flex items-center justify-between">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-emerald-50/50 border border-emerald-100 p-3.5">
                                         <div>
-                                            <h4 className="text-base font-bold text-gray-900">Bahan yang Digunakan</h4>
+                                            <h4 className="text-sm font-bold text-gray-900">Bahan yang Digunakan</h4>
                                             <p className="text-xs text-gray-500 mt-0.5">
                                                 Input jumlah bahan yang dipakai untuk produksi <span className="font-semibold text-emerald-600">{fmt(Number(bsValue))}</span>
                                             </p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <label className="text-xs font-semibold text-gray-700 whitespace-nowrap">Varian Kemasan:</label>
+                                            <select
+                                                value={selectedSubProduct}
+                                                onChange={e => handleSubProductChange(e.target.value)}
+                                                className="bg-white border border-emerald-300 text-xs font-bold px-3 py-1.5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                                            >
+                                                <option value="default">BOM Standar / Manual</option>
+                                                {(() => {
+                                                    const vSet = new Set<string>();
+                                                    if (bomConfigData?.variants && Array.isArray(bomConfigData.variants)) {
+                                                        bomConfigData.variants.forEach((v: any) => {
+                                                            if (v.name) vSet.add(v.name);
+                                                        });
+                                                    }
+                                                    try {
+                                                        const storageKey = `sippro_bom_variants_${productSlug}_${tabId}`;
+                                                        const cached = localStorage.getItem(storageKey);
+                                                        if (cached) {
+                                                            const parsed = JSON.parse(cached);
+                                                            if (Array.isArray(parsed.variantsList)) {
+                                                                parsed.variantsList.forEach((name: string) => {
+                                                                    if (name) vSet.add(name);
+                                                                });
+                                                            }
+                                                        }
+                                                    } catch {}
+                                                    return Array.from(vSet).map((vName: string) => (
+                                                        <option key={vName} value={vName}>{vName}</option>
+                                                    ));
+                                                })()}
+                                            </select>
                                         </div>
                                     </div>
 
@@ -513,84 +602,111 @@ export function BelumSamplingModal({
                                             <p className="text-xs mt-1">Anda dapat melewati langkah ini.</p>
                                         </div>
                                     ) : (
-                                        <div className="rounded-xl border border-gray-200 overflow-hidden">
-                                            <table className="w-full text-sm">
+                                        <div className="rounded-sm border border-gray-200 overflow-hidden">
+                                            <table className="w-full text-sm border-collapse">
                                                 <thead>
-                                                    <tr className="bg-gray-50 border-b border-gray-200">
-                                                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Nama Bahan</th>
-                                                        <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider w-20">Satuan</th>
-                                                        <th className="px-4 py-3 text-right text-xs font-semibold text-blue-600 uppercase tracking-wider w-28">Stok</th>
-                                                        <th className="px-4 py-3 text-right text-xs font-semibold text-orange-600 uppercase tracking-wider w-36">Digunakan</th>
+                                                    <tr className="bg-gray-100/80 border-b border-gray-200">
+                                                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Nama Bahan</th>
+                                                        <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider w-24">Satuan</th>
+                                                        <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider w-32">Stok Tersedia</th>
+                                                        <th className="px-4 py-3 text-right text-xs font-semibold text-emerald-800 uppercase tracking-wider w-36">Digunakan</th>
                                                     </tr>
                                                 </thead>
-                                                <tbody className="divide-y divide-gray-100">
-                                                    {materials.map((mat, idx) => {
-                                                        const unitFamily = getUnitFamily(mat.baseSatuan);
-                                                        const hasMultipleUnits = unitFamily.length > 1;
-                                                        // Convert stok to display unit for comparison
-                                                        const stokInDisplay = convertUnit(mat.stokTersedia, mat.baseSatuan, mat.displaySatuan);
-                                                        const noStock = stokInDisplay <= 0;
-                                                        const overStock = mat.kuantum > stokInDisplay && !noStock;
-                                                        return (
-                                                            <tr key={mat.namaBahan} className="hover:bg-gray-50/50 transition-colors">
-                                                                <td className="px-4 py-3">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <div className={`w-2 h-2 rounded-full shrink-0 ${mat.jenis === 'Bahan Baku' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                                                                        <div>
-                                                                            <span className="text-sm font-medium text-gray-800">{mat.namaBahan}</span>
-                                                                            <span className={`ml-2 inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded-full border ${mat.jenis === 'Bahan Baku' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
-                                                                                {mat.jenis}
-                                                                            </span>
+                                                <tbody className="divide-y divide-gray-100 bg-white">
+                                                    {(() => {
+                                                        const sortedList = materials
+                                                            .map((mat, originalIdx) => ({ mat, originalIdx }))
+                                                            .sort((a, b) => {
+                                                                const aUsed = a.mat.kuantum > 0 ? 1 : 0;
+                                                                const bUsed = b.mat.kuantum > 0 ? 1 : 0;
+                                                                if (aUsed !== bUsed) return bUsed - aUsed;
+
+                                                                const aIsBaku = a.mat.jenis === 'Bahan Baku' ? 0 : 1;
+                                                                const bIsBaku = b.mat.jenis === 'Bahan Baku' ? 0 : 1;
+                                                                if (aIsBaku !== bIsBaku) return aIsBaku - bIsBaku;
+
+                                                                return a.mat.namaBahan.localeCompare(b.mat.namaBahan);
+                                                            });
+
+                                                        return sortedList.map(({ mat, originalIdx }) => {
+                                                            const unitFamily = getUnitFamily(mat.baseSatuan);
+                                                            const hasMultipleUnits = unitFamily.length > 1;
+                                                            const stokInDisplay = convertUnit(mat.stokTersedia, mat.baseSatuan, mat.displaySatuan);
+                                                            const overStock = mat.kuantum > stokInDisplay;
+                                                            const isUsed = mat.kuantum > 0;
+                                                            const isBaku = mat.jenis === 'Bahan Baku';
+
+                                                            return (
+                                                                <tr
+                                                                    key={mat.namaBahan}
+                                                                    className={`transition-colors ${
+                                                                        isUsed
+                                                                            ? 'bg-emerald-50/40 hover:bg-emerald-50/60 border-l-4 border-l-emerald-500'
+                                                                            : 'hover:bg-gray-50/60 border-l-4 border-l-transparent'
+                                                                    }`}
+                                                                >
+                                                                    <td className="px-4 py-3">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isBaku ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className={`text-sm font-semibold ${isUsed ? 'text-gray-900' : 'text-gray-600'}`}>
+                                                                                    {mat.namaBahan}
+                                                                                </span>
+                                                                                <span className={`inline-flex px-2 py-0.5 text-[10px] font-semibold rounded-full border ${
+                                                                                    isBaku
+                                                                                        ? 'bg-emerald-100/70 text-emerald-800 border-emerald-200'
+                                                                                        : 'bg-amber-100/70 text-amber-800 border-amber-200'
+                                                                                }`}>
+                                                                                    {mat.jenis}
+                                                                                </span>
+                                                                            </div>
                                                                         </div>
-                                                                    </div>
-                                                                </td>
-                                                                <td className="px-4 py-3 text-center">
-                                                                    {hasMultipleUnits ? (
-                                                                        <select
-                                                                            value={mat.displaySatuan}
-                                                                            onChange={e => handleSatuanChange(idx, e.target.value)}
-                                                                            className="bg-gray-50 border border-gray-200 text-xs font-semibold text-gray-700 rounded-md px-2 py-1.5 cursor-pointer hover:border-emerald-300 focus:outline-none focus:ring-1 focus:ring-emerald-400 transition-all appearance-none text-center"
-                                                                            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 4px center', paddingRight: '18px' }}
-                                                                        >
-                                                                            {unitFamily.map(u => (
-                                                                                <option key={u} value={u}>{u}</option>
-                                                                            ))}
-                                                                        </select>
-                                                                    ) : (
-                                                                        <span className="text-xs text-gray-500 font-medium">{mat.displaySatuan}</span>
-                                                                    )}
-                                                                </td>
-                                                                <td className="px-4 py-3 text-right">
-                                                                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold ${stokInDisplay > 0 ? 'bg-blue-50 text-blue-700' : 'bg-gray-50 text-gray-400'}`}>
-                                                                        {fmt(stokInDisplay)}
-                                                                        <span className="text-[10px] font-normal opacity-60">{mat.displaySatuan}</span>
-                                                                    </span>
-                                                                </td>
-                                                                <td className="px-4 py-3">
-                                                                    <input
-                                                                        type="number"
-                                                                        step="any"
-                                                                        value={mat.kuantum === 0 ? '' : mat.kuantum}
-                                                                        onChange={e => handleMaterialChange(idx, e.target.value)}
-                                                                        disabled={noStock}
-                                                                        className={`w-full h-9 px-3 text-right font-mono text-sm border rounded-lg outline-none transition-all
-                                                                            ${noStock
-                                                                                ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
-                                                                                : overStock
+                                                                    </td>
+                                                                    <td className="px-4 py-3 text-center">
+                                                                        {hasMultipleUnits ? (
+                                                                            <select
+                                                                                value={mat.displaySatuan}
+                                                                                onChange={e => handleSatuanChange(originalIdx, e.target.value)}
+                                                                                className="bg-gray-50 border border-gray-200 text-xs font-semibold text-gray-700 rounded-md px-2 py-1.5 cursor-pointer hover:border-emerald-300 focus:outline-none focus:ring-1 focus:ring-emerald-400 transition-all appearance-none text-center"
+                                                                                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 4px center', paddingRight: '18px' }}
+                                                                            >
+                                                                                {unitFamily.map(u => (
+                                                                                    <option key={u} value={u}>{u}</option>
+                                                                                ))}
+                                                                            </select>
+                                                                        ) : (
+                                                                            <span className="text-xs text-gray-500 font-semibold">{mat.displaySatuan}</span>
+                                                                        )}
+                                                                    </td>
+                                                                    <td className="px-4 py-3 text-right">
+                                                                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold ${stokInDisplay > 0 ? 'bg-blue-50 text-blue-700' : 'bg-red-50 text-red-600'}`}>
+                                                                            {fmt(stokInDisplay)}
+                                                                            <span className="text-[10px] font-normal opacity-60">{mat.displaySatuan}</span>
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="px-4 py-3">
+                                                                        <input
+                                                                            type="number"
+                                                                            step="any"
+                                                                            value={mat.kuantum === 0 ? '' : mat.kuantum}
+                                                                            onChange={e => handleMaterialChange(originalIdx, e.target.value)}
+                                                                            className={`w-full h-9 px-3 text-right font-mono text-sm border rounded-lg outline-none transition-all font-bold ${
+                                                                                overStock
                                                                                     ? 'border-red-300 bg-red-50 text-red-700 focus:border-red-500 focus:ring-1 focus:ring-red-500/20'
-                                                                                    : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20'}`}
-                                                                        placeholder={noStock ? '-' : '0'}
-                                                                    />
-                                                                    {noStock && (
-                                                                        <p className="text-[10px] text-gray-400 mt-0.5 text-right">Stok habis</p>
-                                                                    )}
-                                                                    {overStock && (
-                                                                        <p className="text-[10px] text-red-500 mt-0.5 text-right">Melebihi stok!</p>
-                                                                    )}
-                                                                </td>
-                                                            </tr>
-                                                        );
-                                                    })}
+                                                                                    : isUsed
+                                                                                        ? 'border-emerald-400 bg-emerald-50/30 text-emerald-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500/20'
+                                                                                        : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20'
+                                                                            }`}
+                                                                            placeholder="0"
+                                                                        />
+                                                                        {overStock && (
+                                                                            <p className="text-[10px] text-red-500 mt-0.5 text-right font-medium">Melebihi stok!</p>
+                                                                        )}
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        });
+                                                    })()}
                                                 </tbody>
                                             </table>
                                         </div>
@@ -602,22 +718,19 @@ export function BelumSamplingModal({
                             {step === 2 && (
                                 <div className="space-y-5">
                                     {/* Produksi Summary */}
-                                    <div className="bg-gradient-to-br from-emerald-50 to-white rounded-xl border border-emerald-100 p-5">
+                                    <div className="bg-gradient-to-br from-emerald-50 to-white border border-emerald-100 p-5">
                                         <div className="flex items-center gap-3 mb-1">
-                                            <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-700">
-                                                <FactoryIcon />
-                                            </div>
                                             <div>
                                                 <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Produksi</p>
                                                 <p className="text-2xl font-bold text-gray-900 font-mono">{fmt(Number(bsValue))}</p>
                                             </div>
                                         </div>
                                         {keterangan && (
-                                            <p className="text-xs text-gray-500 mt-2 ml-[52px] italic">
+                                            <p className="text-xs text-gray-500 mt-2 italic">
                                                 Keterangan: {keterangan}
                                             </p>
                                         )}
-                                        <p className="text-xs text-gray-500 mt-1 ml-[52px]">
+                                        <p className="text-xs text-gray-500 mt-1">
                                             Kode Batch: <span className="font-semibold text-blue-700 font-mono">{batchKode}</span>
                                         </p>
                                     </div>
@@ -650,20 +763,14 @@ export function BelumSamplingModal({
                                     )}
 
                                     {usedMaterials.length === 0 && (
-                                        <div className="bg-gray-50 rounded-xl border border-gray-100 p-4 text-center">
+                                        <div className="bg-gray-50 border border-gray-100 p-4 text-center">
                                             <p className="text-sm text-gray-500">Tidak ada bahan yang diinput</p>
                                             <p className="text-xs text-gray-400 mt-0.5">Hanya data produksi yang akan disimpan</p>
                                         </div>
                                     )}
 
-                                    <div className="bg-amber-50/50 rounded-xl border border-amber-100 p-4">
+                                    <div className="bg-amber-50/50 border border-amber-100 p-4">
                                         <div className="flex items-start gap-3">
-                                            <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-amber-600">
-                                                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                                                    <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
-                                                </svg>
-                                            </div>
                                             <div>
                                                 <p className="text-sm font-medium text-amber-800">Konfirmasi</p>
                                                 <p className="text-xs text-amber-600 mt-1">
@@ -708,7 +815,7 @@ export function BelumSamplingModal({
                             {step < 2 ? (
                                 <button
                                     onClick={handleNext}
-                                    className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 shadow-sm transition-colors"
+                                    className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 shadow-sm transition-colors"
                                 >
                                     Lanjut <ChevronRightIcon />
                                 </button>
@@ -716,7 +823,7 @@ export function BelumSamplingModal({
                                 <button
                                     onClick={handleSubmit}
                                     disabled={saving}
-                                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {saving ? (
                                         <>

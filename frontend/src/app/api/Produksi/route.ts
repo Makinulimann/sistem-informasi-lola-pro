@@ -66,11 +66,18 @@ export async function GET(request: Request) {
         // Filter for this month's grid display
         const dbRecords = tabFilteredRecords.filter(r => new Date(r.tanggal) >= startUtc && new Date(r.tanggal) < endUtc);
 
+        // Prior records (before current month) for accumulation
+        const priorRecords = tabFilteredRecords.filter(r => new Date(r.tanggal) < startUtc);
+        const priorBs = priorRecords.reduce((sum: number, r: any) => sum + Number(r.bs || 0), 0);
+        const priorPs = priorRecords.reduce((sum: number, r: any) => sum + Number(r.ps || 0), 0);
+        const priorPg = priorRecords.reduce((sum: number, r: any) => sum + Number(r.pg || 0), 0);
+
         const daysInMonth = new Date(tahun, bulan, 0).getDate();
         const fullList = [];
 
-        let runningKumulatif = 0;
-        let runningStok = 0;
+        let runningKumulatif = priorBs;
+        let runningStok = priorBs - priorPg;
+        let initialBs = priorBs - priorPs;
 
         for (let day = 1; day <= daysInMonth; day++) {
             const date = new Date(tahun, bulan - 1, day);
@@ -115,18 +122,40 @@ export async function GET(request: Request) {
 
         // --- Calculate Batch WIP available globally ---
         const batchMap: { [kode: string]: { bs: number, ps: number, coa: number } } = {};
-        for (const r of filteredRecords) {
-            if (r.batch_kode && r.bs > 0) {
-                if (!batchMap[r.batch_kode]) batchMap[r.batch_kode] = { bs: 0, ps: 0, coa: 0 };
-                batchMap[r.batch_kode].bs += r.bs;
-            }
-            if (r.ps_batch_kode && r.ps > 0) {
-                if (!batchMap[r.ps_batch_kode]) batchMap[r.ps_batch_kode] = { bs: 0, ps: 0, coa: 0 };
-                batchMap[r.ps_batch_kode].ps += r.ps;
-            }
-            if (r.coa_batch_kode && r.coa > 0) {
-                if (!batchMap[r.coa_batch_kode]) batchMap[r.coa_batch_kode] = { bs: 0, ps: 0, coa: 0 };
-                batchMap[r.coa_batch_kode].coa += r.coa;
+        for (const r of tabFilteredRecords) {
+            const bsNum = Number(r.bs || 0);
+            const psNum = Number(r.ps || 0);
+            const coaNum = Number(r.coa || 0);
+
+            if (bsNum > 0 || psNum > 0 || coaNum > 0) {
+                let effectiveBatch = (r.batch_kode || '').trim();
+                if (!effectiveBatch && bsNum > 0) {
+                    const d = new Date(r.tanggal);
+                    const dd = String(d.getUTCDate()).padStart(2, '0');
+                    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+                    const yy = String(d.getUTCFullYear()).slice(-2);
+                    effectiveBatch = `B-${dd}${mm}${yy}`;
+
+                    // Persist auto-generated batch code if missing in DB
+                    db.from<any>('produksis').update({ batch_kode: effectiveBatch }).eq('id', r.id).then(() => {}).catch(() => {});
+                }
+
+                if (effectiveBatch && bsNum > 0) {
+                    if (!batchMap[effectiveBatch]) batchMap[effectiveBatch] = { bs: 0, ps: 0, coa: 0 };
+                    batchMap[effectiveBatch].bs += bsNum;
+                }
+
+                const effectivePsBatch = (r.ps_batch_kode || '').trim() || effectiveBatch;
+                if (effectivePsBatch && psNum > 0) {
+                    if (!batchMap[effectivePsBatch]) batchMap[effectivePsBatch] = { bs: 0, ps: 0, coa: 0 };
+                    batchMap[effectivePsBatch].ps += psNum;
+                }
+
+                const effectiveCoaBatch = (r.coa_batch_kode || '').trim() || effectivePsBatch || effectiveBatch;
+                if (effectiveCoaBatch && coaNum > 0) {
+                    if (!batchMap[effectiveCoaBatch]) batchMap[effectiveCoaBatch] = { bs: 0, ps: 0, coa: 0 };
+                    batchMap[effectiveCoaBatch].coa += coaNum;
+                }
             }
         }
 
@@ -146,17 +175,18 @@ export async function GET(request: Request) {
             totalCoa: fullList.reduce((sum, x) => sum + x.coa, 0),
             totalBelumSampling: globalBelumSampling,
             kumulatif: runningKumulatif,
-            stokAkhir: runningStok
+            stokAkhir: runningStok,
+            initialBs: initialBs
         };
 
         const availableBatches = [];
         for (const kode in batchMap) {
             const b = batchMap[kode];
-            const bsWip = Math.max(0, b.bs - b.coa);
+            const bsWip = Math.max(0, b.bs - b.ps);
             const psWip = Math.max(0, b.ps - b.coa);
             const coaWip = Math.max(0, b.bs - b.coa);
-            if (bsWip > 0 || psWip > 0 || coaWip > 0) {
-                availableBatches.push({ kode, bsWip, psWip, coaWip });
+            if (bsWip > 0 || psWip > 0 || coaWip > 0 || b.bs > 0) {
+                availableBatches.push({ kode, bsWip: bsWip || b.bs, psWip: psWip || b.ps, coaWip: coaWip || b.bs });
             }
         }
 
