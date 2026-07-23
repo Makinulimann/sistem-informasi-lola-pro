@@ -23,7 +23,6 @@ export async function GET(request: Request) {
         // Fetch all BOM items for the specified slug and tab
         const { data: bomRows, error } = await db.from<any>('bill_of_materials')
             .select('*')
-            .eq('product_slug', productSlug)
             .execute();
 
         if (error) {
@@ -31,12 +30,13 @@ export async function GET(request: Request) {
             return NextResponse.json({ message: 'Failed to fetch BOM.' }, { status: 500 });
         }
 
-        const filtered = (bomRows || []).filter(
-            (row: any) => row.produksi_tab_id === tabId
-        );
+        const filtered = (bomRows || []).filter((row: any) => {
+            if (row.produksi_tab_id !== tabId) return false;
+            const slug = row.product_slug || '';
+            return slug === productSlug || slug.startsWith(`${productSlug}::variant::`);
+        });
 
         if (filtered.length === 0) {
-            // Return default clean state
             return NextResponse.json({
                 baseQuantity: 1000,
                 items: [],
@@ -46,25 +46,38 @@ export async function GET(request: Request) {
 
         const baseQuantity = Number(filtered[0].base_quantity || 1000);
         
-        // Standard items (variant_name is default or null/empty)
+        // Standard items (product_slug matches base productSlug and variant_name is default/empty)
         const defaultItems = filtered
-            .filter((row: any) => row.material_id !== -1 && (!row.variant_name || row.variant_name === 'default'))
+            .filter((row: any) => 
+                row.product_slug === productSlug && 
+                row.material_id !== -1 && 
+                (!row.variant_name || row.variant_name === 'default')
+            )
             .map((row: any) => ({
                 id: row.id,
                 materialId: row.material_id,
                 quantity: Number(row.material_quantity || 0)
             }));
 
-        // Variant items grouped by variant_name
+        // Variant items grouped by variant_name or encoded product_slug
         const variantMap: Record<string, any[]> = {};
         filtered.forEach((row: any) => {
-            if (row.variant_name && row.variant_name !== 'default' && row.material_id !== -1) {
-                if (!variantMap[row.variant_name]) variantMap[row.variant_name] = [];
-                variantMap[row.variant_name].push({
-                    id: row.id,
-                    materialId: row.material_id,
-                    quantity: Number(row.material_quantity || 0)
-                });
+            let vName: string | null = null;
+            if (row.variant_name && row.variant_name !== 'default') {
+                vName = row.variant_name;
+            } else if (row.product_slug && row.product_slug.includes('::variant::')) {
+                vName = row.product_slug.split('::variant::')[1];
+            }
+
+            if (vName) {
+                if (!variantMap[vName]) variantMap[vName] = [];
+                if (row.material_id !== -1) {
+                    variantMap[vName].push({
+                        id: row.id,
+                        materialId: row.material_id,
+                        quantity: Number(row.material_quantity || 0)
+                    });
+                }
             }
         });
 
@@ -104,12 +117,15 @@ export async function POST(request: Request) {
 
         // 1. Delete existing BOM items for this slug and tab
         const { data: existingRows } = await db.from<any>('bill_of_materials')
-            .select('id, produksi_tab_id')
-            .eq('product_slug', productSlug)
+            .select('id, produksi_tab_id, product_slug')
             .execute();
 
         const idsToDelete = (existingRows || [])
-            .filter((row: any) => row.produksi_tab_id === tabIdNum)
+            .filter((row: any) => {
+                if (row.produksi_tab_id !== tabIdNum) return false;
+                const slug = row.product_slug || '';
+                return slug === productSlug || slug.startsWith(`${productSlug}::variant::`);
+            })
             .map((row: any) => row.id);
 
         for (const id of idsToDelete) {
@@ -136,33 +152,32 @@ export async function POST(request: Request) {
 
                 let { error: insertError } = await db.from<any>('bill_of_materials').insert(insertObj);
 
-                // Fallback if variant_name column does not exist in schema yet
                 if (insertError && (insertError as any).code === 'PGRST204') {
                     delete insertObj.variant_name;
                     const retry = await db.from<any>('bill_of_materials').insert(insertObj);
                     insertError = retry.error;
                 }
 
-                if (insertError) {
-                    console.error('Error inserting standard BOM item:', insertError);
-                } else {
+                if (!insertError) {
                     insertedCount++;
                 }
             }
         }
 
-        // 3. Insert variant BOM items (if any)
+        // 3. Insert variant BOM items (with product_slug fallback)
         if (Array.isArray(variants)) {
             for (const v of variants) {
                 if (v && v.name) {
+                    const variantSlug = `${productSlug}::variant::${v.name}`;
                     let vInserted = 0;
+
                     if (Array.isArray(v.items)) {
                         for (const item of v.items) {
                             const matId = parseInt(item.materialId, 10);
                             const matQty = parseFloat(item.quantity) || 0;
                             if (!isNaN(matId) && matQty > 0) {
                                 const vInsertObj: any = {
-                                    product_slug: productSlug,
+                                    product_slug: variantSlug,
                                     produksi_tab_id: tabIdNum,
                                     base_quantity: baseQtyNum,
                                     material_id: matId,
@@ -184,9 +199,10 @@ export async function POST(request: Request) {
                             }
                         }
                     }
+
                     if (vInserted === 0) {
                         const vPlaceholderObj: any = {
-                            product_slug: productSlug,
+                            product_slug: variantSlug,
                             produksi_tab_id: tabIdNum,
                             base_quantity: baseQtyNum,
                             material_id: -1,
