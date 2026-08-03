@@ -693,12 +693,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                                     <button
                                                         onClick={() => {
                                                             setPsModal({ isOpen: true, tanggal: row.tanggal });
-                                                            const d = new Date(row.tanggal);
-                                                            const dd = String(d.getDate()).padStart(2, '0');
-                                                            const mm = String(d.getMonth() + 1).padStart(2, '0');
-                                                            const yy = String(d.getFullYear()).slice(-2);
-                                                            const fallbackBatch = `B-${dd}${mm}${yy}`;
-                                                            const initialBatch = row.psBatchKode || row.batchKode || (psAvailableBatches.length > 0 ? psAvailableBatches[0].kode : fallbackBatch);
+                                                            const initialBatch = row.psBatchKode || row.batchKode || (psAvailableBatches.length > 0 ? psAvailableBatches[0].kode : '');
                                                             setPsBatchKode(initialBatch);
                                                             const found = psAvailableBatches.find(b => b.kode === initialBatch);
                                                             if (psDisplay > 0) {
@@ -727,12 +722,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                                     <button
                                                         onClick={() => {
                                                             setCoaModal({ isOpen: true, tanggal: row.tanggal });
-                                                            const d = new Date(row.tanggal);
-                                                            const dd = String(d.getDate()).padStart(2, '0');
-                                                            const mm = String(d.getMonth() + 1).padStart(2, '0');
-                                                            const yy = String(d.getFullYear()).slice(-2);
-                                                            const fallbackBatch = `B-${dd}${mm}${yy}`;
-                                                            const initialBatch = row.coaBatchKode || row.psBatchKode || row.batchKode || (coaAvailableBatches.length > 0 ? coaAvailableBatches[0].kode : fallbackBatch);
+                                                            const initialBatch = row.coaBatchKode || row.psBatchKode || row.batchKode || (coaAvailableBatches.length > 0 ? coaAvailableBatches[0].kode : '');
                                                             setCoaBatchKode(initialBatch);
                                                             const found = coaAvailableBatches.find(b => b.kode === initialBatch);
                                                             if (coaDisplay > 0) {
