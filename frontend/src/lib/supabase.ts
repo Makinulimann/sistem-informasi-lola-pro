@@ -215,34 +215,34 @@ export const db = {
           const result = await supabaseFetch<T[]>(query);
           return { data: result.data?.[0] || null, error: result.error };
         },
-        order: (column: string, opts: { ascending?: boolean } = {}) => {
+        order: (orderColumn: string, opts: { ascending?: boolean } = {}) => {
           const dir = opts.ascending === false ? '.desc' : '';
           return {
             execute: async (): Promise<{ data: T[]; error: any }> => {
-              const query = `${table}?${column}=eq.${encodeURIComponent(String(value))}&select=${columns}&order=${column}${dir}`;
+              const query = `${table}?${column}=eq.${encodeURIComponent(String(value))}&select=${columns}&order=${orderColumn}${dir}&limit=10000`;
               const res = await supabaseFetch<T[]>(query);
               return { data: res.data || [], error: res.error };
             },
           };
         },
         execute: async (): Promise<{ data: T[]; error: any }> => {
-          const query = `${table}?${column}=eq.${encodeURIComponent(String(value))}&select=${columns}`;
+          const query = `${table}?${column}=eq.${encodeURIComponent(String(value))}&select=${columns}&limit=10000`;
           const res = await supabaseFetch<T[]>(query);
           return { data: res.data || [], error: res.error };
         },
       }),
       // Order without filter
-      order: (column: string, opts: { ascending?: boolean } = {}) => ({
+      order: (orderColumn: string, opts: { ascending?: boolean } = {}) => ({
         execute: async (): Promise<{ data: T[]; error: any }> => {
           const dir = opts.ascending === false ? '.desc' : '';
-          const query = `${table}?select=${columns || '*'}&order=${column}${dir}`;
+          const query = `${table}?select=${columns || '*'}&order=${orderColumn}${dir}&limit=10000`;
           const res = await supabaseFetch<T[]>(query);
           return { data: res.data || [], error: res.error };
         },
       }),
       // Execute without filter
       execute: async (): Promise<{ data: T[]; error: any }> => {
-        const query = `${table}?select=${columns}`;
+        const query = `${table}?select=${columns}&limit=10000`;
         const res = await supabaseFetch<T[]>(query);
         return { data: res.data || [], error: res.error };
       },

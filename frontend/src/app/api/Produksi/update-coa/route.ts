@@ -27,10 +27,10 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'ProduksiTab not found.' }, { status: 404 });
         }
 
-        // Fetch target batch
-        const { data: allProduksi } = await db.from<any>('produksis').select('*').execute();
+        // Fetch target batch filtered by tab
+        const { data: allProduksi } = await db.from<any>('produksis').select('*').eq('produksi_tab_id', tabId).execute();
         const targetBatch = (allProduksi || []).find((p: any) => 
-            p.produksi_tab_id === tabId && p.batch_kode === batchKode && p.bs > 0
+            p.batch_kode === batchKode && p.bs > 0
         );
 
         if (!targetBatch) {
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
 
         let existingRecord = (allProduksi || []).find((p: any) => {
             const pDate = new Date(p.tanggal);
-            return p.produksi_tab_id === tabId && pDate.getTime() === targetUtcDate.getTime();
+            return pDate.getTime() === targetUtcDate.getTime();
         });
 
         if (existingRecord) {

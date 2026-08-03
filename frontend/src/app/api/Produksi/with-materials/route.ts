@@ -37,14 +37,18 @@ export async function POST(request: Request) {
         );
 
         if (existing) {
-            await db.from<any>('produksis').update({
+            const { error: updateErr } = await db.from<any>('produksis').update({
                 bs: bsValue,
                 batch_kode: batchKodeValue,
                 keterangan: ketValue,
-                updated_at: new Date().toISOString()
             }).eq('id', existing.id);
+
+            if (updateErr) {
+                console.error('Error updating produksis:', updateErr);
+                return NextResponse.json({ message: 'Failed to update produksis record: ' + JSON.stringify(updateErr) }, { status: 500 });
+            }
         } else {
-            await db.from<any>('produksis').insert({
+            const { error: insertErr } = await db.from<any>('produksis').insert({
                 product_slug: productSlug,
                 produksi_tab_id: tabId,
                 tanggal: targetUtc.toISOString(),
@@ -59,6 +63,11 @@ export async function POST(request: Request) {
                 coa_batch_kode: '',
                 keterangan: ketValue
             });
+
+            if (insertErr) {
+                console.error('Error inserting produksis:', insertErr);
+                return NextResponse.json({ message: 'Failed to insert produksis record: ' + JSON.stringify(insertErr) }, { status: 500 });
+            }
         }
 
         // 2. Delete existing Mutasi

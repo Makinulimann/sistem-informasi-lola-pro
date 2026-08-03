@@ -17,18 +17,13 @@ export async function GET(request: Request) {
             return NextResponse.json({ message: 'productSlug is required.' }, { status: 400 });
         }
 
-        // Fetch data from Supabase
-        const { data: allRecords, error } = await db.from<any>('produksis').select('*').execute();
+        // Fetch data from Supabase filtered by product_slug
+        const { data: filteredRecords, error } = await db.from<any>('produksis').select('*').eq('product_slug', productSlug).execute();
 
         if (error) {
             console.error('Error fetching produksi:', error);
             return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
         }
-
-        // Filter for this product
-        const filteredRecords = (allRecords || []).filter((r: any) => 
-            r.product_slug === productSlug
-        );
 
         if (!tabIdStr || !bulanStr || !tahunStr) {
             const batchMap: { [kode: string]: { bs: number } } = {};

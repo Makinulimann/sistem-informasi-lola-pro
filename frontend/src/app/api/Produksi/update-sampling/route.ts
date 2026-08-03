@@ -28,15 +28,15 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'ProduksiTab not found.' }, { status: 404 });
         }
 
-        // Fetch the target batch
-        const { data: allProduksi } = await db.from<any>('produksis').select('*').execute();
+        // Fetch the target batch filtered by tab
+        const { data: allProduksi } = await db.from<any>('produksis').select('*').eq('produksi_tab_id', tabId).execute();
         let targetBatch = (allProduksi || []).find((p: any) => 
-            p.produksi_tab_id === tabId && p.batch_kode === batchKode && p.bs > 0
+            p.batch_kode === batchKode && p.bs > 0
         );
 
         if (!targetBatch) {
             targetBatch = (allProduksi || []).find((p: any) => 
-                p.produksi_tab_id === tabId && (!p.batch_kode || p.batch_kode === '') && p.bs > 0
+                (!p.batch_kode || p.batch_kode === '') && p.bs > 0
             );
             if (targetBatch) {
                 await db.from<any>('produksis').update({ batch_kode: batchKode }).eq('id', targetBatch.id);
@@ -55,9 +55,7 @@ export async function POST(request: Request) {
         const targetUtcDate = new Date(localDate.getTime() - utcOffset);
 
         // Find or create record for the current date
-        const existingRecords = (allProduksi || []).filter((p: any) => 
-            p.produksi_tab_id === tabId
-        );
+        const existingRecords = allProduksi || [];
         
         let existingRecord = existingRecords.find((p: any) => {
             const pDate = new Date(p.tanggal);
