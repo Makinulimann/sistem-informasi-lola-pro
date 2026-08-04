@@ -98,15 +98,27 @@ export async function GET(request: Request) {
             }
         });
 
+        // Track which slugs already have BOM-based variant entries (to prevent duplicate base entries)
+        const slugsWithVariants = new Set<string>();
+        products.forEach(p => { if (p.kemasan) slugsWithVariants.add(p.product_slug); });
+
         // 2. Fetch RKO targets for this year
         const { data: fetchedRko } = await db.from<RkoRow>('rko_targets').select('*').eq('tahun', tahun).execute();
         const rkoRows: RkoRow[] = fetchedRko || [];
 
-        // Include target rows previously saved only if they match known valid product slugs and not test/invalid rows
+        // Include saved rko_targets only if they match valid slugs, are not test rows,
+        // AND are not base-name duplicates for slugs that already have BOM variants
         const validSlugs = new Set(['petro-gladiator', 'bio-fertil', 'petro-fish', 'phonska-oca', 'petro-gladiator-cair']);
         rkoRows.forEach(r => {
             const key = `${r.product_slug}||${r.tab_name}`;
+            const baseProductName = SLUG_NAME_MAP[r.product_slug] || r.product_slug;
+            // Skip if this is a base-name entry for a slug that already has variants
+            const isBaseNameEntry = r.tab_name.trim() === baseProductName.trim();
             if (!addedKeys.has(key) && validSlugs.has(r.product_slug) && !r.tab_name.toLowerCase().includes('tes')) {
+                if (slugsWithVariants.has(r.product_slug) && isBaseNameEntry) {
+                    // This slug has variants — skip the redundant base entry
+                    return;
+                }
                 addedKeys.add(key);
                 products.push({
                     product_slug: r.product_slug,

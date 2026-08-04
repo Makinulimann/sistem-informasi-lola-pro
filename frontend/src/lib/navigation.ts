@@ -56,6 +56,7 @@ export const navigation: NavSection[] = [
             { label: 'Aktivitas Harian', href: '/dashboard/produk-pengembangan/aktivitas-harian' },
             { label: 'Maintenance', href: '/dashboard/produk-pengembangan/maintenance' },
             { label: 'RKAP / RKO', href: '/dashboard/rkap' },
+            { label: 'Template Laporan', href: '/dashboard/produk-pengembangan/template-laporan' },
         ],
     },
 ];
