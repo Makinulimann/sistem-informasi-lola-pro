@@ -179,7 +179,7 @@ export async function GET(request: Request) {
             const b = batchMap[kode];
             const bsWip = Math.max(0, b.bs - b.ps);
             const psWip = Math.max(0, b.ps - b.coa);
-            const coaWip = Math.max(0, (b.ps > 0 ? b.ps : b.bs) - b.coa);
+            const coaWip = Math.max(0, b.ps - b.coa);
             if (bsWip > 0 || psWip > 0 || coaWip > 0) {
                 availableBatches.push({ kode, bsWip, psWip, coaWip });
             }

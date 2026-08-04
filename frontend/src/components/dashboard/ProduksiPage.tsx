@@ -722,17 +722,15 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                                     <button
                                                         onClick={() => {
                                                             setCoaModal({ isOpen: true, tanggal: row.tanggal });
-                                                            const initialBatch = row.coaBatchKode || row.psBatchKode || row.batchKode || (coaAvailableBatches.length > 0 ? coaAvailableBatches[0].kode : '');
+                                                            const initialBatch = coaAvailableBatches.find(b => b.kode === row.coaBatchKode || b.kode === row.psBatchKode)?.kode || (coaAvailableBatches.length > 0 ? coaAvailableBatches[0].kode : '');
                                                             setCoaBatchKode(initialBatch);
                                                             const found = coaAvailableBatches.find(b => b.kode === initialBatch);
                                                             if (coaDisplay > 0) {
                                                                 setCoaValue(String(coaDisplay));
-                                                            } else if (psDisplay > 0) {
-                                                                setCoaValue(String(psDisplay));
-                                                            } else if (bsDisplay > 0) {
-                                                                setCoaValue(String(bsDisplay));
                                                             } else if (found) {
                                                                 setCoaValue(String(Math.round(convertValue(found.coaWip, baseUnit, currentUnit) * 1000) / 1000));
+                                                            } else if (psDisplay > 0) {
+                                                                setCoaValue(String(psDisplay));
                                                             } else {
                                                                 setCoaValue('');
                                                             }

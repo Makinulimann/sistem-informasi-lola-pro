@@ -401,6 +401,7 @@ export function BelumSamplingModal({
                 bsSatuan: baseUnitForProduct,
                 keterangan: keterangan || undefined,
                 batchKode: batchKode.trim(),
+                variantName: selectedSubProduct !== 'default' ? selectedSubProduct : undefined,
                 materials: materialsPayload,
             });
 

@@ -30,11 +30,11 @@ export async function POST(request: Request) {
         // Fetch target batch filtered by tab
         const { data: allProduksi } = await db.from<any>('produksis').select('*').eq('produksi_tab_id', tabId).execute();
         const targetBatch = (allProduksi || []).find((p: any) => 
-            p.batch_kode === batchKode && p.bs > 0
+            (p.batch_kode === batchKode || p.ps_batch_kode === batchKode) && Number(p.ps || 0) > 0
         );
 
         if (!targetBatch) {
-            return NextResponse.json({ error: `Kode Batch ${batchKode} tidak ditemukan atau belum ada produksi (BS).` }, { status: 404 });
+            return NextResponse.json({ error: `Kode Batch ${batchKode} tidak ditemukan atau belum dilakukan proses sampling (PS).` }, { status: 404 });
         }
 
         if (coa < 0) {

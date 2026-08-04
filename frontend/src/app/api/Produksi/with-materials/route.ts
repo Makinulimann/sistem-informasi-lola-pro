@@ -14,9 +14,26 @@ export async function POST(request: Request) {
         const tanggalValid = body.tanggal || body.Tanggal;
         const bsValue = body.bs !== undefined ? body.bs : body.BS;
         const bsSatuanValue = body.bsSatuan || body.BsSatuan || '';
-        const ketValue = body.keterangan || body.Keterangan || '';
+        const variantNameValue = body.variantName || body.VariantName || body.variant_name || '';
         const materialsArray = body.materials || body.Materials;
         const batchKodeValue = body.batchKode || body.BatchKode || '';
+        let ketValue = body.keterangan || body.Keterangan || '';
+
+        const prefixParts: string[] = [];
+        if (variantNameValue && variantNameValue !== 'default') {
+            prefixParts.push(`Varian: ${variantNameValue}`);
+        }
+        if (batchKodeValue) {
+            prefixParts.push(`Batch: ${batchKodeValue}`);
+        }
+
+        if (prefixParts.length > 0) {
+            const prefixTag = `[${prefixParts.join(' - ')}]`;
+            const cleanUserKet = ketValue.replace(/^\[(Varian|Batch):[^\]]+\]\s*/gi, '').trim();
+            if (!ketValue.includes(prefixTag)) {
+                ketValue = `${prefixTag} ${cleanUserKet}`.trim();
+            }
+        }
 
         if (!productSlug || tabId === undefined) {
             return NextResponse.json({ message: 'Invalid request.' }, { status: 400 });

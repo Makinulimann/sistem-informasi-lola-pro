@@ -129,6 +129,7 @@ export interface SaveWithMaterialsRequest {
     bsSatuan?: string;
     keterangan?: string;
     batchKode?: string;
+    variantName?: string;
     materials: MaterialUsage[];
 }
 
