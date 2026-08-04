@@ -36,8 +36,11 @@ export async function GET(request: Request) {
             const m = bulan ? parseInt(bulan, 10) : 1;
 
             filtered = filtered.filter((r: any) => {
-                const rDate = new Date(r.tanggal || r.Tanggal);
-                return rDate.getFullYear() === y && (!bulan || rDate.getMonth() + 1 === m);
+                const d = new Date(r.tanggal || r.Tanggal);
+                const localDate = new Date(d.getTime() + 7 * 60 * 60 * 1000);
+                const itemYear = localDate.getUTCFullYear();
+                const itemMonth = localDate.getUTCMonth() + 1;
+                return itemYear === y && (!bulan || itemMonth === m);
             });
         }
 

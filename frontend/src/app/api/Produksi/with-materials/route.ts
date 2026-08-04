@@ -44,8 +44,8 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'Invalid date format.' }, { status: 400 });
         }
 
-        const utcOffset = 7 * 60 * 60 * 1000;
-        const targetUtc = new Date(localDate.getTime() - utcOffset);
+        const dateStr = tanggalValid.includes('T') ? tanggalValid.split('T')[0] : tanggalValid;
+        const targetUtc = new Date(`${dateStr}T00:00:00.000Z`);
 
         // 1. Upsert Produksi
         const { data: records } = await db.from<any>('produksis').select('*').eq('product_slug', productSlug).execute();

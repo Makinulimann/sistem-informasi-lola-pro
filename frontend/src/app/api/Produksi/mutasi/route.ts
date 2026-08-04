@@ -34,7 +34,10 @@ export async function GET(request: Request) {
                 const ket = b.keterangan || b.Keterangan || '';
                 const rDateStr = b.tanggal || b.Tanggal;
                 const rDate = rDateStr ? new Date(rDateStr) : null;
-                const isSameDate = rDate && rDate.getTime() === targetUtc.getTime();
+                const rLocalDate = rDate ? new Date(rDate.getTime() + (rDateStr.includes('T') ? 7 * 60 * 60 * 1000 : 0)) : null;
+                const rYmd = rLocalDate ? rLocalDate.toISOString().split('T')[0] : '';
+                const targetYmd = tanggal.split('T')[0];
+                const isSameDate = rYmd === targetYmd || (rDate && rDate.getTime() === targetUtc.getTime());
                 return ket.toLowerCase().startsWith('produksi ') && isSameDate;
             })
             .map((b: any) => ({

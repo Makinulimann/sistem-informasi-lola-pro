@@ -85,14 +85,14 @@ export async function GET(request: Request) {
             return NextResponse.json({ message: 'productSlug is required' }, { status: 400 });
         }
 
-        // Calculate date range
+        // Calculate date range (adjusted for WIB +7h offset)
         const utcOffset = 7 * 60 * 60 * 1000;
         const now = new Date();
         const targetBulan = bulan ? parseInt(bulan, 10) : now.getMonth() + 1;
         const targetTahun = tahun ? parseInt(tahun, 10) : now.getFullYear();
 
-        const periodStartUtc = new Date(targetTahun, targetBulan - 1, 1);
-        const periodEndUtc = new Date(targetTahun, targetBulan, 1);
+        const periodStartUtc = new Date(Date.UTC(targetTahun, targetBulan - 1, 1) - utcOffset);
+        const periodEndUtc = new Date(Date.UTC(targetTahun, targetBulan, 1) - utcOffset);
 
         const hasPeriodFilter = !!(bulan || tahun);
 
