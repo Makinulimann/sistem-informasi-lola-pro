@@ -379,19 +379,32 @@ Berikan output HANYA JSON valid dengan struktur berikut:
 }
 `;
 
-                const geminiRes = await fetch(
-                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${activeApiKey}`,
-                    {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            contents: [{ parts: [{ text: prompt }] }],
-                            generationConfig: { responseMimeType: 'application/json' },
-                        }),
-                    }
-                );
+                const modelsToTry = ['gemini-3.5-flash-lite', 'gemini-2.5-flash-lite', 'gemini-1.5-flash-lite', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+                let geminiRes: Response | null = null;
 
-                if (geminiRes.ok) {
+                for (const modelName of modelsToTry) {
+                    try {
+                        const res = await fetch(
+                            `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${activeApiKey}`,
+                            {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    contents: [{ parts: [{ text: prompt }] }],
+                                    generationConfig: { responseMimeType: 'application/json' },
+                                }),
+                            }
+                        );
+                        if (res.ok) {
+                            geminiRes = res;
+                            break;
+                        }
+                    } catch (e) {
+                        console.warn(`Failed with model ${modelName}, trying fallback...`);
+                    }
+                }
+
+                if (geminiRes && geminiRes.ok) {
                     const resJson = await geminiRes.json();
                     const rawText = resJson?.candidates?.[0]?.content?.parts?.[0]?.text;
                     if (rawText) {
