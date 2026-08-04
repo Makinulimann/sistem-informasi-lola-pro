@@ -308,74 +308,127 @@ export async function POST(request: Request) {
             return 'catatan-tambahan';
         };
 
+        // Helper to format any ISO or YYYY-MM-DD string to DD/MM/YYYY
+        function formatYmdToDmy(dateStr: string): string {
+            if (!dateStr) return '';
+            const cleanStr = dateStr.split('T')[0].split(' ')[0];
+            const parts = cleanStr.split('-');
+            if (parts.length === 3 && parts[0].length === 4) {
+                return `${parts[2]}/${parts[1]}/${parts[0]}`;
+            }
+            return dateStr;
+        }
+
         // Smart Case-Insensitive & Punctuation-Insensitive Deduplication
         const normalizeText = (text: string) => text.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-        const rawGrouped: Record<string, { lines: string[]; normSet: Set<string> }> = {
-            'petro-fish': { lines: [], normSet: new Set() },
-            'phonska-oca': { lines: [], normSet: new Set() },
-            'bio-fertil': { lines: [], normSet: new Set() },
-            'petro-gladiator': { lines: [], normSet: new Set() },
-            'petro-gladiator-cair': { lines: [], normSet: new Set() },
-            'catatan-tambahan': { lines: [], normSet: new Set() },
+        interface DateGroup {
+            id: string;
+            tanggal: string;
+            bullets: string[];
+        }
+
+        // Map per category: Map<tanggal, Map<normalized_text, original_text>>
+        const rawGroupMap: Record<string, Map<string, Map<string, string>>> = {
+            'petro-fish': new Map(),
+            'phonska-oca': new Map(),
+            'bio-fertil': new Map(),
+            'petro-gladiator': new Map(),
+            'petro-gladiator-cair': new Map(),
+            'catatan-tambahan': new Map(),
         };
 
         filteredAktivitas.forEach((act) => {
             const desc = act.deskripsi || '';
             const lines = desc.split('\n').map(l => l.trim()).filter(Boolean);
+            const dateDmy = formatYmdToDmy(act.tanggal);
 
             lines.forEach(line => {
                 const targetCat = classifyLine(line, act.product_slug);
+                const catMap = rawGroupMap[targetCat];
+
+                if (!catMap.has(dateDmy)) {
+                    catMap.set(dateDmy, new Map());
+                }
+
                 const norm = normalizeText(line);
-                if (!rawGrouped[targetCat].normSet.has(norm)) {
-                    rawGrouped[targetCat].normSet.add(norm);
-                    rawGrouped[targetCat].lines.push(line);
+                const innerMap = catMap.get(dateDmy)!;
+                if (!innerMap.has(norm)) {
+                    innerMap.set(norm, line);
                 }
             });
         });
 
-        const aktivitasGrouped: Record<string, string[]> = {
-            'petro-fish': rawGrouped['petro-fish'].lines,
-            'phonska-oca': rawGrouped['phonska-oca'].lines,
-            'bio-fertil': rawGrouped['bio-fertil'].lines,
-            'petro-gladiator': rawGrouped['petro-gladiator'].lines,
-            'petro-gladiator-cair': rawGrouped['petro-gladiator-cair'].lines,
-            'catatan-tambahan': rawGrouped['catatan-tambahan'].lines,
+        const buildDateGroupsFromMap = (catMap: Map<string, Map<string, string>>): DateGroup[] => {
+            const dates = Array.from(catMap.keys()).sort((a, b) => {
+                const partsA = a.split('/').map(Number);
+                const partsB = b.split('/').map(Number);
+                if (partsA.length === 3 && partsB.length === 3) {
+                    const timeA = new Date(partsA[2], partsA[1] - 1, partsA[0]).getTime();
+                    const timeB = new Date(partsB[2], partsB[1] - 1, partsB[0]).getTime();
+                    return timeA - timeB;
+                }
+                return a.localeCompare(b);
+            });
+
+            return dates.map((d, idx) => ({
+                id: `${d}-${idx}`,
+                tanggal: d,
+                bullets: Array.from(catMap.get(d)!.values()),
+            }));
+        };
+
+        const rawAktivitasGrouped: Record<string, DateGroup[]> = {
+            'petro-fish': buildDateGroupsFromMap(rawGroupMap['petro-fish']),
+            'phonska-oca': buildDateGroupsFromMap(rawGroupMap['phonska-oca']),
+            'bio-fertil': buildDateGroupsFromMap(rawGroupMap['bio-fertil']),
+            'petro-gladiator': buildDateGroupsFromMap(rawGroupMap['petro-gladiator']),
+            'petro-gladiator-cair': buildDateGroupsFromMap(rawGroupMap['petro-gladiator-cair']),
+            'catatan-tambahan': buildDateGroupsFromMap(rawGroupMap['catatan-tambahan']),
         };
 
         // 3. Gemini AI Summarization
         const activeApiKey = apiKey || process.env.GEMINI_API_KEY;
-        let aiSummaries: Record<string, string[]> = { ...aktivitasGrouped };
+        let aiSummaries: Record<string, DateGroup[]> = { ...rawAktivitasGrouped };
 
-        const categoriesWithData = Object.keys(aktivitasGrouped).filter(k => aktivitasGrouped[k].length > 0);
+        const formatCatForPrompt = (groups: DateGroup[]) => {
+            if (groups.length === 0) return 'Kosong';
+            return groups.map(g => `[Tanggal ${g.tanggal}: ${g.bullets.join('; ')}]`).join(' | ');
+        };
+
+        const categoriesWithData = Object.keys(rawAktivitasGrouped).filter(k => rawAktivitasGrouped[k].length > 0);
 
         if (activeApiKey && categoriesWithData.length > 0) {
             try {
                 const prompt = `
 Anda adalah Manajer Operasional Kemitraan Produk Pengembangan PT Petrokimia Gresik.
-Rangkumlah logbook aktivitas harian berikut untuk periode ${startDate} s/d ${endDate} menjadi poin-poin ringkasan yang padat, jelas, formal, dan profesional dalam Bahasa Indonesia (maksimal 3-5 poin per kategori).
+Rangkumlah logbook aktivitas harian berikut untuk periode ${startDate} s/d ${endDate} menjadi poin-poin ringkasan yang padat, jelas, formal, dan profesional dalam Bahasa Indonesia (maksimal 3-5 poin per tanggal per kategori).
 
-PENTING UNTUK DEDUPLIKASI:
-- HANYA hasilkan 1 poin ringkasan unik per aktivitas.
-- JANGAN mengulang atau membuat poin ganda untuk aktivitas yang sama (meskipun berbeda huruf kapital/spasi/koma seperti "drum P3" dan "Drum P3").
+PENTING UNTUK PENGELOMPOKAN TANGGAL & DEDUPLIKASI:
+- Kelompokkan poin ringkasan secara ketat berdasarkan TANGGAL pelaksanaan (format DD/MM/YYYY).
+- HANYA hasilkan 1 poin ringkasan unik per aktivitas pada tanggal tersebut.
 - Kosongkan array jika tidak ada data untuk kategori tersebut.
 
 Data Logbook Aktivitas Raw:
-- Petro Fish: ${aktivitasGrouped['petro-fish'].join(' | ') || 'Kosong'}
-- Phonska Oca Plus: ${aktivitasGrouped['phonska-oca'].join(' | ') || 'Kosong'}
-- Petro Bio Fertil: ${aktivitasGrouped['bio-fertil'].join(' | ') || 'Kosong'}
-- Petro Gladiator Padat: ${aktivitasGrouped['petro-gladiator'].join(' | ') || 'Kosong'}
-- Petro Gladiator Cair: ${aktivitasGrouped['petro-gladiator-cair'].join(' | ') || 'Kosong'}
-- Catatan Tambahan (General Maintenance/Lainnya): ${aktivitasGrouped['catatan-tambahan'].join(' | ') || 'Kosong'}
+- Petro Fish: ${formatCatForPrompt(rawAktivitasGrouped['petro-fish'])}
+- Phonska Oca Plus: ${formatCatForPrompt(rawAktivitasGrouped['phonska-oca'])}
+- Petro Bio Fertil: ${formatCatForPrompt(rawAktivitasGrouped['bio-fertil'])}
+- Petro Gladiator Padat: ${formatCatForPrompt(rawAktivitasGrouped['petro-gladiator'])}
+- Petro Gladiator Cair: ${formatCatForPrompt(rawAktivitasGrouped['petro-gladiator-cair'])}
+- Catatan Tambahan (General Maintenance/Lainnya): ${formatCatForPrompt(rawAktivitasGrouped['catatan-tambahan'])}
 
 Berikan output HANYA JSON valid dengan struktur berikut:
 {
-  "petro_fish": ["poin 1", "poin 2"],
-  "phonska_oca": ["poin 1", "poin 2"],
-  "bio_fertil": ["poin 1", "poin 2"],
-  "petro_gladiator": ["poin 1", "poin 2"],
-  "petro_gladiator_cair": ["poin 1", "poin 2"],
-  "catatan_tambahan": ["poin 1", "poin 2"]
+  "petro_fish": [
+    { "tanggal": "DD/MM/YYYY", "bullets": ["poin 1", "poin 2"] }
+  ],
+  "phonska_oca": [],
+  "bio_fertil": [],
+  "petro_gladiator": [],
+  "petro_gladiator_cair": [],
+  "catatan_tambahan": [
+    { "tanggal": "DD/MM/YYYY", "bullets": ["catatan 1"] }
+  ]
 }
 `;
 
@@ -410,37 +463,52 @@ Berikan output HANYA JSON valid dengan struktur berikut:
                     if (rawText) {
                         const parsed = JSON.parse(rawText);
 
-                        const postDeduplicate = (arr: string[]) => {
-                            const result: string[] = [];
-                            const seen = new Set<string>();
-                            (arr || []).forEach(item => {
-                                const norm = normalizeText(item);
-                                if (item && !seen.has(norm)) {
-                                    seen.add(norm);
-                                    result.push(item);
-                                }
-                            });
-                            return result;
+                        const parseAiCategoryGroups = (arr: any[]): DateGroup[] => {
+                            if (!Array.isArray(arr)) return [];
+                            return arr.map((item, idx) => {
+                                const rawDate = typeof item === 'object' && item?.tanggal ? item.tanggal : '';
+                                const cleanDate = formatYmdToDmy(rawDate) || rawDate;
+                                const rawBullets = Array.isArray(item?.bullets)
+                                    ? item.bullets
+                                    : (item?.poin ? [item.poin] : (typeof item === 'string' ? [item] : []));
+
+                                const postBullets: string[] = [];
+                                const seen = new Set<string>();
+                                rawBullets.forEach((b: any) => {
+                                    const str = typeof b === 'string' ? b.trim() : '';
+                                    const norm = normalizeText(str);
+                                    if (str && !seen.has(norm)) {
+                                        seen.add(norm);
+                                        postBullets.push(str);
+                                    }
+                                });
+
+                                return {
+                                    id: `${cleanDate}-${idx}`,
+                                    tanggal: cleanDate,
+                                    bullets: postBullets,
+                                };
+                            }).filter(g => g.tanggal && g.bullets.length > 0);
                         };
 
                         aiSummaries = {
-                            'petro-fish': postDeduplicate(parsed.petro_fish || []),
-                            'phonska-oca': postDeduplicate(parsed.phonska_oca || []),
-                            'bio-fertil': postDeduplicate(parsed.bio_fertil || []),
-                            'petro-gladiator': postDeduplicate(parsed.petro_gladiator || []),
-                            'petro-gladiator-cair': postDeduplicate(parsed.petro_gladiator_cair || []),
-                            'catatan-tambahan': postDeduplicate(parsed.catatan_tambahan || []),
+                            'petro-fish': parseAiCategoryGroups(parsed.petro_fish || []),
+                            'phonska-oca': parseAiCategoryGroups(parsed.phonska_oca || []),
+                            'bio-fertil': parseAiCategoryGroups(parsed.bio_fertil || []),
+                            'petro-gladiator': parseAiCategoryGroups(parsed.petro_gladiator || []),
+                            'petro-gladiator-cair': parseAiCategoryGroups(parsed.petro_gladiator_cair || []),
+                            'catatan-tambahan': parseAiCategoryGroups(parsed.catatan_tambahan || []),
                         };
                     }
                 } else {
-                    aiSummaries = { ...aktivitasGrouped };
+                    aiSummaries = { ...rawAktivitasGrouped };
                 }
             } catch (err) {
                 console.error('Gemini AI generation failed, using raw grouped summaries:', err);
-                aiSummaries = { ...aktivitasGrouped };
+                aiSummaries = { ...rawAktivitasGrouped };
             }
         } else {
-            aiSummaries = { ...aktivitasGrouped };
+            aiSummaries = { ...rawAktivitasGrouped };
         }
 
         return NextResponse.json({
