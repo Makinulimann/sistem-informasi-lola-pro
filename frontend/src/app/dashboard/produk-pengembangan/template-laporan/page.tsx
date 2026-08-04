@@ -77,31 +77,31 @@ export default function TemplateLaporanPage() {
     const [productBlocks, setProductBlocks] = useState<ProductBlock[]>([
         {
             id: 'petro-fish',
-            name: 'Petro Fish (PFS)',
+            name: 'Petro Fish',
             image: '/images/petro-fish.webp',
             bullets: []
         },
         {
             id: 'phonska-oca',
-            name: 'Phonska Oca Plus (POP)',
+            name: 'Phonska Oca Plus',
             image: '/images/phonska-oca-plus.webp',
             bullets: []
         },
         {
             id: 'bio-fertil',
-            name: 'Petro Bio Fertil (PBF)',
+            name: 'Petro Bio Fertil',
             image: '/images/bio-fertil.webp',
             bullets: []
         },
         {
             id: 'petro-gladiator',
-            name: 'Petro Gladiator Padat (PGD)',
+            name: 'Petro Gladiator Padat',
             image: '/images/petro-gladiator.webp',
             bullets: []
         },
         {
             id: 'petro-gladiator-cair',
-            name: 'Petro Gladiator Cair (PGD Cair)',
+            name: 'Petro Gladiator Cair',
             image: '/images/petro-gladiator.webp',
             bullets: []
         }
@@ -224,7 +224,10 @@ export default function TemplateLaporanPage() {
                 <tr>
                     <td style="border: 1px solid #000; padding: 8px; width: 150px; text-align: center; vertical-align: top; background: #fafafa;">
                         <img src="${p.image}" alt="${p.name}" style="width: 65px; height: 75px; object-fit: contain; margin-bottom: 4px;" />
-                        <div style="font-weight: bold; font-size: 8.5pt;">${p.name}</div>
+                        <div style="font-weight: bold; font-size: 8.5pt;">${p.name.replace(/\s*\([^)]*\)/g, '')}</div>
+                    </td>
+                    <td style="border: 1px solid #000; padding: 8px; text-align: center; vertical-align: top; font-size: 8.5pt; width: 120px;">
+                        ${formatYmdToDmy(startDate)} s/d ${formatYmdToDmy(endDate)}
                     </td>
                     <td style="border: 1px solid #000; padding: 8px; vertical-align: top;">
                         ${p.bullets.length === 0 ? '<div style="color: #666; font-style: italic;">Tidak ada aktivitas harian pada periode terpilih.</div>' : `
@@ -303,7 +306,8 @@ export default function TemplateLaporanPage() {
                         <thead>
                             <tr>
                                 <th style="width: 150px;">Produk</th>
-                                <th>Rangkuman Aktivitas Per Produk</th>
+                                <th style="width: 120px;">Tanggal</th>
+                                <th>Hasil Rangkuman Aktivitas</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -556,6 +560,7 @@ export default function TemplateLaporanPage() {
                                     <thead>
                                         <tr className="bg-gray-100 text-gray-900 font-bold uppercase border-b border-gray-300">
                                             <th className="px-4 py-2.5 text-left w-52 border-r border-gray-300">Produk</th>
+                                            <th className="px-4 py-2.5 text-center w-36 border-r border-gray-300">Tanggal</th>
                                             <th className="px-4 py-2.5 text-left">Hasil Rangkuman Aktivitas</th>
                                         </tr>
                                     </thead>
@@ -568,7 +573,7 @@ export default function TemplateLaporanPage() {
                                                             <img src={block.image} alt={block.name} className="w-full h-full object-contain" />
                                                         </div>
                                                         <div>
-                                                            <div className="font-bold text-gray-900 text-xs">{block.name}</div>
+                                                            <div className="font-bold text-gray-900 text-xs">{block.name.replace(/\s*\([^)]*\)/g, '')}</div>
                                                             <button
                                                                 onClick={() => handleAddBullet(block.id)}
                                                                 className="text-[10px] text-emerald-700 font-semibold flex items-center gap-0.5 mt-1 hover:underline cursor-pointer"
@@ -577,6 +582,9 @@ export default function TemplateLaporanPage() {
                                                             </button>
                                                         </div>
                                                     </div>
+                                                </td>
+                                                <td className="px-4 py-3 border-r border-gray-300 bg-gray-50/20 align-top text-center font-medium text-gray-700 whitespace-nowrap">
+                                                    {formatYmdToDmy(startDate)} s/d {formatYmdToDmy(endDate)}
                                                 </td>
                                                 <td className="px-4 py-3 align-top">
                                                     {block.bullets.length === 0 ? (

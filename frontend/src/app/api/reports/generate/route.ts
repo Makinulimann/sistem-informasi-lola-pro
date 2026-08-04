@@ -361,11 +361,11 @@ PENTING UNTUK DEDUPLIKASI:
 - Kosongkan array jika tidak ada data untuk kategori tersebut.
 
 Data Logbook Aktivitas Raw:
-- Petro Fish (PFS): ${aktivitasGrouped['petro-fish'].join(' | ') || 'Kosong'}
-- Phonska Oca Plus (POP): ${aktivitasGrouped['phonska-oca'].join(' | ') || 'Kosong'}
-- Petro Bio Fertil (PBF): ${aktivitasGrouped['bio-fertil'].join(' | ') || 'Kosong'}
-- Petro Gladiator Padat (PGD Padat): ${aktivitasGrouped['petro-gladiator'].join(' | ') || 'Kosong'}
-- Petro Gladiator Cair (PGD Cair): ${aktivitasGrouped['petro-gladiator-cair'].join(' | ') || 'Kosong'}
+- Petro Fish: ${aktivitasGrouped['petro-fish'].join(' | ') || 'Kosong'}
+- Phonska Oca Plus: ${aktivitasGrouped['phonska-oca'].join(' | ') || 'Kosong'}
+- Petro Bio Fertil: ${aktivitasGrouped['bio-fertil'].join(' | ') || 'Kosong'}
+- Petro Gladiator Padat: ${aktivitasGrouped['petro-gladiator'].join(' | ') || 'Kosong'}
+- Petro Gladiator Cair: ${aktivitasGrouped['petro-gladiator-cair'].join(' | ') || 'Kosong'}
 - Catatan Tambahan (General Maintenance/Lainnya): ${aktivitasGrouped['catatan-tambahan'].join(' | ') || 'Kosong'}
 
 Berikan output HANYA JSON valid dengan struktur berikut:
@@ -379,7 +379,7 @@ Berikan output HANYA JSON valid dengan struktur berikut:
 }
 `;
 
-                const modelsToTry = ['gemini-3.5-flash-lite', 'gemini-2.5-flash-lite', 'gemini-1.5-flash-lite', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+                const modelsToTry = ['gemini-3.5-flash-lite', 'gemini-2.5-flash-lite'];
                 let geminiRes: Response | null = null;
 
                 for (const modelName of modelsToTry) {
