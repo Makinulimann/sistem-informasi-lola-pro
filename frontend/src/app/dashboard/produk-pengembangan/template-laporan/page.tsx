@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     Sparkles,
     Calendar,
@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { AppButton } from '@/components/ui/app-button';
 import { useToast } from '@/components/ui/toast';
+import { sidebarService } from '@/lib/sidebarService';
 
 /* ─── Helper: Format any date/ISO string to DD/MM/YYYY ─── */
 function formatYmdToDmy(dateStr: string): string {
@@ -34,6 +35,43 @@ interface RkoRow {
     satuan: string;
 }
 
+interface GroupedRkoProduct {
+    productName: string;
+    bentuk: string;
+    satuan: string;
+    rows: RkoRow[];
+    originalIndices: number[];
+}
+
+function groupRkoTable(rkoTable: RkoRow[]): GroupedRkoProduct[] {
+    const groups: GroupedRkoProduct[] = [];
+    const map = new Map<string, GroupedRkoProduct>();
+
+    rkoTable.forEach((row, originalIdx) => {
+        const cleanName = (row.name || '')
+            .replace(/\s*-\s*(1\s*liter|500\s*ml|pgd\s*@[^)]+|pbf\s*@[^)]+|@[^)]+).*$/i, '')
+            .trim() || row.name;
+
+        if (!map.has(cleanName)) {
+            const group: GroupedRkoProduct = {
+                productName: cleanName,
+                bentuk: row.bentuk,
+                satuan: row.satuan,
+                rows: [row],
+                originalIndices: [originalIdx],
+            };
+            map.set(cleanName, group);
+            groups.push(group);
+        } else {
+            const group = map.get(cleanName)!;
+            group.rows.push(row);
+            group.originalIndices.push(originalIdx);
+        }
+    });
+
+    return groups;
+}
+
 interface DateGroup {
     id: string;
     tanggal: string;
@@ -55,11 +93,11 @@ export default function TemplateLaporanPage() {
     const endDatePickerRef = useRef<HTMLInputElement>(null);
 
     // Filters & Config
-    const [startDate, setStartDate] = useState<string>('03/03/2026');
-    const [endDate, setEndDate] = useState<string>('07/03/2026');
+    const [startDate, setStartDate] = useState<string>('');
+    const [endDate, setEndDate] = useState<string>('');
     const [rkoYear, setRkoYear] = useState<number>(2026);
-    const [updateDate, setUpdateDate] = useState<string>('07/03/2026');
-    const [tableADateLabel, setTableADateLabel] = useState<string>('01/01/2026 s/d 07/03/2026');
+    const [updateDate, setUpdateDate] = useState<string>('');
+    const [tableADateLabel, setTableADateLabel] = useState<string>('01/01/2026');
 
     // State for generated preview
     const [hasGenerated, setHasGenerated] = useState<boolean>(false);
@@ -70,6 +108,9 @@ export default function TemplateLaporanPage() {
         if (endDate) {
             setUpdateDate(endDate);
             setTableADateLabel(`01/01/${rkoYear} s/d ${endDate}`);
+        } else {
+            setUpdateDate('');
+            setTableADateLabel(`01/01/${rkoYear}`);
         }
     }, [endDate, rkoYear]);
 
@@ -77,11 +118,11 @@ export default function TemplateLaporanPage() {
     const [rkoTable, setRkoTable] = useState<RkoRow[]>([
         { no: 1, name: 'Phonska OCA Plus', bentuk: 'Cair', kemasan: '1 Liter', realisasiProduksi: 0, realisasiPengambilan: 0, stokAkhir: 0, satuan: 'Liter' },
         { no: 2, name: 'Petro Fish', bentuk: 'Cair', kemasan: '1 Liter', realisasiProduksi: 0, realisasiPengambilan: 0, stokAkhir: 0, satuan: 'Liter' },
-        { no: 3, name: 'Petro Gladiator - PGD @1KG', bentuk: 'Padat', kemasan: '1 Kg', realisasiProduksi: 0, realisasiPengambilan: 0, stokAkhir: 0, satuan: 'Kg' },
-        { no: 4, name: 'Petro Gladiator - PGD @2KG', bentuk: 'Padat', kemasan: '2 Kg', realisasiProduksi: 0, realisasiPengambilan: 0, stokAkhir: 0, satuan: 'Kg' },
+        { no: 3, name: 'Petro Gladiator Padat', bentuk: 'Padat', kemasan: '1 Kg', realisasiProduksi: 0, realisasiPengambilan: 0, stokAkhir: 0, satuan: 'Kg' },
+        { no: 4, name: 'Petro Gladiator Padat', bentuk: 'Padat', kemasan: '2 Kg', realisasiProduksi: 0, realisasiPengambilan: 0, stokAkhir: 0, satuan: 'Kg' },
         { no: 5, name: 'Petro Bio Fertil', bentuk: 'Padat', kemasan: '5 Kg', realisasiProduksi: 0, realisasiPengambilan: 0, stokAkhir: 0, satuan: 'Kg' },
-        { no: 6, name: 'Petro Gladiator Cair - 1 Liter', bentuk: 'Cair', kemasan: '1 Liter', realisasiProduksi: 0, realisasiPengambilan: 0, stokAkhir: 0, satuan: 'Liter' },
-        { no: 7, name: 'Petro Gladiator Cair - 500 ml', bentuk: 'Cair', kemasan: '500 ml', realisasiProduksi: 0, realisasiPengambilan: 0, stokAkhir: 0, satuan: 'Liter' },
+        { no: 6, name: 'Petro Gladiator Cair', bentuk: 'Cair', kemasan: '1 Liter', realisasiProduksi: 0, realisasiPengambilan: 0, stokAkhir: 0, satuan: 'Liter' },
+        { no: 7, name: 'Petro Gladiator Cair', bentuk: 'Cair', kemasan: '500 ml', realisasiProduksi: 0, realisasiPengambilan: 0, stokAkhir: 0, satuan: 'Liter' },
     ]);
 
     const [productBlocks, setProductBlocks] = useState<ProductBlock[]>([
@@ -117,10 +158,94 @@ export default function TemplateLaporanPage() {
         }
     ]);
 
+    const [availableProductsCatalog, setAvailableProductsCatalog] = useState<ProductBlock[]>([
+        { id: 'petro-fish', name: 'Petro Fish', image: '/images/petro-fish.webp', dateGroups: [] },
+        { id: 'phonska-oca', name: 'Phonska Oca Plus', image: '/images/phonska-oca-plus.webp', dateGroups: [] },
+        { id: 'bio-fertil', name: 'Petro Bio Fertil', image: '/images/bio-fertil.webp', dateGroups: [] },
+        { id: 'petro-gladiator', name: 'Petro Gladiator Padat', image: '/images/petro-gladiator.webp', dateGroups: [] },
+        { id: 'petro-gladiator-cair', name: 'Petro Gladiator Cair', image: '/images/petro-gladiator.webp', dateGroups: [] },
+    ]);
+
+    /* ─── Load Initial Active Products Dynamically ─── */
+    const loadInitialProducts = useCallback(async () => {
+        try {
+            const allMenus = await sidebarService.getAllFlat();
+            const produkPengembangan = allMenus.find(
+                (m) => (m.label || '').toLowerCase().trim() === 'produk pengembangan' && !m.parentId
+            );
+            if (!produkPengembangan) return;
+
+            const level2 = allMenus.filter(
+                (m) => m.parentId === produkPengembangan.id && m.isActive !== false
+            );
+
+            const NON_PRODUCT_SLUGS = new Set([
+                'bahan-baku',
+                'aktivitas-harian',
+                'maintenance',
+                'rkap-rko',
+                'rencana-pengadaan',
+                'template-laporan',
+            ]);
+
+            const NON_PRODUCT_LABELS = new Set([
+                'bahan baku',
+                'aktivitas harian',
+                'maintenance',
+                'rkap / rko',
+                'rkap/rko',
+                'rkap',
+                'rko',
+                'rencana pengadaan',
+                'template laporan',
+            ]);
+
+            const activeProducts: ProductBlock[] = level2
+                .filter((l2) => {
+                    const hasChildren = allMenus.some((m) => m.parentId === l2.id);
+                    if (!hasChildren) return false;
+                    const labelNorm = (l2.label || '').toLowerCase().trim();
+                    if (NON_PRODUCT_LABELS.has(labelNorm)) return false;
+                    return true;
+                })
+                .sort((a, b) => a.order - b.order)
+                .map((l2) => {
+                    const children = allMenus.filter((m) => m.parentId === l2.id);
+                    const firstChildHref = children.find((c) => c.href && c.href !== '#')?.href || '';
+                    const hrefParts = firstChildHref.split('/').filter(Boolean);
+                    const slug = hrefParts.length >= 3 ? hrefParts[2] : l2.label.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+
+                    return {
+                        id: slug,
+                        name: l2.label,
+                        image: l2.imageUrl || `/images/${slug}.webp`,
+                        dateGroups: [],
+                    };
+                })
+                .filter((p) => !NON_PRODUCT_SLUGS.has(p.id.toLowerCase()));
+
+            if (activeProducts.length > 0) {
+                setProductBlocks(activeProducts);
+                setAvailableProductsCatalog(activeProducts);
+            }
+        } catch (err) {
+            console.error('Failed to load initial products for report template:', err);
+        }
+    }, []);
+
+    useEffect(() => {
+        loadInitialProducts();
+    }, [loadInitialProducts]);
+
     const [catatanTambahanBullets, setCatatanTambahanBullets] = useState<string[]>([]);
 
     /* ── Generate Report via API ── */
     const handleGenerate = async () => {
+        if (!startDate.trim() || !endDate.trim()) {
+            toast.warning('Perhatian', 'Tanggal Mulai Aktivitas dan Tanggal Akhir Aktivitas harus diisi terlebih dahulu.');
+            return;
+        }
+
         setGenerating(true);
         try {
             const formatDmyToYmd = (dmy: string) => {
@@ -157,12 +282,17 @@ export default function TemplateLaporanPage() {
                 setTableADateLabel(data.tableADateLabel);
             }
 
-            if (data.aiSummaries) {
+            if (data.productBlocks && data.productBlocks.length > 0) {
+                setProductBlocks(data.productBlocks);
+            } else if (data.aiSummaries) {
                 setProductBlocks(prev => prev.map(p => ({
                     ...p,
                     image: data.productImageMap && data.productImageMap[p.id] ? data.productImageMap[p.id] : p.image,
                     dateGroups: data.aiSummaries[p.id] || []
                 })));
+            }
+
+            if (data.aiSummaries) {
 
                 const rawCatatan: DateGroup[] = data.aiSummaries['catatan-tambahan'] || [];
                 const allCatatan = rawCatatan.flatMap(g => g.bullets || []);
@@ -254,7 +384,7 @@ export default function TemplateLaporanPage() {
     };
 
     const handleAddDateGroup = (blockId: string) => {
-        const defaultDate = startDate || '03/03/2026';
+        const defaultDate = startDate || formatYmdToDmy(new Date().toISOString().split('T')[0]);
         setProductBlocks(prev => prev.map(p => {
             if (p.id !== blockId) return p;
             const newGroup: DateGroup = {
@@ -276,6 +406,31 @@ export default function TemplateLaporanPage() {
         }));
     };
 
+    const handleDeleteProductBlock = (blockId: string) => {
+        setProductBlocks(prev => prev.filter(p => p.id !== blockId));
+    };
+
+    const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
+
+    const handleAddProductBlock = (prod: { id: string; name: string; image: string }) => {
+        const normName = prod.name.toLowerCase().trim();
+        if (productBlocks.some(b => b.id === prod.id || b.name.toLowerCase().trim() === normName)) return;
+        const defaultDate = startDate || formatYmdToDmy(new Date().toISOString().split('T')[0]);
+        const newBlock: ProductBlock = {
+            id: prod.id,
+            name: prod.name,
+            image: prod.image,
+            dateGroups: [
+                {
+                    id: `manual-group-${Date.now()}`,
+                    tanggal: defaultDate,
+                    bullets: ['Aktivitas baru...']
+                }
+            ]
+        };
+        setProductBlocks(prev => [...prev, newBlock]);
+    };
+
     /* ── Export PDF ── */
     const handleExportPDF = () => {
         if (!hasGenerated) {
@@ -289,18 +444,26 @@ export default function TemplateLaporanPage() {
                 return;
             }
 
-            const rkoRowsHtml = rkoTable.map((r, i) => `
-                <tr>
-                    <td style="text-align: center; border: 1px solid #000; padding: 4px;">${i + 1}</td>
-                    <td style="border: 1px solid #000; padding: 4px; font-weight: bold;">${r.name}</td>
-                    <td style="text-align: center; border: 1px solid #000; padding: 4px;">${r.bentuk}</td>
-                    <td style="text-align: center; border: 1px solid #000; padding: 4px;">${r.kemasan}</td>
-                    <td style="text-align: right; border: 1px solid #000; padding: 4px;">${(r.realisasiProduksi || 0).toLocaleString('id-ID')}</td>
-                    <td style="text-align: right; border: 1px solid #000; padding: 4px;">${(r.realisasiPengambilan || 0).toLocaleString('id-ID')}</td>
-                    <td style="text-align: right; border: 1px solid #000; padding: 4px; font-weight: bold; background: #ecfdf5;">${(r.stokAkhir || 0).toLocaleString('id-ID')}</td>
-                    <td style="text-align: center; border: 1px solid #000; padding: 4px;">${r.satuan}</td>
-                </tr>
-            `).join('');
+            const groupedRko = groupRkoTable(rkoTable);
+
+            const rkoRowsHtml = groupedRko.flatMap((group, groupIdx) => {
+                return group.rows.map((r, rowIdx) => `
+                    <tr>
+                        ${rowIdx === 0 ? `
+                            <td rowspan="${group.rows.length}" style="text-align: center; border: 1px solid #000; padding: 4px; vertical-align: middle;">${groupIdx + 1}</td>
+                            <td rowspan="${group.rows.length}" style="border: 1px solid #000; padding: 4px; font-weight: bold; vertical-align: middle;">${group.productName}</td>
+                            <td rowspan="${group.rows.length}" style="text-align: center; border: 1px solid #000; padding: 4px; vertical-align: middle;">${group.bentuk}</td>
+                        ` : ''}
+                        <td style="text-align: center; border: 1px solid #000; padding: 4px;">${r.kemasan}</td>
+                        <td style="text-align: right; border: 1px solid #000; padding: 4px;">${(r.realisasiProduksi || 0).toLocaleString('id-ID')}</td>
+                        <td style="text-align: right; border: 1px solid #000; padding: 4px;">${(r.realisasiPengambilan || 0).toLocaleString('id-ID')}</td>
+                        <td style="text-align: right; border: 1px solid #000; padding: 4px; font-weight: bold; background: #ecfdf5;">${(r.stokAkhir || 0).toLocaleString('id-ID')}</td>
+                        ${rowIdx === 0 ? `
+                            <td rowspan="${group.rows.length}" style="text-align: center; border: 1px solid #000; padding: 4px; vertical-align: middle;">${group.satuan}</td>
+                        ` : ''}
+                    </tr>
+                `);
+            }).join('');
 
             const productRowsHtml = productBlocks.map(p => {
                 const groups = p.dateGroups || [];
@@ -508,7 +671,7 @@ export default function TemplateLaporanPage() {
                                 type="text"
                                 value={startDate}
                                 onChange={(e) => setStartDate(e.target.value)}
-                                placeholder="03/03/2026"
+                                placeholder="DD/MM/YYYY"
                                 className="w-full text-xs h-9 pl-3 pr-10 border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500 outline-none font-medium"
                             />
                             <button
@@ -544,7 +707,7 @@ export default function TemplateLaporanPage() {
                                 type="text"
                                 value={endDate}
                                 onChange={(e) => setEndDate(e.target.value)}
-                                placeholder="07/03/2026"
+                                placeholder="DD/MM/YYYY"
                                 className="w-full text-xs h-9 pl-3 pr-10 border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500 outline-none font-medium"
                             />
                             <button
@@ -592,7 +755,7 @@ export default function TemplateLaporanPage() {
                             type="text"
                             value={updateDate}
                             onChange={(e) => setUpdateDate(e.target.value)}
-                            placeholder="07/03/2026"
+                            placeholder="DD/MM/YYYY"
                             className="w-full text-xs h-9 px-3 border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500 outline-none font-medium"
                         />
                     </div>
@@ -658,39 +821,78 @@ export default function TemplateLaporanPage() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {rkoTable.map((row, idx) => (
-                                        <tr key={idx} className="hover:bg-gray-50">
-                                            <td className="border border-gray-300 text-center py-1 font-medium">{row.no}</td>
-                                            <td className="border border-gray-300 px-2 py-1 font-bold">{row.name}</td>
-                                            <td className="border border-gray-300 text-center py-1 font-semibold">{row.bentuk}</td>
-                                            <td className="border border-gray-300 text-center py-1 font-semibold">{row.kemasan}</td>
-                                            <td className="border border-gray-300 p-0">
-                                                <input
-                                                    type="number"
-                                                    value={row.realisasiProduksi}
-                                                    onChange={(e) => handleRkoChange(idx, 'realisasiProduksi', parseFloat(e.target.value) || 0)}
-                                                    className="w-full text-right px-2 py-1 outline-none font-medium focus:bg-emerald-50"
-                                                />
-                                            </td>
-                                            <td className="border border-gray-300 p-0">
-                                                <input
-                                                    type="number"
-                                                    value={row.realisasiPengambilan}
-                                                    onChange={(e) => handleRkoChange(idx, 'realisasiPengambilan', parseFloat(e.target.value) || 0)}
-                                                    className="w-full text-right px-2 py-1 outline-none font-medium focus:bg-emerald-50"
-                                                />
-                                            </td>
-                                            <td className="border border-gray-300 p-0 bg-emerald-50/50">
-                                                <input
-                                                    type="number"
-                                                    value={row.stokAkhir}
-                                                    onChange={(e) => handleRkoChange(idx, 'stokAkhir', parseFloat(e.target.value) || 0)}
-                                                    className="w-full text-right px-2 py-1 outline-none font-bold text-emerald-900 bg-transparent focus:bg-emerald-100"
-                                                />
-                                            </td>
-                                            <td className="border border-gray-300 text-center py-1">{row.satuan}</td>
-                                        </tr>
-                                    ))}
+                                    {groupRkoTable(rkoTable).flatMap((group, groupIdx) => {
+                                        return group.rows.map((row, rowIdx) => {
+                                            const globalRowIdx = group.originalIndices[rowIdx];
+                                            return (
+                                                <tr key={`${groupIdx}-${rowIdx}`} className="hover:bg-gray-50">
+                                                    {rowIdx === 0 && (
+                                                        <>
+                                                            <td
+                                                                rowSpan={group.rows.length}
+                                                                className="border border-gray-300 text-center py-1 font-medium align-middle bg-white"
+                                                            >
+                                                                {groupIdx + 1}
+                                                            </td>
+                                                            <td
+                                                                rowSpan={group.rows.length}
+                                                                className="border border-gray-300 px-2 py-1 font-bold align-middle bg-white"
+                                                            >
+                                                                {group.productName}
+                                                            </td>
+                                                            <td
+                                                                rowSpan={group.rows.length}
+                                                                className="border border-gray-300 text-center py-1 font-semibold align-middle bg-white"
+                                                            >
+                                                                {group.bentuk}
+                                                            </td>
+                                                        </>
+                                                    )}
+                                                     <td className="border border-gray-300 p-0">
+                                                         <input
+                                                             type="text"
+                                                             value={row.kemasan}
+                                                             onChange={(e) => handleRkoChange(globalRowIdx, 'kemasan', e.target.value)}
+                                                             className="w-full text-center px-2 py-1 outline-none font-semibold focus:bg-emerald-50 text-xs"
+                                                             placeholder="-"
+                                                         />
+                                                     </td>
+                                                    <td className="border border-gray-300 p-0">
+                                                        <input
+                                                            type="number"
+                                                            value={row.realisasiProduksi}
+                                                            onChange={(e) => handleRkoChange(globalRowIdx, 'realisasiProduksi', parseFloat(e.target.value) || 0)}
+                                                            className="w-full text-right px-2 py-1 outline-none font-medium focus:bg-emerald-50"
+                                                        />
+                                                    </td>
+                                                    <td className="border border-gray-300 p-0">
+                                                        <input
+                                                            type="number"
+                                                            value={row.realisasiPengambilan}
+                                                            onChange={(e) => handleRkoChange(globalRowIdx, 'realisasiPengambilan', parseFloat(e.target.value) || 0)}
+                                                            className="w-full text-right px-2 py-1 outline-none font-medium focus:bg-emerald-50"
+                                                        />
+                                                    </td>
+                                                    <td className="border border-gray-300 p-0 bg-emerald-50/50">
+                                                        <input
+                                                            type="number"
+                                                            value={row.stokAkhir}
+                                                            onChange={(e) => handleRkoChange(globalRowIdx, 'stokAkhir', parseFloat(e.target.value) || 0)}
+                                                            className="w-full text-right px-2 py-1 outline-none font-bold text-emerald-900 bg-transparent focus:bg-emerald-100"
+                                                        />
+                                                    </td>
+                                                    {rowIdx === 0 && (
+                                                        <td
+                                                            rowSpan={group.rows.length}
+                                                            className="border border-gray-300 text-center py-1 align-middle bg-white"
+                                                        >
+                                                            {group.satuan}
+                                                        </td>
+                                                    )}
+                                                </tr>
+                                            );
+                                        });
+                                    })}
                                 </tbody>
                             </table>
                         </div>
@@ -705,7 +907,15 @@ export default function TemplateLaporanPage() {
 
                         {/* Structured Table for Summarized Product Activities */}
                         <div className="space-y-3">
-                            <h4 className="text-xs font-bold text-gray-800">Tabel Rangkuman Aktivitas Per Produk:</h4>
+                            <div className="flex items-center justify-between">
+                                <h4 className="text-xs font-bold text-gray-800">Tabel Rangkuman Aktivitas Per Produk:</h4>
+                                <button
+                                    onClick={() => setIsAddProductModalOpen(true)}
+                                    className="text-xs text-emerald-700 font-semibold flex items-center gap-1 hover:underline cursor-pointer bg-emerald-50 px-2 py-1 rounded border border-emerald-200"
+                                >
+                                    <Plus className="size-3.5" /> Tambah Produk
+                                </button>
+                            </div>
                             <div className="overflow-x-auto border border-gray-300 rounded-lg">
                                 <table className="w-full text-xs border-collapse">
                                     <thead>
@@ -716,120 +926,145 @@ export default function TemplateLaporanPage() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-200">
-                                        {productBlocks.map((block) => {
-                                            const groups = block.dateGroups || [];
+                                        {productBlocks.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={3} className="px-4 py-8 text-center text-gray-400 text-xs italic">
+                                                    Semua produk telah dihapus dari rangkuman. Klik tombol <strong className="text-emerald-700">&quot;+ Tambah Produk&quot;</strong> di atas untuk menambahkan produk kembali.
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            productBlocks.map((block) => {
+                                                const groups = block.dateGroups || [];
 
-                                            if (groups.length === 0) {
-                                                return (
-                                                    <tr key={block.id} className="hover:bg-gray-50/60">
-                                                        <td className="px-4 py-3 border-r border-gray-300 bg-gray-50/40 align-top">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className="w-12 h-14 flex-shrink-0 bg-white rounded border border-gray-200 p-1 flex items-center justify-center">
-                                                                    <img src={block.image} alt={block.name} className="w-full h-full object-contain" />
+                                                if (groups.length === 0) {
+                                                    return (
+                                                        <tr key={block.id} className="hover:bg-gray-50/60">
+                                                            <td className="px-4 py-3 border-r border-gray-300 bg-gray-50/40 align-top">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="w-12 h-14 flex-shrink-0 bg-white rounded border border-gray-200 p-1 flex items-center justify-center">
+                                                                        <img src={block.image} alt={block.name} className="w-full h-full object-contain" />
+                                                                    </div>
+                                                                    <div>
+                                                                        <div className="font-bold text-gray-900 text-xs">{block.name.replace(/\s*\([^)]*\)/g, '')}</div>
+                                                                        <div className="flex items-center gap-2 mt-1">
+                                                                            <button
+                                                                                onClick={() => handleAddDateGroup(block.id)}
+                                                                                className="text-[10px] text-emerald-700 font-semibold flex items-center gap-0.5 hover:underline cursor-pointer"
+                                                                            >
+                                                                                <Plus className="size-3" /> Tambah Tanggal
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => handleDeleteProductBlock(block.id)}
+                                                                                className="text-[10px] text-red-600 font-semibold flex items-center gap-0.5 hover:underline cursor-pointer"
+                                                                                title="Hapus produk ini dari tabel"
+                                                                            >
+                                                                                <Trash2 className="size-3" /> Hapus Produk
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
-                                                                <div>
-                                                                    <div className="font-bold text-gray-900 text-xs">{block.name.replace(/\s*\([^)]*\)/g, '')}</div>
+                                                            </td>
+                                                            <td className="px-3 py-3 border-r border-gray-300 bg-gray-50/20 align-top text-center text-xs text-gray-400 italic">
+                                                                {startDate} s/d {endDate}
+                                                            </td>
+                                                            <td className="px-4 py-3 align-top text-xs text-gray-400 italic">
+                                                                Tidak ada aktivitas harian pada periode terpilih.
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                }
+
+                                                return groups.map((group, groupIdx) => (
+                                                    <tr key={group.id} className="border-b border-gray-200 hover:bg-gray-50/60">
+                                                        {groupIdx === 0 && (
+                                                            <td
+                                                                rowSpan={groups.length}
+                                                                className="px-4 py-3 border-r border-gray-300 bg-gray-50/40 align-top"
+                                                            >
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="w-12 h-14 flex-shrink-0 bg-white rounded border border-gray-200 p-1 flex items-center justify-center">
+                                                                        <img src={block.image} alt={block.name} className="w-full h-full object-contain" />
+                                                                    </div>
+                                                                    <div>
+                                                                        <div className="font-bold text-gray-900 text-xs">{block.name.replace(/\s*\([^)]*\)/g, '')}</div>
+                                                                        <div className="flex items-center gap-2 mt-1">
+                                                                            <button
+                                                                                onClick={() => handleAddDateGroup(block.id)}
+                                                                                className="text-[10px] text-emerald-700 font-semibold flex items-center gap-0.5 hover:underline cursor-pointer"
+                                                                            >
+                                                                                <Plus className="size-3" /> Tambah Tanggal
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => handleDeleteProductBlock(block.id)}
+                                                                                className="text-[10px] text-red-600 font-semibold flex items-center gap-0.5 hover:underline cursor-pointer"
+                                                                                title="Hapus produk ini dari tabel"
+                                                                            >
+                                                                                <Trash2 className="size-3" /> Hapus Produk
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+                                                        )}
+
+                                                        <td className="px-3 py-3 border-r border-gray-300 bg-gray-50/20 align-top w-36">
+                                                            <input
+                                                                type="text"
+                                                                value={group.tanggal}
+                                                                onChange={(e) => handleDateGroupChange(block.id, group.id, 'tanggal', e.target.value)}
+                                                                className="w-full text-center font-bold text-gray-800 text-xs bg-transparent outline-none focus:bg-white rounded px-1 py-0.5 border-b border-transparent focus:border-emerald-500"
+                                                            />
+                                                        </td>
+
+                                                        <td className="px-4 py-3 align-top">
+                                                            <div className="space-y-1.5">
+                                                                {group.bullets.length === 0 ? (
+                                                                    <span className="text-gray-400 italic text-xs">Belum ada poin aktivitas pada tanggal ini.</span>
+                                                                ) : (
+                                                                    <ul className="list-disc list-outside ml-4 space-y-1.5 text-xs text-gray-800">
+                                                                        {group.bullets.map((bullet, bIdx) => (
+                                                                            <li key={bIdx} className="group relative">
+                                                                                <div className="flex items-center gap-1.5">
+                                                                                    <input
+                                                                                        type="text"
+                                                                                        value={bullet}
+                                                                                        onChange={(e) => handleBulletChange(block.id, group.id, bIdx, e.target.value)}
+                                                                                        className="w-full bg-transparent outline-none focus:bg-emerald-50/60 rounded px-1.5 py-0.5 border-b border-transparent focus:border-emerald-500 text-xs"
+                                                                                    />
+                                                                                    <button
+                                                                                        onClick={() => handleDeleteBullet(block.id, group.id, bIdx)}
+                                                                                        className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 transition-opacity p-0.5 cursor-pointer"
+                                                                                        title="Hapus Poin"
+                                                                                    >
+                                                                                        <Trash2 className="size-3.5" />
+                                                                                    </button>
+                                                                                </div>
+                                                                            </li>
+                                                                        ))}
+                                                                    </ul>
+                                                                )}
+
+                                                                <div className="pt-1 flex items-center gap-3">
                                                                     <button
-                                                                        onClick={() => handleAddDateGroup(block.id)}
-                                                                        className="text-[10px] text-emerald-700 font-semibold flex items-center gap-0.5 mt-1 hover:underline cursor-pointer"
+                                                                        onClick={() => handleAddBulletToGroup(block.id, group.id)}
+                                                                        className="text-[10px] text-emerald-700 font-semibold flex items-center gap-0.5 hover:underline cursor-pointer"
                                                                     >
-                                                                        <Plus className="size-3" /> Tambah Tanggal
+                                                                        <Plus className="size-3" /> Tambah Poin
                                                                     </button>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-3 py-3 border-r border-gray-300 bg-gray-50/20 align-top text-center text-xs text-gray-400 italic">
-                                                            {startDate} s/d {endDate}
-                                                        </td>
-                                                        <td className="px-4 py-3 align-top text-xs text-gray-400 italic">
-                                                            Tidak ada aktivitas harian pada periode terpilih.
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            }
-
-                                            return groups.map((group, groupIdx) => (
-                                                <tr key={group.id} className="border-b border-gray-200 hover:bg-gray-50/60">
-                                                    {groupIdx === 0 && (
-                                                        <td
-                                                            rowSpan={groups.length}
-                                                            className="px-4 py-3 border-r border-gray-300 bg-gray-50/40 align-top"
-                                                        >
-                                                            <div className="flex items-center gap-3">
-                                                                <div className="w-12 h-14 flex-shrink-0 bg-white rounded border border-gray-200 p-1 flex items-center justify-center">
-                                                                    <img src={block.image} alt={block.name} className="w-full h-full object-contain" />
-                                                                </div>
-                                                                <div>
-                                                                    <div className="font-bold text-gray-900 text-xs">{block.name.replace(/\s*\([^)]*\)/g, '')}</div>
-                                                                    <button
-                                                                        onClick={() => handleAddDateGroup(block.id)}
-                                                                        className="text-[10px] text-emerald-700 font-semibold flex items-center gap-0.5 mt-1 hover:underline cursor-pointer"
-                                                                    >
-                                                                        <Plus className="size-3" /> Tambah Tanggal
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                    )}
-
-                                                    <td className="px-3 py-3 border-r border-gray-300 bg-gray-50/20 align-top w-36">
-                                                        <input
-                                                            type="text"
-                                                            value={group.tanggal}
-                                                            onChange={(e) => handleDateGroupChange(block.id, group.id, 'tanggal', e.target.value)}
-                                                            className="w-full text-center font-bold text-gray-800 text-xs bg-transparent outline-none focus:bg-white rounded px-1 py-0.5 border-b border-transparent focus:border-emerald-500"
-                                                        />
-                                                    </td>
-
-                                                    <td className="px-4 py-3 align-top">
-                                                        <div className="space-y-1.5">
-                                                            {group.bullets.length === 0 ? (
-                                                                <span className="text-gray-400 italic text-xs">Belum ada poin aktivitas pada tanggal ini.</span>
-                                                            ) : (
-                                                                <ul className="list-disc list-outside ml-4 space-y-1.5 text-xs text-gray-800">
-                                                                    {group.bullets.map((bullet, bIdx) => (
-                                                                        <li key={bIdx} className="group relative">
-                                                                            <div className="flex items-center gap-1.5">
-                                                                                <input
-                                                                                    type="text"
-                                                                                    value={bullet}
-                                                                                    onChange={(e) => handleBulletChange(block.id, group.id, bIdx, e.target.value)}
-                                                                                    className="w-full bg-transparent outline-none focus:bg-emerald-50/60 rounded px-1.5 py-0.5 border-b border-transparent focus:border-emerald-500 text-xs"
-                                                                                />
-                                                                                <button
-                                                                                    onClick={() => handleDeleteBullet(block.id, group.id, bIdx)}
-                                                                                    className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 transition-opacity p-0.5 cursor-pointer"
-                                                                                    title="Hapus Poin"
-                                                                                >
-                                                                                    <Trash2 className="size-3.5" />
-                                                                                </button>
-                                                                            </div>
-                                                                        </li>
-                                                                    ))}
-                                                                </ul>
-                                                            )}
-
-                                                            <div className="pt-1 flex items-center gap-3">
-                                                                <button
-                                                                    onClick={() => handleAddBulletToGroup(block.id, group.id)}
-                                                                    className="text-[10px] text-emerald-700 font-semibold flex items-center gap-0.5 hover:underline cursor-pointer"
-                                                                >
-                                                                    <Plus className="size-3" /> Tambah Poin
-                                                                </button>
-                                                                {groups.length > 1 && (
                                                                     <button
                                                                         onClick={() => handleDeleteDateGroup(block.id, group.id)}
                                                                         className="text-[10px] text-red-600 font-semibold flex items-center gap-0.5 hover:underline cursor-pointer"
+                                                                        title="Hapus baris tanggal ini"
                                                                     >
                                                                         <Trash2 className="size-3" /> Hapus Tanggal
                                                                     </button>
-                                                                )}
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ));
-                                        })}
+                                                        </td>
+                                                    </tr>
+                                                ));
+                                            })
+                                        )}
                                     </tbody>
                                 </table>
                             </div>
@@ -877,6 +1112,61 @@ export default function TemplateLaporanPage() {
                                     </ul>
                                 )}
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Tambah Produk ke Rangkuman */}
+            {isAddProductModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 animate-in fade-in zoom-in-95 duration-200 space-y-4">
+                        <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                            <h4 className="text-base font-bold text-gray-900">Tambah Produk ke Rangkuman</h4>
+                            <button
+                                onClick={() => setIsAddProductModalOpen(false)}
+                                className="text-gray-400 hover:text-gray-600 font-bold text-sm cursor-pointer"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        <p className="text-xs text-gray-500">
+                            Pilih produk yang ingin ditambahkan kembali ke Tabel Rangkuman Aktivitas Per Produk:
+                        </p>
+                        <div className="space-y-2 max-h-64 overflow-y-auto border border-gray-200 rounded-lg p-2 bg-gray-50/50">
+                            {availableProductsCatalog.map(prod => {
+                                const normName = prod.name.toLowerCase().trim();
+                                const isAdded = productBlocks.some(
+                                    b => b.id === prod.id || b.name.toLowerCase().trim() === normName
+                                );
+                                return (
+                                    <div key={prod.id} className="flex items-center justify-between p-2.5 bg-white rounded border border-gray-200 hover:border-emerald-300 transition-colors">
+                                        <div className="flex items-center gap-3">
+                                            <img src={prod.image} alt={prod.name} className="w-8 h-9 object-contain" />
+                                            <span className="text-xs font-bold text-gray-800">{prod.name}</span>
+                                        </div>
+                                        <button
+                                            disabled={isAdded}
+                                            onClick={() => {
+                                                handleAddProductBlock(prod);
+                                                setIsAddProductModalOpen(false);
+                                            }}
+                                            className={`text-xs px-3 py-1 rounded font-semibold transition-all ${
+                                                isAdded
+                                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                    : 'bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer shadow-xs'
+                                            }`}
+                                        >
+                                            {isAdded ? 'Sudah Ada' : '+ Tambah'}
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <div className="flex justify-end pt-2 border-t border-gray-100">
+                            <AppButton variant="secondary" onClick={() => setIsAddProductModalOpen(false)}>
+                                Tutup
+                            </AppButton>
                         </div>
                     </div>
                 </div>

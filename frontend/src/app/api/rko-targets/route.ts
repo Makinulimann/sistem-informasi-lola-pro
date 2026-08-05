@@ -111,12 +111,9 @@ export async function GET(request: Request) {
         const validSlugs = new Set(['petro-gladiator', 'bio-fertil', 'petro-fish', 'phonska-oca', 'petro-gladiator-cair']);
         rkoRows.forEach(r => {
             const key = `${r.product_slug}||${r.tab_name}`;
-            const baseProductName = SLUG_NAME_MAP[r.product_slug] || r.product_slug;
-            // Skip if this is a base-name entry for a slug that already has variants
-            const isBaseNameEntry = r.tab_name.trim() === baseProductName.trim();
             if (!addedKeys.has(key) && validSlugs.has(r.product_slug) && !r.tab_name.toLowerCase().includes('tes')) {
-                if (slugsWithVariants.has(r.product_slug) && isBaseNameEntry) {
-                    // This slug has variants — skip the redundant base entry
+                if (slugsWithVariants.has(r.product_slug)) {
+                    // This slug has active BOM variants — skip stale/renamed/deleted rko_targets entries
                     return;
                 }
                 addedKeys.add(key);

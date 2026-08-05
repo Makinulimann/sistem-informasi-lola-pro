@@ -49,12 +49,60 @@ export function BomConfigTab({
     const [categoryFilter, setCategoryFilter] = useState<string>('all');
     const [sortBy, setSortBy] = useState<string>('nama-asc');
 
-    // Add Variant Modal
+    // Add & Edit Variant Modal
     const [isAddVariantOpen, setIsAddVariantOpen] = useState(false);
     const [newVariantNameInput, setNewVariantNameInput] = useState('');
 
+    const [editingVariantName, setEditingVariantName] = useState<string | null>(null);
+    const [editVariantInput, setEditVariantInput] = useState('');
+
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+    // Helper to save BOM state immediately to database
+    const saveBOMWithState = async (
+        listToSave: string[],
+        quantitiesToSave: Record<string, Record<number, string>>,
+        baseQtyToSave: string = baseQuantity,
+        materialsToUse: ProductMaterial[] = materials
+    ) => {
+        const parsedBaseQty = parseFloat(baseQtyToSave) || 1000;
+        const items = materialsToUse.map(mat => {
+            const qtyStr = quantities[mat.masterItemId] || '0';
+            return {
+                materialId: mat.masterItemId,
+                quantity: parseFloat(qtyStr) || 0
+            };
+        });
+
+        const variantsPayload: BOMVariant[] = listToSave.map(vName => {
+            const vMap = quantitiesToSave[vName] || {};
+            const vItems = materialsToUse
+                .map(mat => ({
+                    materialId: mat.masterItemId,
+                    quantity: parseFloat(vMap[mat.masterItemId] || '0') || 0
+                }))
+                .filter(i => i.quantity > 0);
+
+            return {
+                name: vName,
+                items: vItems
+            };
+        });
+
+        await saveBOM({
+            productSlug,
+            tabId,
+            baseQuantity: parsedBaseQty,
+            items,
+            variants: variantsPayload
+        });
+
+        const storageKey = `sippro_bom_variants_${productSlug}_${tabId}`;
+        try {
+            localStorage.setItem(storageKey, JSON.stringify({ variantsList: listToSave, variantQuantities: quantitiesToSave }));
+        } catch {}
+    };
 
     // Load materials and current BOM config
     useEffect(() => {
@@ -82,39 +130,39 @@ export function BomConfigTab({
                     const vQuantities: Record<string, Record<number, string>> = {};
                     const vNamesList: string[] = [];
 
-                    // 1. Read cached variants from localStorage first
-                    try {
-                        const cached = localStorage.getItem(storageKey);
-                        if (cached) {
-                            const parsed = JSON.parse(cached);
-                            if (Array.isArray(parsed.variantsList)) {
-                                parsed.variantsList.forEach((name: string) => {
-                                    if (name && !vNamesList.includes(name)) vNamesList.push(name);
-                                });
-                            }
-                            if (parsed.variantQuantities) {
-                                Object.assign(vQuantities, parsed.variantQuantities);
-                            }
-                        }
-                    } catch {}
-
-                    // 2. Merge variants returned from DB
-                    if (bomConfig.variants && Array.isArray(bomConfig.variants)) {
+                    // DB is primary source of truth if variants exist
+                    if (bomConfig.variants && Array.isArray(bomConfig.variants) && bomConfig.variants.length > 0) {
                         bomConfig.variants.forEach(v => {
                             if (v.name && !vNamesList.includes(v.name)) {
                                 vNamesList.push(v.name);
                             }
                             if (v.name) {
-                                const itemMap: Record<number, string> = vQuantities[v.name] || {};
+                                const itemMap: Record<number, string> = {};
                                 (v.items || []).forEach(item => {
                                     itemMap[item.materialId] = String(item.quantity || '');
                                 });
                                 vQuantities[v.name] = itemMap;
                             }
                         });
+                    } else {
+                        // Fallback to localStorage ONLY if DB has no variants yet
+                        try {
+                            const cached = localStorage.getItem(storageKey);
+                            if (cached) {
+                                const parsed = JSON.parse(cached);
+                                if (Array.isArray(parsed.variantsList)) {
+                                    parsed.variantsList.forEach((name: string) => {
+                                        if (name && !vNamesList.includes(name)) vNamesList.push(name);
+                                    });
+                                }
+                                if (parsed.variantQuantities) {
+                                    Object.assign(vQuantities, parsed.variantQuantities);
+                                }
+                            }
+                        } catch {}
                     }
 
-                    // Save merged cache back to localStorage
+                    // Sync cache with current state
                     try {
                         localStorage.setItem(storageKey, JSON.stringify({ variantsList: vNamesList, variantQuantities: vQuantities }));
                     } catch {}
@@ -157,23 +205,29 @@ export function BomConfigTab({
         }
     };
 
-    const handleAddVariant = () => {
+    const handleAddVariant = async () => {
         const trimmed = newVariantNameInput.trim();
         if (!trimmed) return;
         if (!variantsList.includes(trimmed)) {
-            const updated = [...variantsList, trimmed];
-            setVariantsList(updated);
+            const updatedList = [...variantsList, trimmed];
+            setVariantsList(updatedList);
             setActiveVariantName(trimmed);
-            const storageKey = `sippro_bom_variants_${productSlug}_${tabId}`;
+            setNewVariantNameInput('');
+            setIsAddVariantOpen(false);
+
             try {
-                localStorage.setItem(storageKey, JSON.stringify({ variantsList: updated, variantQuantities }));
-            } catch {}
+                await saveBOMWithState(updatedList, variantQuantities);
+                setSuccessMessage(`Varian kemasan "${trimmed}" berhasil ditambahkan.`);
+            } catch (err) {
+                console.error('Failed to add variant:', err);
+            }
+        } else {
+            setNewVariantNameInput('');
+            setIsAddVariantOpen(false);
         }
-        setNewVariantNameInput('');
-        setIsAddVariantOpen(false);
     };
 
-    const handleDeleteVariant = (vName: string) => {
+    const handleDeleteVariant = async (vName: string) => {
         const updatedList = variantsList.filter(v => v !== vName);
         setVariantsList(updatedList);
         
@@ -185,10 +239,55 @@ export function BomConfigTab({
             setActiveVariantName('default');
         }
 
-        const storageKey = `sippro_bom_variants_${productSlug}_${tabId}`;
         try {
-            localStorage.setItem(storageKey, JSON.stringify({ variantsList: updatedList, variantQuantities: updatedQty }));
-        } catch {}
+            await saveBOMWithState(updatedList, updatedQty);
+            setSuccessMessage(`Varian kemasan "${vName}" berhasil dihapus.`);
+        } catch (err) {
+            console.error('Failed to delete variant:', err);
+        }
+    };
+
+    const startEditingVariant = (vName: string) => {
+        setEditingVariantName(vName);
+        setEditVariantInput(vName);
+    };
+
+    const handleEditVariant = async () => {
+        if (!editingVariantName) return;
+        const trimmedNewName = editVariantInput.trim();
+        if (!trimmedNewName || trimmedNewName === editingVariantName) {
+            setEditingVariantName(null);
+            return;
+        }
+
+        if (variantsList.includes(trimmedNewName)) {
+            setErrorMessage('Nama varian kemasan tersebut sudah ada.');
+            return;
+        }
+
+        const updatedList = variantsList.map(v => v === editingVariantName ? trimmedNewName : v);
+        setVariantsList(updatedList);
+
+        const updatedQty = { ...variantQuantities };
+        if (updatedQty[editingVariantName]) {
+            updatedQty[trimmedNewName] = updatedQty[editingVariantName];
+            delete updatedQty[editingVariantName];
+        }
+        setVariantQuantities(updatedQty);
+
+        if (activeVariantName === editingVariantName) {
+            setActiveVariantName(trimmedNewName);
+        }
+
+        setEditingVariantName(null);
+
+        try {
+            await saveBOMWithState(updatedList, updatedQty);
+            setSuccessMessage(`Nama varian kemasan "${editingVariantName}" berhasil diubah menjadi "${trimmedNewName}".`);
+        } catch (err) {
+            console.error('Failed to save edited variant:', err);
+            setErrorMessage('Gagal memperbarui database.');
+        }
     };
 
     const handleSave = async () => {
@@ -350,7 +449,7 @@ export function BomConfigTab({
                     {variantsList.map(vName => (
                         <div
                             key={vName}
-                            className={`inline-flex items-center gap-1 px-3 py-2 text-sm font-semibold transition-all ${
+                            className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold transition-all rounded ${
                                 activeVariantName === vName
                                     ? 'bg-amber-600 text-white shadow-sm'
                                     : 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
@@ -365,8 +464,22 @@ export function BomConfigTab({
                             </button>
                             <button
                                 type="button"
-                                onClick={() => handleDeleteVariant(vName)}
-                                className="ml-1 text-xs opacity-70 hover:opacity-100 hover:text-red-500"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    startEditingVariant(vName);
+                                }}
+                                className="ml-1 opacity-70 hover:opacity-100 hover:scale-110 transition-all p-0.5 cursor-pointer text-xs"
+                                title="Edit nama varian kemasan ini"
+                            >
+                                ✏️
+                            </button>
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteVariant(vName);
+                                }}
+                                className="text-xs opacity-70 hover:opacity-100 hover:text-red-500 p-0.5 transition-all cursor-pointer"
                                 title="Hapus varian kemasan ini"
                             >
                                 ✕
@@ -544,6 +657,37 @@ export function BomConfigTab({
                             </AppButton>
                             <AppButton variant="primary" onClick={handleAddVariant}>
                                 Tambah
+                            </AppButton>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Edit Sub-Product Variant */}
+            {editingVariantName !== null && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 animate-in fade-in zoom-in-95 duration-200 space-y-4">
+                        <h4 className="text-lg font-bold text-gray-900">Edit Nama Varian Kemasan</h4>
+                        <p className="text-xs text-gray-500">
+                            Ubah nama varian kemasan sub-produk (contoh: PGD @1KG, PGD @2KG, Box 10L).
+                        </p>
+                        <AppInput
+                            label="Nama Kemasan / Sub-Produk"
+                            value={editVariantInput}
+                            onChange={e => setEditVariantInput(e.target.value)}
+                            placeholder="Contoh: PGD @1KG"
+                            autoFocus
+                        />
+                        <div className="flex justify-end gap-2 pt-2">
+                            <AppButton variant="secondary" onClick={() => setEditingVariantName(null)}>
+                                Batal
+                            </AppButton>
+                            <AppButton
+                                variant="primary"
+                                onClick={handleEditVariant}
+                                disabled={!editVariantInput.trim() || (editVariantInput.trim() !== editingVariantName && variantsList.includes(editVariantInput.trim()))}
+                            >
+                                Simpan
                             </AppButton>
                         </div>
                     </div>

@@ -14,10 +14,47 @@ interface ActivityRecord {
     deskripsi: string;
 }
 
+interface DynamicProduct {
+    slug: string;
+    name: string;
+    bentuk: string;
+    satuan: string;
+    image: string;
+}
+
+const NON_PRODUCT_SLUGS = new Set([
+    'bahan-baku',
+    'aktivitas-harian',
+    'maintenance',
+    'rkap-rko',
+    'rencana-pengadaan',
+    'template-laporan',
+]);
+
+const NON_PRODUCT_LABELS = new Set([
+    'bahan baku',
+    'aktivitas harian',
+    'maintenance',
+    'rkap / rko',
+    'rkap/rko',
+    'rkap',
+    'rko',
+    'rencana pengadaan',
+    'template laporan',
+]);
+
 export async function POST(request: Request) {
     try {
         const body = await request.json();
         const { startDate, endDate, rkoYear, apiKey } = body;
+
+        // Validation: Tanggal Mulai Aktivitas & Tanggal Akhir Aktivitas required
+        if (!startDate || !endDate || !startDate.trim() || !endDate.trim()) {
+            return NextResponse.json(
+                { message: 'Tanggal Mulai Aktivitas dan Tanggal Akhir Aktivitas wajib diisi terlebih dahulu.' },
+                { status: 400 }
+            );
+        }
 
         const year = rkoYear ? parseInt(rkoYear, 10) : new Date().getFullYear();
 
@@ -40,30 +77,119 @@ export async function POST(request: Request) {
         ] = await Promise.all([
             db.from<any>('produksis').select('*').execute(),
             db.from<any>('aktivitas_harians').select('*').execute(),
-            db.from<any>('sidebar_menus').select('label,image_url').execute(),
+            db.from<any>('sidebar_menus').select('*').execute(),
             db.from<any>('produksi_tabs').select('*').execute(),
             db.from<any>('bill_of_materials').select('product_slug,produksi_tab_id,variant_name').execute(),
             db.from<any>('products').select('slug,nama').execute(),
         ]);
 
-        // Map product images from sidebar_menus database table
-        const productImageMap: Record<string, string> = {
-            'petro-fish': '/images/petro-fish.webp',
-            'phonska-oca': '/images/phonska-oca-plus.webp',
-            'bio-fertil': '/images/bio-fertil.webp',
-            'petro-gladiator': '/images/petro-gladiator.webp',
-            'petro-gladiator-cair': '/images/petro-gladiator.webp',
-        };
+        // Build dynamic products map
+        const dynamicProductsMap = new Map<string, DynamicProduct>();
 
-        (sidebarMenus || []).forEach((m: any) => {
-            if (m.label && m.image_url) {
-                const l = m.label.toLowerCase();
-                if (l.includes('fish')) productImageMap['petro-fish'] = m.image_url;
-                else if (l.includes('phonska') || l.includes('oca')) productImageMap['phonska-oca'] = m.image_url;
-                else if (l.includes('bio') || l.includes('fertil')) productImageMap['bio-fertil'] = m.image_url;
-                else if (l.includes('cair')) productImageMap['petro-gladiator-cair'] = m.image_url;
-                else if (l.includes('gladiator')) productImageMap['petro-gladiator'] = m.image_url;
+        // Default products list
+        const defaultProducts: DynamicProduct[] = [
+            { slug: 'petro-fish', name: 'Petro Fish', bentuk: 'Cair', satuan: 'Liter', image: '/images/petro-fish.webp' },
+            { slug: 'phonska-oca', name: 'Phonska Oca Plus', bentuk: 'Cair', satuan: 'Liter', image: '/images/phonska-oca-plus.webp' },
+            { slug: 'bio-fertil', name: 'Petro Bio Fertil', bentuk: 'Padat', satuan: 'Kg', image: '/images/bio-fertil.webp' },
+            { slug: 'petro-gladiator', name: 'Petro Gladiator Padat', bentuk: 'Padat', satuan: 'Kg', image: '/images/petro-gladiator.webp' },
+            { slug: 'petro-gladiator-cair', name: 'Petro Gladiator Cair', bentuk: 'Cair', satuan: 'Liter', image: '/images/petro-gladiator.webp' },
+        ];
+
+        defaultProducts.forEach(p => dynamicProductsMap.set(p.slug, p));
+
+        // Find "Produk Pengembangan" menu (Level 1) in sidebar_menus
+        const produkPengembanganMenu = (sidebarMenus || []).find((m: any) =>
+            (m.label || '').toLowerCase().trim() === 'produk pengembangan' && !m.parent_id
+        );
+        const parentId = produkPengembanganMenu ? produkPengembanganMenu.id : null;
+
+        // Level 2 children of "Produk Pengembangan"
+        const level2Menus = (sidebarMenus || []).filter((m: any) =>
+            parentId ? m.parent_id === parentId : (m.parent_id && m.is_active !== false)
+        );
+
+        level2Menus.forEach((l2: any) => {
+            if (l2.is_active === false) return;
+
+            // Must have level 3 children (actual products have sub-pages like Bahan Baku, Produksi, Analisa)
+            const l3Children = (sidebarMenus || []).filter((m: any) => m.parent_id === l2.id);
+            if (l3Children.length === 0) return;
+
+            const labelNorm = (l2.label || '').toLowerCase().trim();
+            if (NON_PRODUCT_LABELS.has(labelNorm)) return;
+
+            const firstChildHref = l3Children.find((c: any) => c.href && c.href !== '#')?.href || '';
+
+            let slug = '';
+            if (firstChildHref) {
+                const parts = firstChildHref.split('/').filter(Boolean);
+                if (parts.length >= 3) {
+                    slug = parts[2];
+                }
             }
+            if (!slug) {
+                slug = (l2.label || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+            }
+
+            if (!slug || NON_PRODUCT_SLUGS.has(slug.toLowerCase())) return;
+
+            const name = l2.label || slug;
+            const satuanStr = (l2.satuan || '').toLowerCase();
+            const nameStr = name.toLowerCase();
+
+            const isCair = satuanStr.includes('cair') || satuanStr.includes('liter') || satuanStr.includes('l') || nameStr.includes('cair') || slug.includes('cair');
+            const bentuk = isCair ? 'Cair' : 'Padat';
+            const satuan = isCair ? 'Liter' : (l2.satuan || 'Kg');
+
+            const image = l2.image_url || dynamicProductsMap.get(slug)?.image || `/images/${slug}.webp`;
+
+            dynamicProductsMap.set(slug, {
+                slug,
+                name,
+                bentuk,
+                satuan,
+                image,
+            });
+        });
+
+        // Add from `products` table
+        (productsTableData || []).forEach((p: any) => {
+            if (p.slug && p.nama && !dynamicProductsMap.has(p.slug) && !NON_PRODUCT_SLUGS.has(p.slug.toLowerCase())) {
+                const nameStr = p.nama.toLowerCase();
+                if (NON_PRODUCT_LABELS.has(nameStr)) return;
+                const isCair = nameStr.includes('cair');
+                dynamicProductsMap.set(p.slug, {
+                    slug: p.slug,
+                    name: p.nama,
+                    bentuk: isCair ? 'Cair' : 'Padat',
+                    satuan: isCair ? 'Liter' : 'Kg',
+                    image: `/images/${p.slug}.webp`,
+                });
+            }
+        });
+
+        // Add from `produksi_tabs` table
+        (tabsData || []).forEach((t: any) => {
+            if (t.product_slug && !dynamicProductsMap.has(t.product_slug) && !NON_PRODUCT_SLUGS.has(t.product_slug.toLowerCase())) {
+                const nameStr = (t.nama || t.product_slug).toLowerCase();
+                if (NON_PRODUCT_LABELS.has(nameStr)) return;
+                const isCair = nameStr.includes('cair');
+                dynamicProductsMap.set(t.product_slug, {
+                    slug: t.product_slug,
+                    name: t.nama || t.product_slug,
+                    bentuk: isCair ? 'Cair' : 'Padat',
+                    satuan: isCair ? 'Liter' : 'Kg',
+                    image: `/images/${t.product_slug}.webp`,
+                });
+            }
+        });
+
+        const allProductsList = Array.from(dynamicProductsMap.values());
+
+        // Map product images for response
+        const productImageMap: Record<string, string> = {};
+        allProductsList.forEach(p => {
+            productImageMap[p.slug] = p.image;
         });
 
         // Filter produksis for Table A from YYYY-01-01 up to endDate
@@ -73,29 +199,12 @@ export async function POST(request: Request) {
             return t >= tableAStartMs && t <= tableAEndMs;
         });
 
-        // Build dynamic product variants from DB (same logic as rko-targets/route.ts)
-        const SLUG_NAME_MAP: Record<string, string> = {
-            'petro-gladiator': 'Petro Gladiator',
-            'bio-fertil': 'Petro Bio Fertil',
-            'petro-fish': 'Petro Fish',
-            'phonska-oca': 'Phonska Oca Plus',
-            'petro-gladiator-cair': 'Petro Gladiator Cair',
-        };
-        (productsTableData || []).forEach((p: any) => {
-            if (p.slug && p.nama) SLUG_NAME_MAP[p.slug] = p.nama;
+        // Sort products: Cair first, then Padat
+        allProductsList.sort((a, b) => {
+            if (a.bentuk === 'Cair' && b.bentuk !== 'Cair') return -1;
+            if (a.bentuk !== 'Cair' && b.bentuk === 'Cair') return 1;
+            return a.name.localeCompare(b.name);
         });
-
-        const PRODUCT_TYPE_MAP: Record<string, string> = {
-            'petro-gladiator': 'Padat',
-            'bio-fertil': 'Padat',
-            'petro-fish': 'Cair',
-            'phonska-oca': 'Cair',
-            'petro-gladiator-cair': 'Cair',
-        };
-
-        const VALID_SLUGS = new Set(['petro-gladiator', 'bio-fertil', 'petro-fish', 'phonska-oca', 'petro-gladiator-cair']);
-        const tabs: any[] = (tabsData || []).filter((t: any) => VALID_SLUGS.has(t.product_slug));
-        const bomRows: any[] = bomData || [];
 
         interface DynamicVariant {
             id: number;
@@ -111,70 +220,74 @@ export async function POST(request: Request) {
         const addedVarKeys = new Set<string>();
         let varId = 0;
 
-        // Sort: Cair first, then Padat (mirrors RKO display order)
-        const sortedTabs = [...tabs].sort((a, b) => {
-            const aType = PRODUCT_TYPE_MAP[a.product_slug] || 'Padat';
-            const bType = PRODUCT_TYPE_MAP[b.product_slug] || 'Padat';
-            if (aType === 'Cair' && bType !== 'Cair') return -1;
-            if (aType !== 'Cair' && bType === 'Cair') return 1;
-            return 0;
-        });
+        allProductsList.forEach(prod => {
+            const prodTabs = (tabsData || []).filter((t: any) => t.product_slug === prod.slug);
 
-        sortedTabs.forEach((t: any) => {
-            const prodName = SLUG_NAME_MAP[t.product_slug] || t.product_slug;
-            const jenisProduk = PRODUCT_TYPE_MAP[t.product_slug] || 'Padat';
-            const satuan = jenisProduk === 'Cair' ? 'Liter' : 'Kg';
+            if (prodTabs.length > 0) {
+                prodTabs.forEach((t: any) => {
+                    const tabBomRows = (bomData || []).filter((b: any) => b.produksi_tab_id === t.id);
+                    const variantNames = new Set<string>();
 
-            const tabBomRows = bomRows.filter((b: any) => b.produksi_tab_id === t.id);
-            const variantNames = new Set<string>();
-            tabBomRows.forEach((b: any) => {
-                let v = (b.variant_name || '').trim();
-                if (!v && b.product_slug && b.product_slug.includes('::variant::')) {
-                    v = b.product_slug.split('::variant::')[1];
-                }
-                if (v && v !== 'default') variantNames.add(v);
-            });
+                    tabBomRows.forEach((b: any) => {
+                        let v = (b.variant_name || '').trim();
+                        if (!v && b.product_slug && b.product_slug.includes('::variant::')) {
+                            v = b.product_slug.split('::variant::')[1];
+                        }
+                        if (v && v !== 'default') variantNames.add(v);
+                    });
 
-            if (variantNames.size > 0) {
-                variantNames.forEach(vName => {
-                    const fullName = `${prodName} - ${vName}`;
-                    const key = `${t.product_slug}||${fullName}`;
-                    if (!addedVarKeys.has(key)) {
-                        addedVarKeys.add(key);
-                        varId++;
-                        officialVariants.push({
-                            id: varId,
-                            name: fullName,
-                            bentuk: jenisProduk,
-                            kemasan: vName,
-                            productSlug: t.product_slug,
-                            satuan,
-                            tabId: t.id,
+                    if (variantNames.size > 0) {
+                        variantNames.forEach(vName => {
+                            const key = `${prod.slug}||${prod.name}||${vName}`;
+                            if (!addedVarKeys.has(key)) {
+                                addedVarKeys.add(key);
+                                varId++;
+                                officialVariants.push({
+                                    id: varId,
+                                    name: prod.name,
+                                    bentuk: prod.bentuk,
+                                    kemasan: vName,
+                                    productSlug: prod.slug,
+                                    satuan: prod.satuan,
+                                    tabId: t.id,
+                                });
+                            }
                         });
+                    } else {
+                        const key = `${prod.slug}||${prod.name}`;
+                        if (!addedVarKeys.has(key)) {
+                            addedVarKeys.add(key);
+                            varId++;
+                            officialVariants.push({
+                                id: varId,
+                                name: prod.name,
+                                bentuk: prod.bentuk,
+                                kemasan: '',
+                                productSlug: prod.slug,
+                                satuan: prod.satuan,
+                                tabId: t.id,
+                            });
+                        }
                     }
                 });
             } else {
-                // Only add base entry if this slug has no variants at all
-                const slugHasVariants = officialVariants.some(v => v.productSlug === t.product_slug && v.kemasan);
-                if (!slugHasVariants) {
-                    const key = `${t.product_slug}||${prodName}`;
-                    if (!addedVarKeys.has(key)) {
-                        addedVarKeys.add(key);
-                        varId++;
-                        officialVariants.push({
-                            id: varId,
-                            name: prodName,
-                            bentuk: jenisProduk,
-                            kemasan: '',
-                            productSlug: t.product_slug,
-                            satuan,
-                            tabId: t.id,
-                        });
-                    }
+                // If product has no tabs configured yet, still add base entry
+                const key = `${prod.slug}||${prod.name}`;
+                if (!addedVarKeys.has(key)) {
+                    addedVarKeys.add(key);
+                    varId++;
+                    officialVariants.push({
+                        id: varId,
+                        name: prod.name,
+                        bentuk: prod.bentuk,
+                        kemasan: '',
+                        productSlug: prod.slug,
+                        satuan: prod.satuan,
+                        tabId: 0,
+                    });
                 }
             }
         });
-
 
         // Map batch codes to variant names if available
         const batchToVariantMap = new Map<string, string>();
@@ -187,14 +300,13 @@ export async function POST(request: Request) {
             }
         });
 
-        // Helper to check if a produksis row matches a specific variant
         const matchesVariantExplicit = (p: any, v: DynamicVariant): boolean => {
             if (p.product_slug !== v.productSlug) return false;
 
             const ket = (p.keterangan || '').toLowerCase();
             const kem = v.kemasan.toLowerCase().replace('@', '').trim();
 
-            if (!kem) return true; // base entry (no variant) matches all rows of this slug
+            if (!kem) return true;
             if (p.produksi_tab_id && p.produksi_tab_id === v.tabId) return true;
             if (ket.includes(kem)) return true;
             if (p.batch_kode && batchToVariantMap.has(p.batch_kode.toLowerCase())) {
@@ -205,18 +317,15 @@ export async function POST(request: Request) {
             return false;
         };
 
-        // Group variants by productSlug for smart Pengiriman Gudang (pg) allocation
         const slugVariantsMap = new Map<string, DynamicVariant[]>();
         officialVariants.forEach(v => {
             if (!slugVariantsMap.has(v.productSlug)) slugVariantsMap.set(v.productSlug, []);
             slugVariantsMap.get(v.productSlug)!.push(v);
         });
 
-        // Prepare realization tracking map per variant
         const resultRealization = new Map<number, { realProd: number; realPeng: number }>();
         officialVariants.forEach(v => resultRealization.set(v.id, { realProd: 0, realPeng: 0 }));
 
-        // 1) Calculate realisasiProduksi (bs > 0) per variant
         slugVariantsMap.forEach((variants, slug) => {
             const slugProduksis = periodProduksis.filter((p: any) => p.product_slug === slug);
             const bsBatchCodes = new Set<string>();
@@ -224,7 +333,6 @@ export async function POST(request: Request) {
             slugProduksis.forEach((p: any) => {
                 const bsVal = Number(p.bs) || 0;
                 if (bsVal > 0) {
-                    // Match to variant
                     const matchedVar = variants.find(v => matchesVariantExplicit(p, v)) || variants[0];
                     const tracking = resultRealization.get(matchedVar.id)!;
                     tracking.realProd += bsVal;
@@ -232,21 +340,17 @@ export async function POST(request: Request) {
                 }
             });
 
-            // 2) Calculate realisasiPengambilan (pg > 0) per variant
             slugProduksis.forEach((p: any) => {
                 const pgVal = Number(p.pg) || 0;
                 if (pgVal > 0) {
                     const isAlreadyBsBatch = p.batch_kode && bsBatchCodes.has(p.batch_kode.toLowerCase());
                     if (isAlreadyBsBatch) return;
 
-                    // Check explicit variant match
                     const explicitVar = variants.find(v => matchesVariantExplicit(p, v));
                     if (explicitVar) {
                         const tracking = resultRealization.get(explicitVar.id)!;
                         tracking.realPeng += pgVal;
                     } else {
-                        // Untagged pg row (e.g. pg = 102 for petro-gladiator-cair without variant tag)
-                        // Distribute pgVal across variants of this productSlug proportional to realProd (or stock)
                         const totalSlugProd = variants.reduce((sum, v) => sum + resultRealization.get(v.id)!.realProd, 0);
 
                         if (totalSlugProd > 0) {
@@ -260,7 +364,6 @@ export async function POST(request: Request) {
                                 remainingPg -= portion;
                             });
                         } else {
-                            // Default to first variant if 0 production
                             resultRealization.get(variants[0].id)!.realPeng += pgVal;
                         }
                     }
@@ -268,12 +371,12 @@ export async function POST(request: Request) {
             });
         });
 
-        const rkoSummary = officialVariants.map(v => {
+        const rkoSummary = officialVariants.map((v, idx) => {
             const tracking = resultRealization.get(v.id) || { realProd: 0, realPeng: 0 };
             const stokAkhir = Math.max(0, tracking.realProd - tracking.realPeng);
 
             return {
-                no: v.id,
+                no: idx + 1,
                 name: v.name,
                 bentuk: v.bentuk,
                 kemasan: v.kemasan,
@@ -284,7 +387,7 @@ export async function POST(request: Request) {
             };
         });
 
-        // 2. Filter Aktivitas Harian by exact selected date range [startDate, endDate]
+        // 2. Filter Aktivitas Harian by date range
         let filteredAktivitas: ActivityRecord[] = aktivitasData || [];
         if (startDate && endDate) {
             filteredAktivitas = filteredAktivitas.filter((a) => {
@@ -294,32 +397,31 @@ export async function POST(request: Request) {
             });
         }
 
-        // Intelligent Abbreviation & Keyword Classifier
         const classifyLine = (line: string, productSlug: string): string => {
             const l = line.toLowerCase();
             const slug = (productSlug || '').toLowerCase();
 
-            if (/\bpfs\b/i.test(line) || l.includes('petro fish') || l.includes('petrofish') || slug.includes('fish')) return 'petro-fish';
-            if (/\bpop\b/i.test(line) || l.includes('phonska') || l.includes('oca') || slug.includes('phonska') || slug.includes('oca')) return 'phonska-oca';
-            if (/\bpbf\b/i.test(line) || l.includes('bio fertil') || l.includes('biofertil') || slug.includes('bio') || slug.includes('fertil')) return 'bio-fertil';
-            if (/\bpgd.*cair\b/i.test(line) || (/\bpgd\b/i.test(line) && l.includes('cair')) || l.includes('gladiator cair') || slug.includes('gladiator-cair')) return 'petro-gladiator-cair';
-            if (/\bpgd\b/i.test(line) || l.includes('gladiator') || slug.includes('gladiator')) return 'petro-gladiator';
+            if (slug && dynamicProductsMap.has(slug)) {
+                return slug;
+            }
+
+            for (const prod of allProductsList) {
+                const pSlug = prod.slug.toLowerCase();
+                const pName = prod.name.toLowerCase();
+                if (l.includes(pName) || (pSlug.length > 3 && l.includes(pSlug))) {
+                    return prod.slug;
+                }
+            }
+
+            if (/\bpfs\b/i.test(line)) return 'petro-fish';
+            if (/\bpop\b/i.test(line)) return 'phonska-oca';
+            if (/\bpbf\b/i.test(line)) return 'bio-fertil';
+            if (/\bpgd.*cair\b/i.test(line)) return 'petro-gladiator-cair';
+            if (/\bpgd\b/i.test(line)) return 'petro-gladiator';
 
             return 'catatan-tambahan';
         };
 
-        // Helper to format any ISO or YYYY-MM-DD string to DD/MM/YYYY
-        function formatYmdToDmy(dateStr: string): string {
-            if (!dateStr) return '';
-            const cleanStr = dateStr.split('T')[0].split(' ')[0];
-            const parts = cleanStr.split('-');
-            if (parts.length === 3 && parts[0].length === 4) {
-                return `${parts[2]}/${parts[1]}/${parts[0]}`;
-            }
-            return dateStr;
-        }
-
-        // Smart Case-Insensitive & Punctuation-Insensitive Deduplication
         const normalizeText = (text: string) => text.toLowerCase().replace(/[^a-z0-9]/g, '');
 
         interface DateGroup {
@@ -328,15 +430,12 @@ export async function POST(request: Request) {
             bullets: string[];
         }
 
-        // Map per category: Map<tanggal, Map<normalized_text, original_text>>
         const rawGroupMap: Record<string, Map<string, Map<string, string>>> = {
-            'petro-fish': new Map(),
-            'phonska-oca': new Map(),
-            'bio-fertil': new Map(),
-            'petro-gladiator': new Map(),
-            'petro-gladiator-cair': new Map(),
             'catatan-tambahan': new Map(),
         };
+        allProductsList.forEach(p => {
+            rawGroupMap[p.slug] = new Map();
+        });
 
         filteredAktivitas.forEach((act) => {
             const desc = act.deskripsi || '';
@@ -345,7 +444,7 @@ export async function POST(request: Request) {
 
             lines.forEach(line => {
                 const targetCat = classifyLine(line, act.product_slug);
-                const catMap = rawGroupMap[targetCat];
+                const catMap = rawGroupMap[targetCat] || rawGroupMap['catatan-tambahan'];
 
                 if (!catMap.has(dateDmy)) {
                     catMap.set(dateDmy, new Map());
@@ -360,6 +459,7 @@ export async function POST(request: Request) {
         });
 
         const buildDateGroupsFromMap = (catMap: Map<string, Map<string, string>>): DateGroup[] => {
+            if (!catMap) return [];
             const dates = Array.from(catMap.keys()).sort((a, b) => {
                 const partsA = a.split('/').map(Number);
                 const partsB = b.split('/').map(Number);
@@ -378,28 +478,35 @@ export async function POST(request: Request) {
             }));
         };
 
-        const rawAktivitasGrouped: Record<string, DateGroup[]> = {
-            'petro-fish': buildDateGroupsFromMap(rawGroupMap['petro-fish']),
-            'phonska-oca': buildDateGroupsFromMap(rawGroupMap['phonska-oca']),
-            'bio-fertil': buildDateGroupsFromMap(rawGroupMap['bio-fertil']),
-            'petro-gladiator': buildDateGroupsFromMap(rawGroupMap['petro-gladiator']),
-            'petro-gladiator-cair': buildDateGroupsFromMap(rawGroupMap['petro-gladiator-cair']),
-            'catatan-tambahan': buildDateGroupsFromMap(rawGroupMap['catatan-tambahan']),
-        };
+        const rawAktivitasGrouped: Record<string, DateGroup[]> = {};
+        allProductsList.forEach(p => {
+            rawAktivitasGrouped[p.slug] = buildDateGroupsFromMap(rawGroupMap[p.slug]);
+        });
+        rawAktivitasGrouped['catatan-tambahan'] = buildDateGroupsFromMap(rawGroupMap['catatan-tambahan']);
 
         // 3. Gemini AI Summarization
         const activeApiKey = apiKey || process.env.GEMINI_API_KEY;
         let aiSummaries: Record<string, DateGroup[]> = { ...rawAktivitasGrouped };
 
         const formatCatForPrompt = (groups: DateGroup[]) => {
-            if (groups.length === 0) return 'Kosong';
+            if (!groups || groups.length === 0) return 'Kosong';
             return groups.map(g => `[Tanggal ${g.tanggal}: ${g.bullets.join('; ')}]`).join(' | ');
         };
 
-        const categoriesWithData = Object.keys(rawAktivitasGrouped).filter(k => rawAktivitasGrouped[k].length > 0);
+        const categoriesWithData = Object.keys(rawAktivitasGrouped).filter(k => (rawAktivitasGrouped[k] || []).length > 0);
 
         if (activeApiKey && categoriesWithData.length > 0) {
             try {
+                const promptLines = allProductsList.map(p =>
+                    `- ${p.name}: ${formatCatForPrompt(rawAktivitasGrouped[p.slug])}`
+                );
+                promptLines.push(`- Catatan Tambahan (General Maintenance/Lainnya): ${formatCatForPrompt(rawAktivitasGrouped['catatan-tambahan'])}`);
+
+                const jsonStructureParts = allProductsList.map(p =>
+                    `  "${p.slug.replace(/-/g, '_')}": [{ "tanggal": "DD/MM/YYYY", "bullets": ["poin 1"] }]`
+                );
+                jsonStructureParts.push(`  "catatan_tambahan": [{ "tanggal": "DD/MM/YYYY", "bullets": ["catatan 1"] }]`);
+
                 const prompt = `
 Anda adalah Manajer Operasional Kemitraan Produk Pengembangan PT Petrokimia Gresik.
 Rangkumlah logbook aktivitas harian berikut untuk periode ${startDate} s/d ${endDate} menjadi poin-poin ringkasan yang padat, jelas, formal, dan profesional dalam Bahasa Indonesia (maksimal 3-5 poin per tanggal per kategori).
@@ -410,25 +517,11 @@ PENTING UNTUK PENGELOMPOKAN TANGGAL & DEDUPLIKASI:
 - Kosongkan array jika tidak ada data untuk kategori tersebut.
 
 Data Logbook Aktivitas Raw:
-- Petro Fish: ${formatCatForPrompt(rawAktivitasGrouped['petro-fish'])}
-- Phonska Oca Plus: ${formatCatForPrompt(rawAktivitasGrouped['phonska-oca'])}
-- Petro Bio Fertil: ${formatCatForPrompt(rawAktivitasGrouped['bio-fertil'])}
-- Petro Gladiator Padat: ${formatCatForPrompt(rawAktivitasGrouped['petro-gladiator'])}
-- Petro Gladiator Cair: ${formatCatForPrompt(rawAktivitasGrouped['petro-gladiator-cair'])}
-- Catatan Tambahan (General Maintenance/Lainnya): ${formatCatForPrompt(rawAktivitasGrouped['catatan-tambahan'])}
+${promptLines.join('\n')}
 
 Berikan output HANYA JSON valid dengan struktur berikut:
 {
-  "petro_fish": [
-    { "tanggal": "DD/MM/YYYY", "bullets": ["poin 1", "poin 2"] }
-  ],
-  "phonska_oca": [],
-  "bio_fertil": [],
-  "petro_gladiator": [],
-  "petro_gladiator_cair": [],
-  "catatan_tambahan": [
-    { "tanggal": "DD/MM/YYYY", "bullets": ["catatan 1"] }
-  ]
+${jsonStructureParts.join(',\n')}
 }
 `;
 
@@ -491,14 +584,15 @@ Berikan output HANYA JSON valid dengan struktur berikut:
                             }).filter(g => g.tanggal && g.bullets.length > 0);
                         };
 
-                        aiSummaries = {
-                            'petro-fish': parseAiCategoryGroups(parsed.petro_fish || []),
-                            'phonska-oca': parseAiCategoryGroups(parsed.phonska_oca || []),
-                            'bio-fertil': parseAiCategoryGroups(parsed.bio_fertil || []),
-                            'petro-gladiator': parseAiCategoryGroups(parsed.petro_gladiator || []),
-                            'petro-gladiator-cair': parseAiCategoryGroups(parsed.petro_gladiator_cair || []),
-                            'catatan-tambahan': parseAiCategoryGroups(parsed.catatan_tambahan || []),
-                        };
+                        const parsedSummaries: Record<string, DateGroup[]> = {};
+                        allProductsList.forEach(p => {
+                            const keyUnder = p.slug.replace(/-/g, '_');
+                            const aiArr = parsed[p.slug] || parsed[keyUnder] || [];
+                            parsedSummaries[p.slug] = parseAiCategoryGroups(aiArr);
+                        });
+                        parsedSummaries['catatan-tambahan'] = parseAiCategoryGroups(parsed.catatan_tambahan || parsed['catatan-tambahan'] || []);
+
+                        aiSummaries = parsedSummaries;
                     }
                 } else {
                     aiSummaries = { ...rawAktivitasGrouped };
@@ -511,12 +605,20 @@ Berikan output HANYA JSON valid dengan struktur berikut:
             aiSummaries = { ...rawAktivitasGrouped };
         }
 
+        const productBlocks = allProductsList.map(p => ({
+            id: p.slug,
+            name: p.name,
+            image: p.image,
+            dateGroups: aiSummaries[p.slug] || []
+        }));
+
         return NextResponse.json({
             rkoYear: year,
             rkoSummary,
+            productBlocks,
             aiSummaries,
             productImageMap,
-            tableADateLabel: `01/01/${year} s/d ${formatYmdToDmy(endDate)}`,
+            tableADateLabel: endDate ? `01/01/${year} s/d ${formatYmdToDmy(endDate)}` : `01/01/${year}`,
             rawActivitiesCount: filteredAktivitas.length,
         });
 
