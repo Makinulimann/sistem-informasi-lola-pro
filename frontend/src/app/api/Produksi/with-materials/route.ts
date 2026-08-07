@@ -47,11 +47,42 @@ export async function POST(request: Request) {
         const dateStr = tanggalValid.includes('T') ? tanggalValid.split('T')[0] : tanggalValid;
         const targetUtc = new Date(`${dateStr}T00:00:00.000Z`);
 
+        const extractYmd = (val: any): string => {
+            if (!val) return '';
+            if (typeof val === 'string') {
+                const clean = val.split('T')[0].split(' ')[0];
+                const parts = clean.split('-');
+                if (parts.length === 3 && parts[0].length === 4) return clean;
+            }
+            const d = new Date(val);
+            if (isNaN(d.getTime())) return '';
+            return d.toISOString().split('T')[0];
+        };
+
+        const isSameDate = (d1: any, d2: any): boolean => {
+            const y1 = extractYmd(d1);
+            const y2 = extractYmd(d2);
+            if (y1 && y2 && y1 === y2) return true;
+            
+            const d1Obj = new Date(d1);
+            const d2Obj = new Date(d2);
+            if (!isNaN(d1Obj.getTime()) && !isNaN(d2Obj.getTime())) {
+                const local1 = new Date(d1Obj.getTime() + 7 * 3600000).toISOString().split('T')[0];
+                const local2 = new Date(d2Obj.getTime() + 7 * 3600000).toISOString().split('T')[0];
+                return local1 === local2 || local1 === y2 || y1 === local2;
+            }
+            return false;
+        };
+
         // 1. Upsert Produksi
+        const reqId = body.id || body.Id || body.produksiId;
         const { data: records } = await db.from<any>('produksis').select('*').eq('product_slug', productSlug).execute();
-        const existing = (records || []).find((r: any) => 
-            r.produksi_tab_id === tabId && new Date(r.tanggal).getTime() === targetUtc.getTime()
-        );
+        const existing = (records || []).find((r: any) => {
+            if (reqId && Number(r.id) === Number(reqId)) return true;
+            if (r.produksi_tab_id !== tabId) return false;
+            if (batchKodeValue && r.batch_kode && r.batch_kode.toLowerCase() === batchKodeValue.toLowerCase() && r.bs > 0) return true;
+            return isSameDate(r.tanggal, dateStr);
+        });
 
         if (existing) {
             const { error: updateErr } = await db.from<any>('produksis').update({

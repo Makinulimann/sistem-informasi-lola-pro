@@ -77,20 +77,20 @@ export async function GET(request: Request) {
         for (let day = 1; day <= daysInMonth; day++) {
             const date = new Date(tahun, bulan - 1, day);
 
-            const match = dbRecords.find((r: any) => {
+            const dayMatches = dbRecords.filter((r: any) => {
                 const localD = new Date(new Date(r.tanggal).getTime() + utcOffset);
                 return localD.getDate() === date.getDate() && localD.getMonth() === date.getMonth();
             });
 
-            const bs = match?.bs ?? 0;
-            const ps = match?.ps ?? 0;
-            const coa = match?.coa ?? 0;
-            const pg = match?.pg ?? 0;
-            const ket = match?.keterangan ?? "";
-            const id = match?.id ?? 0;
-            const batchKode = match?.batch_kode ?? "";
-            const psBatchKode = match?.ps_batch_kode ?? "";
-            const coaBatchKode = match?.coa_batch_kode ?? "";
+            const bs = dayMatches.reduce((max, r) => Math.max(max, Number(r.bs || 0)), 0);
+            const ps = dayMatches.reduce((max, r) => Math.max(max, Number(r.ps || 0)), 0);
+            const coa = dayMatches.reduce((max, r) => Math.max(max, Number(r.coa || 0)), 0);
+            const pg = dayMatches.reduce((max, r) => Math.max(max, Number(r.pg || 0)), 0);
+            const ket = dayMatches.map((r: any) => r.keterangan).filter(Boolean).join(' ') || "";
+            const id = dayMatches.find((r: any) => r.id)?.id ?? 0;
+            const batchKode = dayMatches.find((r: any) => r.batch_kode)?.batch_kode ?? "";
+            const psBatchKode = dayMatches.find((r: any) => r.ps_batch_kode)?.ps_batch_kode ?? "";
+            const coaBatchKode = dayMatches.find((r: any) => r.coa_batch_kode)?.coa_batch_kode ?? "";
 
             runningKumulatif += bs;
             runningStok += (bs - pg);
@@ -217,14 +217,44 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'Invalid date format.' }, { status: 400 });
         }
 
-        const utcOffset = 7 * 60 * 60 * 1000;
-        const targetUtc = new Date(localDate.getTime() - utcOffset);
+        const dateStr = tanggalValid.includes('T') ? tanggalValid.split('T')[0] : tanggalValid;
+        const targetUtc = new Date(`${dateStr}T00:00:00.000Z`);
+
+        const extractYmd = (val: any): string => {
+            if (!val) return '';
+            if (typeof val === 'string') {
+                const clean = val.split('T')[0].split(' ')[0];
+                const parts = clean.split('-');
+                if (parts.length === 3 && parts[0].length === 4) return clean;
+            }
+            const d = new Date(val);
+            if (isNaN(d.getTime())) return '';
+            return d.toISOString().split('T')[0];
+        };
+
+        const isSameDate = (d1: any, d2: any): boolean => {
+            const y1 = extractYmd(d1);
+            const y2 = extractYmd(d2);
+            if (y1 && y2 && y1 === y2) return true;
+            
+            const d1Obj = new Date(d1);
+            const d2Obj = new Date(d2);
+            if (!isNaN(d1Obj.getTime()) && !isNaN(d2Obj.getTime())) {
+                const local1 = new Date(d1Obj.getTime() + 7 * 3600000).toISOString().split('T')[0];
+                const local2 = new Date(d2Obj.getTime() + 7 * 3600000).toISOString().split('T')[0];
+                return local1 === local2 || local1 === y2 || y1 === local2;
+            }
+            return false;
+        };
 
         // Check for existing record
+        const reqId = body.id || body.Id || body.produksiId;
         const { data: existingArr } = await db.from<any>('produksis').select('*').eq('produksi_tab_id', tabId).execute();
         const existing = (existingArr || []).find((r: any) => {
-            const existingDate = new Date(r.tanggal);
-            return existingDate.getTime() === targetUtc.getTime();
+            if (reqId && Number(r.id) === Number(reqId)) return true;
+            if (r.produksi_tab_id !== tabId) return false;
+            if (batchKodeValue && r.batch_kode && r.batch_kode.toLowerCase() === batchKodeValue.toLowerCase() && r.bs > 0) return true;
+            return isSameDate(r.tanggal, dateStr);
         });
 
         if (existing) {

@@ -6,8 +6,13 @@ import {
     Calendar,
     Plus,
     Trash2,
-    Download
+    Download,
+    Upload,
+    Image as ImageIcon,
+    FileSpreadsheet,
+    RotateCcw
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { AppButton } from '@/components/ui/app-button';
 import { useToast } from '@/components/ui/toast';
 import { sidebarService } from '@/lib/sidebarService';
@@ -85,6 +90,19 @@ interface ProductBlock {
     dateGroups: DateGroup[];
 }
 
+interface PabrikDateGroup {
+    id: string;
+    tanggal: string;
+    bullets: string[];
+}
+
+interface PabrikPlanBlock {
+    id: string;
+    name: string;
+    image: string;
+    dateGroups: PabrikDateGroup[];
+}
+
 export default function TemplateLaporanPage() {
     const toast = useToast();
 
@@ -98,6 +116,138 @@ export default function TemplateLaporanPage() {
     const [rkoYear, setRkoYear] = useState<number>(2026);
     const [updateDate, setUpdateDate] = useState<string>('');
     const [tableADateLabel, setTableADateLabel] = useState<string>('01/01/2026');
+
+    // Optional Section: Update Progres Pabrik dan Produksi
+    const [isPabrikProgressActive, setIsPabrikProgressActive] = useState<boolean>(false);
+    const [pabrikPlanBlocks, setPabrikPlanBlocks] = useState<PabrikPlanBlock[]>([
+        {
+            id: 'pabrik-plan-1',
+            name: 'Pabrik Gladiators / NPK',
+            image: '/images/petro-gladiator.webp',
+            dateGroups: [
+                {
+                    id: 'pabrik-group-1',
+                    tanggal: '01/08/2026 s/d 07/08/2026',
+                    bullets: [
+                        'Pembersihan filter pompa limbah & maintenance rutin.',
+                        'Trial perbanyakan formula baru.'
+                    ]
+                }
+            ]
+        }
+    ]);
+
+    /* ── Handlers for Pabrik Plan Progress ── */
+    const handleAddPabrikPlanBlock = () => {
+        const defaultDate = startDate || formatYmdToDmy(new Date().toISOString().split('T')[0]);
+        const newBlock: PabrikPlanBlock = {
+            id: `pabrik-plan-${Date.now()}`,
+            name: 'Nama Plan Baru...',
+            image: '',
+            dateGroups: [
+                {
+                    id: `pabrik-group-${Date.now()}`,
+                    tanggal: defaultDate,
+                    bullets: ['Aktivitas progres baru...']
+                }
+            ]
+        };
+        setPabrikPlanBlocks(prev => [...prev, newBlock]);
+    };
+
+    const handleDeletePabrikPlanBlock = (planId: string) => {
+        setPabrikPlanBlocks(prev => prev.filter(p => p.id !== planId));
+    };
+
+    const handlePabrikPlanImageUpload = (planId: string, file: File) => {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const dataUrl = e.target?.result as string;
+            if (dataUrl) {
+                setPabrikPlanBlocks(prev => prev.map(p => p.id === planId ? { ...p, image: dataUrl } : p));
+            }
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const handlePabrikPlanNameChange = (planId: string, name: string) => {
+        setPabrikPlanBlocks(prev => prev.map(p => p.id === planId ? { ...p, name } : p));
+    };
+
+    const handlePabrikDateGroupChange = (planId: string, groupId: string, field: 'tanggal', val: string) => {
+        setPabrikPlanBlocks(prev => prev.map(p => {
+            if (p.id !== planId) return p;
+            return {
+                ...p,
+                dateGroups: p.dateGroups.map(g => g.id === groupId ? { ...g, [field]: val } : g)
+            };
+        }));
+    };
+
+    const handlePabrikBulletChange = (planId: string, groupId: string, bulletIdx: number, val: string) => {
+        setPabrikPlanBlocks(prev => prev.map(p => {
+            if (p.id !== planId) return p;
+            return {
+                ...p,
+                dateGroups: p.dateGroups.map(g => {
+                    if (g.id !== groupId) return g;
+                    const newBullets = [...g.bullets];
+                    newBullets[bulletIdx] = val;
+                    return { ...g, bullets: newBullets };
+                })
+            };
+        }));
+    };
+
+    const handleAddPabrikBulletToGroup = (planId: string, groupId: string) => {
+        setPabrikPlanBlocks(prev => prev.map(p => {
+            if (p.id !== planId) return p;
+            return {
+                ...p,
+                dateGroups: p.dateGroups.map(g => {
+                    if (g.id !== groupId) return g;
+                    return { ...g, bullets: [...g.bullets, 'Aktivitas progres baru...'] };
+                })
+            };
+        }));
+    };
+
+    const handleDeletePabrikBullet = (planId: string, groupId: string, bulletIdx: number) => {
+        setPabrikPlanBlocks(prev => prev.map(p => {
+            if (p.id !== planId) return p;
+            return {
+                ...p,
+                dateGroups: p.dateGroups.map(g => {
+                    if (g.id !== groupId) return g;
+                    return { ...g, bullets: g.bullets.filter((_, i) => i !== bulletIdx) };
+                })
+            };
+        }));
+    };
+
+    const handleAddPabrikDateGroup = (planId: string) => {
+        const defaultDate = startDate || formatYmdToDmy(new Date().toISOString().split('T')[0]);
+        setPabrikPlanBlocks(prev => prev.map(p => {
+            if (p.id !== planId) return p;
+            const newGroup: PabrikDateGroup = {
+                id: `pabrik-group-${Date.now()}`,
+                tanggal: defaultDate,
+                bullets: ['Aktivitas progres baru...']
+            };
+            return { ...p, dateGroups: [...p.dateGroups, newGroup] };
+        }));
+    };
+
+    const handleDeletePabrikDateGroup = (planId: string, groupId: string) => {
+        setPabrikPlanBlocks(prev => prev.map(p => {
+            if (p.id !== planId) return p;
+            return {
+                ...p,
+                dateGroups: p.dateGroups.filter(g => g.id !== groupId)
+            };
+        }));
+    };
 
     // State for generated preview
     const [hasGenerated, setHasGenerated] = useState<boolean>(false);
@@ -225,8 +375,29 @@ export default function TemplateLaporanPage() {
                 .filter((p) => !NON_PRODUCT_SLUGS.has(p.id.toLowerCase()));
 
             if (activeProducts.length > 0) {
-                setProductBlocks(activeProducts);
                 setAvailableProductsCatalog(activeProducts);
+                setProductBlocks((prev) => {
+                    // If prev already has dateGroups with data, preserve them!
+                    const hasDataInPrev = prev.some((p) => p.dateGroups && p.dateGroups.length > 0);
+                    if (hasDataInPrev) {
+                        return prev;
+                    }
+                    // Check if localStorage has saved productBlocks with dateGroups
+                    if (typeof window !== 'undefined') {
+                        try {
+                            const savedDraftStr = localStorage.getItem('sipp_template_laporan_draft_v1');
+                            if (savedDraftStr) {
+                                const draft = JSON.parse(savedDraftStr);
+                                if (draft && draft.productBlocks && draft.productBlocks.some((p: any) => p.dateGroups && p.dateGroups.length > 0)) {
+                                    return draft.productBlocks;
+                                }
+                            }
+                        } catch (e) {
+                            console.error('Error reading draft in loadInitialProducts:', e);
+                        }
+                    }
+                    return activeProducts;
+                });
             }
         } catch (err) {
             console.error('Failed to load initial products for report template:', err);
@@ -238,6 +409,93 @@ export default function TemplateLaporanPage() {
     }, [loadInitialProducts]);
 
     const [catatanTambahanBullets, setCatatanTambahanBullets] = useState<string[]>([]);
+
+    const DRAFT_STORAGE_KEY = 'sipp_template_laporan_draft_v1';
+    const isRestoredRef = useRef<boolean>(false);
+
+    /* ─── Auto-Restore Draft from LocalStorage on Mount (Strictly Once) ─── */
+    useEffect(() => {
+        if (isRestoredRef.current) return;
+        isRestoredRef.current = true;
+
+        try {
+            const savedDraftStr = localStorage.getItem(DRAFT_STORAGE_KEY);
+            if (savedDraftStr) {
+                const draft = JSON.parse(savedDraftStr);
+                if (draft && (draft.hasGenerated || draft.startDate || draft.endDate)) {
+                    if (draft.startDate !== undefined) setStartDate(draft.startDate);
+                    if (draft.endDate !== undefined) setEndDate(draft.endDate);
+                    if (draft.rkoYear !== undefined) setRkoYear(draft.rkoYear);
+                    if (draft.updateDate !== undefined) setUpdateDate(draft.updateDate);
+                    if (draft.tableADateLabel !== undefined) setTableADateLabel(draft.tableADateLabel);
+                    if (draft.hasGenerated !== undefined) setHasGenerated(draft.hasGenerated);
+                    if (draft.rkoTable && Array.isArray(draft.rkoTable)) setRkoTable(draft.rkoTable);
+                    if (draft.productBlocks && Array.isArray(draft.productBlocks) && draft.productBlocks.length > 0) {
+                        setProductBlocks(draft.productBlocks);
+                    }
+                    if (draft.catatanTambahanBullets && Array.isArray(draft.catatanTambahanBullets)) setCatatanTambahanBullets(draft.catatanTambahanBullets);
+                    if (draft.isPabrikProgressActive !== undefined) setIsPabrikProgressActive(draft.isPabrikProgressActive);
+                    if (draft.pabrikPlanBlocks && Array.isArray(draft.pabrikPlanBlocks)) setPabrikPlanBlocks(draft.pabrikPlanBlocks);
+                }
+            }
+        } catch (err) {
+            console.error('Failed to restore draft from localStorage:', err);
+        }
+    }, []);
+
+    /* ─── Auto-Save Draft to LocalStorage whenever state changes ─── */
+    useEffect(() => {
+        if (!isRestoredRef.current) return;
+        try {
+            const draftPayload = {
+                startDate,
+                endDate,
+                rkoYear,
+                updateDate,
+                tableADateLabel,
+                hasGenerated,
+                rkoTable,
+                productBlocks,
+                catatanTambahanBullets,
+                isPabrikProgressActive,
+                pabrikPlanBlocks,
+                lastSavedAt: new Date().toISOString()
+            };
+            localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draftPayload));
+        } catch (err) {
+            console.error('Failed to save draft to localStorage:', err);
+        }
+    }, [
+        startDate,
+        endDate,
+        rkoYear,
+        updateDate,
+        tableADateLabel,
+        hasGenerated,
+        rkoTable,
+        productBlocks,
+        catatanTambahanBullets,
+        isPabrikProgressActive,
+        pabrikPlanBlocks
+    ]);
+
+    /* ─── Reset Draft Handler ─── */
+    const handleResetDraft = () => {
+        try {
+            localStorage.removeItem(DRAFT_STORAGE_KEY);
+            setHasGenerated(false);
+            setCatatanTambahanBullets([]);
+            setIsPabrikProgressActive(false);
+            if (availableProductsCatalog.length > 0) {
+                setProductBlocks(availableProductsCatalog.map(p => ({ ...p, dateGroups: [] })));
+            } else {
+                loadInitialProducts();
+            }
+            toast.success('Draft Dibersihkan', 'Draft laporan lokal berhasil di-reset ke kondisi awal.');
+        } catch (err) {
+            console.error('Failed to reset draft:', err);
+        }
+    };
 
     /* ── Generate Report via API ── */
     const handleGenerate = async () => {
@@ -475,37 +733,83 @@ export default function TemplateLaporanPage() {
                                 <img src="${p.image}" alt="${p.name}" style="width: 65px; height: 75px; object-fit: contain; margin-bottom: 4px;" />
                                 <div style="font-weight: bold; font-size: 8.5pt;">${p.name.replace(/\s*\([^)]*\)/g, '')}</div>
                             </td>
-                            <td style="border: 1px solid #000; padding: 8px; text-align: center; vertical-align: top; font-size: 8.5pt; width: 120px;">
-                                
-                            </td>
-                            <td style="border: 1px solid #000; padding: 8px; vertical-align: top;">
-                                
-                            </td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align: center; vertical-align: top; font-size: 8.5pt; width: 120px;"></td>
+                            <td style="border: 1px solid #000; padding: 8px; vertical-align: top;"></td>
                         </tr>
                     `;
                 }
 
-                return groups.map((g, gIdx) => `
-                    <tr>
-                        ${gIdx === 0 ? `
-                            <td rowspan="${groups.length}" style="border: 1px solid #000; padding: 8px; width: 150px; text-align: center; vertical-align: top; background: #fafafa;">
-                                <img src="${p.image}" alt="${p.name}" style="width: 65px; height: 75px; object-fit: contain; margin-bottom: 4px;" />
-                                <div style="font-weight: bold; font-size: 8.5pt;">${p.name.replace(/\s*\([^)]*\)/g, '')}</div>
+                return groups.map((g, gIdx) => {
+                    const firstCol = gIdx === 0 ? `
+                        <td rowspan="${groups.length}" style="border: 1px solid #000; padding: 8px; width: 150px; text-align: center; vertical-align: top; background: #fafafa;">
+                            <img src="${p.image}" alt="${p.name}" style="width: 65px; height: 75px; object-fit: contain; margin-bottom: 4px;" />
+                            <div style="font-weight: bold; font-size: 8.5pt;">${p.name.replace(/\s*\([^)]*\)/g, '')}</div>
+                        </td>
+                    ` : '';
+                    const bulletList = g.bullets.length === 0 ? '' : `
+                        <ul style="margin: 0; padding-left: 16px; font-size: 8.5pt; line-height: 1.5;">
+                            ${g.bullets.map(b => `<li>${b}</li>`).join('')}
+                        </ul>
+                    `;
+                    return `
+                        <tr>
+                            ${firstCol}
+                            <td style="border: 1px solid #000; padding: 8px; text-align: center; vertical-align: top; font-size: 8.5pt; width: 120px; font-weight: bold;">
+                                ${g.tanggal}
                             </td>
-                        ` : ''}
-                        <td style="border: 1px solid #000; padding: 8px; text-align: center; vertical-align: top; font-size: 8.5pt; width: 120px; font-weight: bold;">
-                            ${g.tanggal}
-                        </td>
-                        <td style="border: 1px solid #000; padding: 8px; vertical-align: top;">
-                            ${g.bullets.length === 0 ? '' : `
-                                <ul style="margin: 0; padding-left: 16px; font-size: 8.5pt; line-height: 1.5;">
-                                    ${g.bullets.map(b => `<li>${b}</li>`).join('')}
-                                </ul>
-                            `}
-                        </td>
-                    </tr>
-                `).join('');
+                            <td style="border: 1px solid #000; padding: 8px; vertical-align: top;">
+                                ${bulletList}
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
             }).join('');
+
+            let pabrikRowsHtml = '';
+            if (isPabrikProgressActive && pabrikPlanBlocks.length > 0) {
+                pabrikRowsHtml = pabrikPlanBlocks.map(p => {
+                    const groups = p.dateGroups || [];
+
+                    if (groups.length === 0) {
+                        const imgHtml = p.image ? `<img src="${p.image}" alt="${p.name}" style="width: 65px; height: 75px; object-fit: contain; margin-bottom: 4px;" />` : '';
+                        return `
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 8px; width: 150px; text-align: center; vertical-align: top; background: #fafafa;">
+                                    ${imgHtml}
+                                    <div style="font-weight: bold; font-size: 8.5pt;">${p.name}</div>
+                                </td>
+                                <td style="border: 1px solid #000; padding: 8px; text-align: center; vertical-align: top; font-size: 8.5pt; width: 120px;"></td>
+                                <td style="border: 1px solid #000; padding: 8px; vertical-align: top;"></td>
+                            </tr>
+                        `;
+                    }
+
+                    return groups.map((g, gIdx) => {
+                        const firstCol = gIdx === 0 ? `
+                            <td rowspan="${groups.length}" style="border: 1px solid #000; padding: 8px; width: 150px; text-align: center; vertical-align: top; background: #fafafa;">
+                                ${p.image ? `<img src="${p.image}" alt="${p.name}" style="width: 65px; height: 75px; object-fit: contain; margin-bottom: 4px;" />` : ''}
+                                <div style="font-weight: bold; font-size: 8.5pt;">${p.name}</div>
+                            </td>
+                        ` : '';
+                        const bulletList = g.bullets.length === 0 ? '' : `
+                            <ul style="margin: 0; padding-left: 16px; font-size: 8.5pt; line-height: 1.5;">
+                                ${g.bullets.map(b => `<li>${b}</li>`).join('')}
+                            </ul>
+                        `;
+                        return `
+                            <tr>
+                                ${firstCol}
+                                <td style="border: 1px solid #000; padding: 8px; text-align: center; vertical-align: top; font-size: 8.5pt; width: 120px; font-weight: bold;">
+                                    ${g.tanggal}
+                                </td>
+                                <td style="border: 1px solid #000; padding: 8px; vertical-align: top;">
+                                    ${bulletList}
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
+                }).join('');
+            }
 
             const html = `
                 <!DOCTYPE html>
@@ -583,7 +887,27 @@ export default function TemplateLaporanPage() {
                         </tbody>
                     </table>
 
-                    <div style="font-weight: bold; margin: 12px 0 6px 0; font-size: 9pt;">Catatan Tambahan & Maintenance General:</div>
+                    ${isPabrikProgressActive && pabrikPlanBlocks.length > 0 ? `
+                        <div class="section-title">
+                            <span>C. UPDATE PROGRES PABRIK DAN PRODUKSI</span>
+                            <span style="font-size: 8pt; font-weight: normal; font-style: italic;">(periode: ${startDate} s/d ${endDate})</span>
+                        </div>
+
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width: 150px;">Plan / Unit</th>
+                                    <th style="width: 120px;">Tanggal</th>
+                                    <th>Poin Aktivitas Progres</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${pabrikRowsHtml}
+                            </tbody>
+                        </table>
+                    ` : ''}
+
+                    <div style="font-weight: bold; margin: 12px 0 6px 0; font-size: 9pt;">Catatan Tambahan:</div>
                     <table>
                         <tbody>
                             <tr>
@@ -613,6 +937,271 @@ export default function TemplateLaporanPage() {
         }
     };
 
+    /* ── Export Excel (.xlsx / .xls) ── */
+    const handleExportExcel = () => {
+        if (!hasGenerated) {
+            toast.warning('Perhatian', 'Generate laporan terlebih dahulu sebelum melakukan export Excel.');
+            return;
+        }
+        try {
+            const groupedRko = groupRkoTable(rkoTable);
+
+            const rkoRowsHtml = groupedRko.flatMap((group, groupIdx) => {
+                return group.rows.map((r, rowIdx) => `
+                    <tr>
+                        ${rowIdx === 0 ? `
+                            <td rowspan="${group.rows.length}" align="center" valign="middle" style="border: 1px solid #000; text-align: center; vertical-align: middle;">${groupIdx + 1}</td>
+                            <td rowspan="${group.rows.length}" valign="middle" style="border: 1px solid #000; font-weight: bold; vertical-align: middle;">${group.productName}</td>
+                            <td rowspan="${group.rows.length}" align="center" valign="middle" style="border: 1px solid #000; text-align: center; vertical-align: middle;">${group.bentuk}</td>
+                        ` : ''}
+                        <td align="center" style="border: 1px solid #000; text-align: center;">${r.kemasan}</td>
+                        <td align="right" style="border: 1px solid #000; text-align: right; mso-number-format:'\\#\\,\\#\\#0';">${(r.realisasiProduksi || 0).toLocaleString('id-ID')}</td>
+                        <td align="right" style="border: 1px solid #000; text-align: right; mso-number-format:'\\#\\,\\#\\#0';">${(r.realisasiPengambilan || 0).toLocaleString('id-ID')}</td>
+                        <td align="right" style="border: 1px solid #000; text-align: right; font-weight: bold; background-color: #ecfdf5; mso-number-format:'\\#\\,\\#\\#0';">${(r.stokAkhir || 0).toLocaleString('id-ID')}</td>
+                        ${rowIdx === 0 ? `
+                            <td rowspan="${group.rows.length}" align="center" valign="middle" style="border: 1px solid #000; text-align: center; vertical-align: middle;">${group.satuan}</td>
+                        ` : ''}
+                    </tr>
+                `);
+            }).join('');
+
+            const productRowsHtml = productBlocks.map(p => {
+                const groups = p.dateGroups || [];
+
+                if (groups.length === 0) {
+                    return `
+                        <tr>
+                            <td style="border: 1px solid #000; padding: 8px; width: 160px; text-align: center; vertical-align: top; background-color: #fafafa;">
+                                <img src="${p.image}" alt="${p.name}" width="55" height="65" style="object-fit: contain; margin-bottom: 4px;" /><br/>
+                                <b>${p.name.replace(/\s*\([^)]*\)/g, '')}</b>
+                            </td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align: center; vertical-align: top; width: 120px; font-weight: bold;">-</td>
+                            <td colSpan="6" style="border: 1px solid #000; padding: 8px; vertical-align: top; font-style: italic; color: #666;">Tidak ada aktivitas harian pada periode terpilih.</td>
+                        </tr>
+                    `;
+                }
+
+                return groups.map((g, gIdx) => {
+                    const firstCol = gIdx === 0 ? `
+                        <td rowspan="${groups.length}" style="border: 1px solid #000; padding: 8px; width: 160px; text-align: center; vertical-align: top; background-color: #fafafa;">
+                            <img src="${p.image}" alt="${p.name}" width="55" height="65" style="object-fit: contain; margin-bottom: 4px;" /><br/>
+                            <b>${p.name.replace(/\s*\([^)]*\)/g, '')}</b>
+                        </td>
+                    ` : '';
+                    const bulletList = g.bullets.length === 0 ? '<i style="color:#888;">Belum ada aktivitas.</i>' : `
+                        <ul style="margin: 0; padding-left: 16px; line-height: 1.5;">
+                            ${g.bullets.map(b => `<li>${b}</li>`).join('')}
+                        </ul>
+                    `;
+                    return `
+                        <tr>
+                            ${firstCol}
+                            <td style="border: 1px solid #000; padding: 8px; text-align: center; vertical-align: top; width: 120px; font-weight: bold;">
+                                ${g.tanggal}
+                            </td>
+                            <td colSpan="6" style="border: 1px solid #000; padding: 8px; vertical-align: top;">
+                                ${bulletList}
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }).join('');
+
+            let pabrikRowsHtml = '';
+            if (isPabrikProgressActive && pabrikPlanBlocks.length > 0) {
+                pabrikRowsHtml = pabrikPlanBlocks.map(p => {
+                    const groups = p.dateGroups || [];
+
+                    if (groups.length === 0) {
+                        const imgHtml = p.image ? `<img src="${p.image}" alt="${p.name}" width="55" height="65" style="object-fit: contain; margin-bottom: 4px;" /><br/>` : '';
+                        return `
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 8px; width: 160px; text-align: center; vertical-align: top; background-color: #fafafa;">
+                                    ${imgHtml}
+                                    <b>${p.name}</b>
+                                </td>
+                                <td style="border: 1px solid #000; padding: 8px; text-align: center; vertical-align: top; width: 120px; font-weight: bold;">-</td>
+                                <td colSpan="6" style="border: 1px solid #000; padding: 8px; vertical-align: top; font-style: italic; color: #666;">Tidak ada poin aktivitas.</td>
+                            </tr>
+                        `;
+                    }
+
+                    return groups.map((g, gIdx) => {
+                        const firstCol = gIdx === 0 ? `
+                            <td rowspan="${groups.length}" style="border: 1px solid #000; padding: 8px; width: 160px; text-align: center; vertical-align: top; background-color: #fafafa;">
+                                ${p.image ? `<img src="${p.image}" alt="${p.name}" width="55" height="65" style="object-fit: contain; margin-bottom: 4px;" /><br/>` : ''}
+                                <b>${p.name}</b>
+                            </td>
+                        ` : '';
+                        const bulletList = g.bullets.length === 0 ? '<i style="color:#888;">Belum ada aktivitas.</i>' : `
+                            <ul style="margin: 0; padding-left: 16px; line-height: 1.5;">
+                                ${g.bullets.map(b => `<li>${b}</li>`).join('')}
+                            </ul>
+                        `;
+                        return `
+                            <tr>
+                                ${firstCol}
+                                <td style="border: 1px solid #000; padding: 8px; text-align: center; vertical-align: top; width: 120px; font-weight: bold;">
+                                    ${g.tanggal}
+                                </td>
+                                <td colSpan="6" style="border: 1px solid #000; padding: 8px; vertical-align: top;">
+                                    ${bulletList}
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
+                }).join('');
+            }
+
+            const origin = typeof window !== 'undefined' ? window.location.origin : '';
+            const logoUrl = `${origin}/images/logo-PG.webp`;
+
+            const excelHtml = `
+                <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+                <head>
+                    <meta charset="utf-8">
+                    <!--[if gte mso 9]>
+                    <xml>
+                     <x:ExcelWorkbook>
+                      <x:ExcelWorksheets>
+                       <x:ExcelWorksheet>
+                        <x:Name>Laporan KPP</x:Name>
+                        <x:WorksheetOptions>
+                         <x:DisplayGridlines/>
+                        </x:WorksheetOptions>
+                       </x:ExcelWorksheet>
+                      </x:ExcelWorksheets>
+                     </x:ExcelWorkbook>
+                    </xml>
+                    <![endif]-->
+                    <style>
+                        body { font-family: Arial, sans-serif; font-size: 9pt; color: #000000; }
+                        table { width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 8.5pt; }
+                        th { border: 1px solid #000000; padding: 6px; background-color: #f1f5f9; text-align: center; font-weight: bold; }
+                        td { border: 1px solid #000000; padding: 5px; vertical-align: top; }
+                        .section-title { font-size: 9.5pt; font-weight: bold; background-color: #e2e8f0; padding: 6px; border: 1px solid #000000; }
+                        .doc-title { text-align: center; font-size: 12pt; font-weight: bold; text-transform: uppercase; margin: 10px 0; }
+                    </style>
+                </head>
+                <body>
+                    <table style="border: none; margin-bottom: 10px;">
+                        <tr>
+                            <td style="border: none; vertical-align: middle;">
+                                <img src="${logoUrl}" alt="Petrokimia Gresik" height="42" />
+                            </td>
+                            <td style="border: none; text-align: right; vertical-align: middle;" colSpan="7">
+                                <div style="font-size: 11pt; font-weight: bold;">PT PETROKIMIA GRESIK</div>
+                                <div style="font-size: 8.5pt; color: #333333;">Sistem Informasi Pengelolaan Produk</div>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <div class="doc-title">LAPORAN KEMITRAAN PRODUK PENGEMBANGAN</div>
+                    <div style="text-align: right; font-weight: bold; font-size: 8.5pt; margin-bottom: 8px;">Up Date: ${updateDate || '-'}</div>
+
+                    <table style="border: none; margin-bottom: 4px;">
+                        <tr>
+                            <td class="section-title" colSpan="8">
+                                A. INFORMASI PRODUKSI DAN STOK PRODUK KPP TAHUN ${rkoYear} <i style="font-weight: normal; font-size: 8pt;">(periode: ${tableADateLabel})</i>
+                            </td>
+                        </tr>
+                    </table>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th rowSpan="2" style="width: 35px;">No</th>
+                                <th rowSpan="2" style="width: 160px;">Nama Produk</th>
+                                <th rowSpan="2" style="width: 80px;">Bentuk</th>
+                                <th rowSpan="2" style="width: 80px;">Kemasan</th>
+                                <th rowSpan="2" style="width: 120px;">Realisasi Produksi</th>
+                                <th rowSpan="2" style="width: 130px;">Realisasi Pengambilan</th>
+                                <th rowSpan="2" style="width: 100px;">Stok Akhir</th>
+                                <th rowSpan="2" style="width: 80px;">Satuan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rkoRowsHtml}
+                        </tbody>
+                    </table>
+
+                    <table style="border: none; margin-top: 12px; margin-bottom: 4px;">
+                        <tr>
+                            <td class="section-title" colSpan="8">
+                                B. UPDATE PROGRES & RANGKUMAN AKTIVITAS <i style="font-weight: normal; font-size: 8pt;">(periode: ${startDate || '-'} s/d ${endDate || '-'})</i>
+                            </td>
+                        </tr>
+                    </table>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 160px;">Produk</th>
+                                <th style="width: 120px;">Tanggal</th>
+                                <th colSpan="6">Hasil Rangkuman Aktivitas</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${productRowsHtml}
+                        </tbody>
+                    </table>
+
+                    ${isPabrikProgressActive && pabrikPlanBlocks.length > 0 ? `
+                        <table style="border: none; margin-top: 12px; margin-bottom: 4px;">
+                            <tr>
+                                <td class="section-title" colSpan="8">
+                                    C. UPDATE PROGRES PABRIK DAN PRODUKSI <i style="font-weight: normal; font-size: 8pt;">(periode: ${startDate || '-'} s/d ${endDate || '-'})</i>
+                                </td>
+                            </tr>
+                        </table>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width: 160px;">Plan / Unit</th>
+                                    <th style="width: 120px;">Tanggal</th>
+                                    <th colSpan="6">Poin Aktivitas Progres</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${pabrikRowsHtml}
+                            </tbody>
+                        </table>
+                    ` : ''}
+
+                    <div style="font-weight: bold; margin: 12px 0 4px 0; font-size: 9pt;">Catatan Tambahan:</div>
+                    <table>
+                        <tbody>
+                            <tr>
+                                <td colSpan="8" style="padding: 8px; vertical-align: top;">
+                                    ${catatanTambahanBullets.length === 0 ? '<div style="color: #666; font-style: italic;">Tidak ada catatan tambahan pada periode terpilih.</div>' : `
+                                        <ul style="margin: 0; padding-left: 16px; font-size: 8.5pt; line-height: 1.5;">
+                                            ${catatanTambahanBullets.map(b => `<li>${b}</li>`).join('')}
+                                        </ul>
+                                    `}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </body>
+                </html>
+            `;
+
+            const blob = new Blob([excelHtml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+            const fileNameDate = updateDate ? updateDate.replace(/[/\\?%*:|"<>]/g, '-') : 'Terbaru';
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Laporan_Kemitraan_Produk_Pengembangan_${fileNameDate}.xls`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            toast.success('Berhasil Export Excel', 'File Excel dengan format rapi berhasil diunduh.');
+        } catch (err: any) {
+            console.error('Export Excel failed:', err);
+            toast.error('Gagal Export Excel', err.message || 'Terjadi kesalahan saat mengekspor Excel.');
+        }
+    };
+
     return (
         <div className="space-y-6 pb-12">
             {/* Breadcrumb */}
@@ -637,11 +1226,27 @@ export default function TemplateLaporanPage() {
                 <div className="flex items-center gap-2 flex-wrap">
                     <AppButton
                         variant="secondary"
+                        onClick={handleResetDraft}
+                        icon={<RotateCcw className="size-4 text-gray-600" />}
+                        title="Reset editan draft lokal dan kembalikan ke kondisi awal"
+                    >
+                        Reset Draft
+                    </AppButton>
+                    <AppButton
+                        variant="secondary"
                         onClick={handleExportPDF}
                         disabled={!hasGenerated}
                         icon={<Download className="size-4 text-red-600" />}
                     >
                         Export PDF
+                    </AppButton>
+                    <AppButton
+                        variant="secondary"
+                        onClick={handleExportExcel}
+                        disabled={!hasGenerated}
+                        icon={<FileSpreadsheet className="size-4 text-emerald-600" />}
+                    >
+                        Export Excel
                     </AppButton>
                     <AppButton
                         variant="primary"
@@ -1068,6 +1673,248 @@ export default function TemplateLaporanPage() {
                                     </tbody>
                                 </table>
                             </div>
+                        </div>
+
+                        {/* Section C: Update Progres Pabrik dan Produksi (Opsional) */}
+                        <div className="pt-4 border-t border-gray-200 space-y-3">
+                            <div className="flex items-center justify-between bg-slate-100 px-3 py-2 border-l-4 border-slate-700 rounded-xs">
+                                <div className="flex items-center gap-2">
+                                    <h3 className="text-xs sm:text-sm font-bold text-gray-900 uppercase">
+                                        C. UPDATE PROGRES PABRIK DAN PRODUKSI <span className="text-[11px] font-normal text-gray-500 lowercase">(opsional)</span>
+                                    </h3>
+                                </div>
+                                <button
+                                    onClick={() => setIsPabrikProgressActive(!isPabrikProgressActive)}
+                                    className={`text-xs font-semibold px-3 py-1 rounded transition-colors cursor-pointer flex items-center gap-1.5 ${
+                                        isPabrikProgressActive
+                                            ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                                            : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs'
+                                    }`}
+                                >
+                                    <Plus className={`size-3.5 ${isPabrikProgressActive ? 'rotate-45 text-red-600' : ''}`} />
+                                    {isPabrikProgressActive ? 'Sembunyikan Bagian Ini' : '+ Tambah Update Progres Pabrik'}
+                                </button>
+                            </div>
+
+                            {isPabrikProgressActive && (
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between pt-1">
+                                        <p className="text-xs text-gray-500">
+                                            Tabel update progres fisik pabrik/produksi (Upload gambar plan lokal, nama plan, tanggal & poin aktivitas):
+                                        </p>
+                                        <button
+                                            onClick={handleAddPabrikPlanBlock}
+                                            className="text-xs bg-emerald-600 text-white font-semibold px-3 py-1 rounded hover:bg-emerald-700 transition-colors flex items-center gap-1 cursor-pointer shadow-xs"
+                                        >
+                                            <Plus className="size-3.5" /> Tambah Plan Baru
+                                        </button>
+                                    </div>
+
+                                    <div className="border border-gray-300 rounded-lg overflow-hidden bg-white shadow-xs">
+                                        <table className="w-full text-left border-collapse">
+                                            <thead>
+                                                <tr className="bg-gray-100 text-gray-700 text-xs font-bold border-b border-gray-300">
+                                                    <th className="px-4 py-2.5 w-48">Kolom Plan (Gambar & Nama)</th>
+                                                    <th className="px-4 py-2.5 w-36">Kolom Tanggal</th>
+                                                    <th className="px-4 py-2.5">Kolom Poin Aktivitas</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-200 text-xs">
+                                                {pabrikPlanBlocks.length === 0 ? (
+                                                    <tr>
+                                                        <td colSpan={3} className="text-center py-6 text-gray-400 italic">
+                                                            Belum ada plan pabrik. Klik &quot;+ Tambah Plan Baru&quot; untuk menambahkan unit plan.
+                                                        </td>
+                                                    </tr>
+                                                ) : (
+                                                    pabrikPlanBlocks.map(plan => {
+                                                        const groups = plan.dateGroups || [];
+
+                                                        if (groups.length === 0) {
+                                                            return (
+                                                                <tr key={plan.id} className="hover:bg-gray-50/60">
+                                                                    <td className="px-4 py-3 border-r border-gray-300 bg-gray-50/40 align-top w-48">
+                                                                        <div className="flex flex-col items-center gap-2">
+                                                                            <div className="relative group w-20 h-24 bg-gray-100 border border-dashed border-gray-300 rounded flex items-center justify-center overflow-hidden">
+                                                                                {plan.image ? (
+                                                                                    <img src={plan.image} alt={plan.name} className="w-full h-full object-contain p-1" />
+                                                                                ) : (
+                                                                                    <div className="flex flex-col items-center justify-center text-gray-400 p-1 text-center">
+                                                                                        <ImageIcon className="size-6 mb-1" />
+                                                                                        <span className="text-[9px]">Belum ada gambar</span>
+                                                                                    </div>
+                                                                                )}
+                                                                                <label className="absolute inset-0 bg-black/60 text-white opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center cursor-pointer transition-opacity text-[10px] font-medium p-1 text-center">
+                                                                                    <Upload className="size-4 mb-0.5" />
+                                                                                    <span>Upload Gambar</span>
+                                                                                    <input
+                                                                                        type="file"
+                                                                                        accept="image/*"
+                                                                                        className="hidden"
+                                                                                        onChange={(e) => {
+                                                                                            if (e.target.files?.[0]) {
+                                                                                                handlePabrikPlanImageUpload(plan.id, e.target.files[0]);
+                                                                                            }
+                                                                                        }}
+                                                                                    />
+                                                                                </label>
+                                                                            </div>
+                                                                            <input
+                                                                                type="text"
+                                                                                value={plan.name}
+                                                                                onChange={(e) => handlePabrikPlanNameChange(plan.id, e.target.value)}
+                                                                                placeholder="Nama Plan..."
+                                                                                className="w-full text-center font-bold text-gray-800 text-xs border-b border-gray-300 outline-none focus:border-emerald-600 px-1 py-0.5 bg-white rounded"
+                                                                            />
+                                                                            <div className="flex items-center gap-2 pt-1">
+                                                                                <button
+                                                                                    onClick={() => handleAddPabrikDateGroup(plan.id)}
+                                                                                    className="text-[10px] text-emerald-700 font-semibold flex items-center gap-0.5 hover:underline cursor-pointer"
+                                                                                >
+                                                                                    <Plus className="size-3" /> Tambah Tanggal
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={() => handleDeletePabrikPlanBlock(plan.id)}
+                                                                                    className="text-[10px] text-red-600 font-semibold flex items-center gap-0.5 hover:underline cursor-pointer"
+                                                                                >
+                                                                                    <Trash2 className="size-3" /> Hapus Plan
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="px-3 py-3 border-r border-gray-300 align-top text-center text-gray-400 italic">
+                                                                        Tidak ada tanggal.
+                                                                    </td>
+                                                                    <td className="px-4 py-3 align-top">
+                                                                        <button
+                                                                            onClick={() => handleAddPabrikDateGroup(plan.id)}
+                                                                            className="text-xs text-emerald-700 font-semibold flex items-center gap-0.5 hover:underline cursor-pointer"
+                                                                        >
+                                                                            <Plus className="size-3" /> Tambah Tanggal
+                                                                        </button>
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        }
+
+                                                        return groups.map((group, gIdx) => (
+                                                            <tr key={group.id} className="border-b border-gray-200 hover:bg-gray-50/60">
+                                                                {gIdx === 0 && (
+                                                                    <td rowSpan={groups.length} className="px-4 py-3 border-r border-gray-300 bg-gray-50/40 align-top w-48">
+                                                                        <div className="flex flex-col items-center gap-2">
+                                                                            <div className="relative group w-20 h-24 bg-gray-100 border border-dashed border-gray-300 rounded flex items-center justify-center overflow-hidden">
+                                                                                {plan.image ? (
+                                                                                    <img src={plan.image} alt={plan.name} className="w-full h-full object-contain p-1" />
+                                                                                ) : (
+                                                                                    <div className="flex flex-col items-center justify-center text-gray-400 p-1 text-center">
+                                                                                        <ImageIcon className="size-6 mb-1" />
+                                                                                        <span className="text-[9px]">Belum ada gambar</span>
+                                                                                    </div>
+                                                                                )}
+                                                                                <label className="absolute inset-0 bg-black/60 text-white opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center cursor-pointer transition-opacity text-[10px] font-medium p-1 text-center">
+                                                                                    <Upload className="size-4 mb-0.5" />
+                                                                                    <span>Upload Gambar</span>
+                                                                                    <input
+                                                                                        type="file"
+                                                                                        accept="image/*"
+                                                                                        className="hidden"
+                                                                                        onChange={(e) => {
+                                                                                            if (e.target.files?.[0]) {
+                                                                                                handlePabrikPlanImageUpload(plan.id, e.target.files[0]);
+                                                                                            }
+                                                                                        }}
+                                                                                    />
+                                                                                </label>
+                                                                            </div>
+
+                                                                            <input
+                                                                                type="text"
+                                                                                value={plan.name}
+                                                                                onChange={(e) => handlePabrikPlanNameChange(plan.id, e.target.value)}
+                                                                                placeholder="Nama Plan..."
+                                                                                className="w-full text-center font-bold text-gray-800 text-xs border-b border-gray-300 outline-none focus:border-emerald-600 px-1 py-0.5 bg-white rounded"
+                                                                            />
+
+                                                                            <div className="flex items-center gap-2 pt-1">
+                                                                                <button
+                                                                                    onClick={() => handleAddPabrikDateGroup(plan.id)}
+                                                                                    className="text-[10px] text-emerald-700 font-semibold flex items-center gap-0.5 hover:underline cursor-pointer"
+                                                                                >
+                                                                                    <Plus className="size-3" /> Tambah Tanggal
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={() => handleDeletePabrikPlanBlock(plan.id)}
+                                                                                    className="text-[10px] text-red-600 font-semibold flex items-center gap-0.5 hover:underline cursor-pointer"
+                                                                                >
+                                                                                    <Trash2 className="size-3" /> Hapus Plan
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                    </td>
+                                                                )}
+
+                                                                <td className="px-3 py-3 border-r border-gray-300 bg-gray-50/20 align-top w-36">
+                                                                    <input
+                                                                        type="text"
+                                                                        value={group.tanggal}
+                                                                        onChange={(e) => handlePabrikDateGroupChange(plan.id, group.id, 'tanggal', e.target.value)}
+                                                                        className="w-full text-center font-bold text-gray-800 text-xs bg-transparent outline-none focus:bg-white rounded px-1 py-0.5 border-b border-transparent focus:border-emerald-500"
+                                                                    />
+                                                                </td>
+
+                                                                <td className="px-4 py-3 align-top">
+                                                                    <div className="space-y-1.5">
+                                                                        {group.bullets.length === 0 ? (
+                                                                            <span className="text-gray-400 italic text-xs">Belum ada poin aktivitas progres.</span>
+                                                                        ) : (
+                                                                            <ul className="list-disc list-outside ml-4 space-y-1.5 text-xs text-gray-800">
+                                                                                {group.bullets.map((bullet, bIdx) => (
+                                                                                    <li key={bIdx} className="group relative">
+                                                                                        <div className="flex items-center gap-1.5">
+                                                                                            <input
+                                                                                                type="text"
+                                                                                                value={bullet}
+                                                                                                onChange={(e) => handlePabrikBulletChange(plan.id, group.id, bIdx, e.target.value)}
+                                                                                                className="w-full bg-transparent outline-none focus:bg-emerald-50/60 rounded px-1.5 py-0.5 border-b border-transparent focus:border-emerald-500 text-xs"
+                                                                                            />
+                                                                                            <button
+                                                                                                onClick={() => handleDeletePabrikBullet(plan.id, group.id, bIdx)}
+                                                                                                className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 transition-opacity p-0.5 cursor-pointer"
+                                                                                                title="Hapus Poin"
+                                                                                            >
+                                                                                                <Trash2 className="size-3.5" />
+                                                                                            </button>
+                                                                                        </div>
+                                                                                    </li>
+                                                                                ))}
+                                                                            </ul>
+                                                                        )}
+
+                                                                        <div className="pt-1 flex items-center gap-3">
+                                                                            <button
+                                                                                onClick={() => handleAddPabrikBulletToGroup(plan.id, group.id)}
+                                                                                className="text-[10px] text-emerald-700 font-semibold flex items-center gap-0.5 hover:underline cursor-pointer"
+                                                                            >
+                                                                                <Plus className="size-3" /> Tambah Poin
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => handleDeletePabrikDateGroup(plan.id, group.id)}
+                                                                                className="text-[10px] text-red-600 font-semibold flex items-center gap-0.5 hover:underline cursor-pointer"
+                                                                            >
+                                                                                <Trash2 className="size-3" /> Hapus Tanggal
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        ));
+                                                    })
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Catatan Tambahan Table */}

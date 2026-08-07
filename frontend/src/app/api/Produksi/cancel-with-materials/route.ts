@@ -22,18 +22,47 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'Invalid date format.' }, { status: 400 });
         }
 
-        const utcOffset = 7 * 60 * 60 * 1000;
-        const targetUtc = new Date(localDate.getTime() - utcOffset);
+        const dateStr = tanggalValid.includes('T') ? tanggalValid.split('T')[0] : tanggalValid;
+
+        const extractYmd = (val: any): string => {
+            if (!val) return '';
+            if (typeof val === 'string') {
+                const clean = val.split('T')[0].split(' ')[0];
+                const parts = clean.split('-');
+                if (parts.length === 3 && parts[0].length === 4) return clean;
+            }
+            const d = new Date(val);
+            if (isNaN(d.getTime())) return '';
+            return d.toISOString().split('T')[0];
+        };
+
+        const isSameDate = (d1: any, d2: any): boolean => {
+            const y1 = extractYmd(d1);
+            const y2 = extractYmd(d2);
+            if (y1 && y2 && y1 === y2) return true;
+            
+            const d1Obj = new Date(d1);
+            const d2Obj = new Date(d2);
+            if (!isNaN(d1Obj.getTime()) && !isNaN(d2Obj.getTime())) {
+                const local1 = new Date(d1Obj.getTime() + 7 * 3600000).toISOString().split('T')[0];
+                const local2 = new Date(d2Obj.getTime() + 7 * 3600000).toISOString().split('T')[0];
+                return local1 === local2 || local1 === y2 || y1 === local2;
+            }
+            return false;
+        };
 
         const fields = body.fieldsToDelete || ['bs', 'ps', 'coa', 'pg'];
+        const reqId = body.id || body.Id || body.produksiId;
 
         // 1. Delete or clear produksis columns
         const { data: records } = await db.from<any>('produksis').select('*').eq('product_slug', productSlug).execute();
-        const record = (records || []).find((r: any) => 
-            r.produksi_tab_id === tabId && new Date(r.tanggal).getTime() === targetUtc.getTime()
-        );
+        const recordsToProcess = (records || []).filter((r: any) => {
+            if (reqId && Number(r.id) === Number(reqId)) return true;
+            if (r.produksi_tab_id !== tabId) return false;
+            return isSameDate(r.tanggal, dateStr);
+        });
 
-        if (record) {
+        for (const record of recordsToProcess) {
             const updates: any = {};
             if (fields.includes('bs')) updates.bs = 0;
             if (fields.includes('ps')) { updates.ps = 0; updates.ps_batch_kode = ''; }
@@ -63,10 +92,7 @@ export async function POST(request: Request) {
             const toDeleteIds = (relatedBahanBaku || [])
                 .filter((b: any) => {
                     const ket = b.keterangan || b.Keterangan;
-                    const rDate = new Date(b.tanggal || b.Tanggal);
-                    const isSameDate = rDate.getTime() === targetUtc.getTime();
-                    
-                    return ket && ket.toLowerCase().startsWith('produksi ') && ket.toLowerCase().includes(productLabelDdl.toLowerCase()) && isSameDate;
+                    return ket && ket.toLowerCase().startsWith('produksi ') && ket.toLowerCase().includes(productLabelDdl.toLowerCase()) && isSameDate(b.tanggal || b.Tanggal, dateStr);
                 })
                 .map((b: any) => b.id || b.Id);
 

@@ -129,13 +129,23 @@ export async function GET(request: Request) {
 
         // Fetch produksis for realization (bs & pg fields & keterangan / batch codes for variant matching)
         const utcYear = parseInt(tahun, 10);
-        const { data: fetchedProduksi } = await db.from<any>('produksis').select('produksi_tab_id,tanggal,bs,pg,keterangan,batch_kode,ps_batch_kode,coa_batch_kode').execute();
-        const produksiRows = (fetchedProduksi || []).filter((p: any) => {
+        const { data: fetchedProduksi } = await db.from<any>('produksis').select('id,produksi_tab_id,tanggal,bs,pg,keterangan,batch_kode,ps_batch_kode,coa_batch_kode').execute();
+        const rawProduksiRows = (fetchedProduksi || []).filter((p: any) => {
             if (!p.tanggal) return false;
             const d = new Date(p.tanggal);
             const localYear = new Date(d.getTime() + 7 * 60 * 60 * 1000).getFullYear();
             return localYear === utcYear;
         });
+
+        const deduplicatedMap = new Map<string, any>();
+        rawProduksiRows.forEach((p: any) => {
+            const dateStr = p.tanggal ? p.tanggal.split('T')[0] : '';
+            const key = `${p.produksi_tab_id}||${dateStr}||${(p.batch_kode || '').toLowerCase()}||${p.bs}||${p.pg}||${(p.keterangan || '').trim()}`;
+            if (!deduplicatedMap.has(key)) {
+                deduplicatedMap.set(key, p);
+            }
+        });
+        const produksiRows = Array.from(deduplicatedMap.values());
 
         // Map batch codes to variant names from all produksis rows
         const batchToVariantMap = new Map<string, string>();

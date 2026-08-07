@@ -192,12 +192,22 @@ export async function POST(request: Request) {
             productImageMap[p.slug] = p.image;
         });
 
-        // Filter produksis for Table A from YYYY-01-01 up to endDate
-        const periodProduksis = (produksisData || []).filter((p: any) => {
+        // Filter produksis for Table A from YYYY-01-01 up to endDate & deduplicate identical duplicate records
+        const rawPeriodProduksis = (produksisData || []).filter((p: any) => {
             if (!p.tanggal) return false;
             const t = new Date(p.tanggal).getTime();
             return t >= tableAStartMs && t <= tableAEndMs;
         });
+
+        const deduplicatedProduksisMap = new Map<string, any>();
+        rawPeriodProduksis.forEach((p: any) => {
+            const dateStr = p.tanggal ? p.tanggal.split('T')[0] : '';
+            const key = `${p.product_slug}||${p.produksi_tab_id}||${dateStr}||${(p.batch_kode || '').toLowerCase()}||${p.bs}||${p.pg}||${(p.keterangan || '').trim()}`;
+            if (!deduplicatedProduksisMap.has(key)) {
+                deduplicatedProduksisMap.set(key, p);
+            }
+        });
+        const periodProduksis = Array.from(deduplicatedProduksisMap.values());
 
         // Sort products: Cair first, then Padat
         allProductsList.sort((a, b) => {
@@ -300,28 +310,37 @@ export async function POST(request: Request) {
             }
         });
 
-        const matchesVariantExplicit = (p: any, v: DynamicVariant): boolean => {
-            if (p.product_slug !== v.productSlug) return false;
-
-            const ket = (p.keterangan || '').toLowerCase();
-            const kem = v.kemasan.toLowerCase().replace('@', '').trim();
-
-            if (!kem) return true;
-            if (p.produksi_tab_id && p.produksi_tab_id === v.tabId) return true;
-            if (ket.includes(kem)) return true;
-            if (p.batch_kode && batchToVariantMap.has(p.batch_kode.toLowerCase())) {
-                const mappedVar = (batchToVariantMap.get(p.batch_kode.toLowerCase()) || '').toLowerCase();
-                if (mappedVar.includes(kem)) return true;
-            }
-
-            return false;
-        };
-
         const slugVariantsMap = new Map<string, DynamicVariant[]>();
         officialVariants.forEach(v => {
             if (!slugVariantsMap.has(v.productSlug)) slugVariantsMap.set(v.productSlug, []);
             slugVariantsMap.get(v.productSlug)!.push(v);
         });
+
+        const isExplicitVariantMatch = (p: any, v: DynamicVariant): boolean => {
+            if (p.product_slug !== v.productSlug) return false;
+
+            const ket = (p.keterangan || '').toLowerCase();
+            const kem = v.kemasan.toLowerCase().replace('@', '').trim();
+            const kemNoSpace = kem.replace(/\s+/g, '');
+
+            if (!kem) return true;
+
+            // Direct match in keterangan
+            if (ket && (ket.includes(kem) || (kemNoSpace && ket.includes(kemNoSpace)))) {
+                return true;
+            }
+
+            // Direct match in batch code mapping
+            if (p.batch_kode && batchToVariantMap.has(p.batch_kode.toLowerCase())) {
+                const mappedVar = (batchToVariantMap.get(p.batch_kode.toLowerCase()) || '').toLowerCase();
+                const mappedNoSpace = mappedVar.replace(/\s+/g, '');
+                if (mappedVar.includes(kem) || (kemNoSpace && mappedNoSpace.includes(kemNoSpace))) {
+                    return true;
+                }
+            }
+
+            return false;
+        };
 
         const resultRealization = new Map<number, { realProd: number; realPeng: number }>();
         officialVariants.forEach(v => resultRealization.set(v.id, { realProd: 0, realPeng: 0 }));
@@ -333,7 +352,7 @@ export async function POST(request: Request) {
             slugProduksis.forEach((p: any) => {
                 const bsVal = Number(p.bs) || 0;
                 if (bsVal > 0) {
-                    const matchedVar = variants.find(v => matchesVariantExplicit(p, v)) || variants[0];
+                    const matchedVar = variants.find(v => isExplicitVariantMatch(p, v)) || variants[0];
                     const tracking = resultRealization.get(matchedVar.id)!;
                     tracking.realProd += bsVal;
                     if (p.batch_kode) bsBatchCodes.add(p.batch_kode.toLowerCase());
@@ -346,7 +365,7 @@ export async function POST(request: Request) {
                     const isAlreadyBsBatch = p.batch_kode && bsBatchCodes.has(p.batch_kode.toLowerCase());
                     if (isAlreadyBsBatch) return;
 
-                    const explicitVar = variants.find(v => matchesVariantExplicit(p, v));
+                    const explicitVar = variants.find(v => isExplicitVariantMatch(p, v));
                     if (explicitVar) {
                         const tracking = resultRealization.get(explicitVar.id)!;
                         tracking.realPeng += pgVal;
