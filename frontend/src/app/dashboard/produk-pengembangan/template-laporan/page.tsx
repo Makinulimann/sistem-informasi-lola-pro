@@ -10,12 +10,16 @@ import {
     Upload,
     Image as ImageIcon,
     FileSpreadsheet,
-    RotateCcw
+    RotateCcw,
+    Bookmark,
+    History
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { AppButton } from '@/components/ui/app-button';
 import { useToast } from '@/components/ui/toast';
 import { sidebarService } from '@/lib/sidebarService';
+import { reportDraftService, type ReportVersionDraft } from '@/lib/reportDraftService';
+import { VersionHistoryDrawer, SaveDraftModal } from '@/components/dashboard/VersionHistoryDrawer';
 
 /* ─── Helper: Format any date/ISO string to DD/MM/YYYY ─── */
 function formatYmdToDmy(dateStr: string): string {
@@ -252,6 +256,95 @@ export default function TemplateLaporanPage() {
     // State for generated preview
     const [hasGenerated, setHasGenerated] = useState<boolean>(false);
     const [generating, setGenerating] = useState<boolean>(false);
+
+    // Version Drafts State
+    const [userName, setUserName] = useState<string>('User');
+    const [isHistoryDrawerOpen, setIsHistoryDrawerOpen] = useState<boolean>(false);
+    const [isSaveDraftModalOpen, setIsSaveDraftModalOpen] = useState<boolean>(false);
+    const [versions, setVersions] = useState<ReportVersionDraft[]>([]);
+    const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
+
+    useEffect(() => {
+        const loadInitialDraftData = async () => {
+            try {
+                const res = await fetch('/api/auth/me');
+                if (res.ok) {
+                    const info = await res.json();
+                    setUserName(info.fullName || 'User');
+                }
+            } catch (err) {
+                console.error('Failed to fetch user profile:', err);
+            }
+
+            // Sync with DB to support multi-browser & Incognito mode
+            const dbData = await reportDraftService.fetchVersionsFromDB();
+            setVersions(dbData.versions);
+            setActiveVersionId(dbData.activeVersionId);
+        };
+
+        loadInitialDraftData();
+    }, []);
+
+    const handleSaveDraft = async (customName?: string) => {
+        const draftData = {
+            startDate,
+            endDate,
+            rkoYear,
+            updateDate,
+            tableADateLabel,
+            hasGenerated,
+            rkoTable,
+            productBlocks,
+            catatanTambahanBullets,
+            isPabrikProgressActive,
+            pabrikPlanBlocks,
+        };
+        const newVersion = await reportDraftService.saveVersion(draftData, userName, customName);
+        const dbData = await reportDraftService.fetchVersionsFromDB();
+        setVersions(dbData.versions);
+        setActiveVersionId(newVersion.id);
+        toast.success('Draft Tersimpan', `Versi "${newVersion.name}" berhasil disimpan ke histori versi.`);
+    };
+
+    const handleRestoreVersion = async (version: ReportVersionDraft) => {
+        if (version && version.data) {
+            const d = version.data;
+            if (d.startDate !== undefined) setStartDate(d.startDate);
+            if (d.endDate !== undefined) setEndDate(d.endDate);
+            if (d.rkoYear !== undefined) setRkoYear(d.rkoYear);
+            if (d.updateDate !== undefined) setUpdateDate(d.updateDate);
+            if (d.tableADateLabel !== undefined) setTableADateLabel(d.tableADateLabel);
+            if (d.hasGenerated !== undefined) setHasGenerated(d.hasGenerated);
+            if (d.rkoTable) setRkoTable(d.rkoTable);
+            if (d.productBlocks) setProductBlocks(d.productBlocks);
+            if (d.catatanTambahanBullets) setCatatanTambahanBullets(d.catatanTambahanBullets);
+            if (d.isPabrikProgressActive !== undefined) setIsPabrikProgressActive(d.isPabrikProgressActive);
+            if (d.pabrikPlanBlocks) setPabrikPlanBlocks(d.pabrikPlanBlocks);
+
+            await reportDraftService.setActiveVersionId(version.id);
+            setActiveVersionId(version.id);
+            toast.success('Versi Diterapkan', `Laporan berhasil dimuat ke versi "${version.name}".`);
+        }
+    };
+
+    const handleRenameVersion = async (id: string, newName: string) => {
+        const ok = await reportDraftService.renameVersion(id, newName);
+        if (ok) {
+            const dbData = await reportDraftService.fetchVersionsFromDB();
+            setVersions(dbData.versions);
+            toast.success('Nama Versi Diperbarui', `Nama versi telah diubah menjadi "${newName}".`);
+        }
+    };
+
+    const handleDeleteVersion = async (id: string) => {
+        const ok = await reportDraftService.deleteVersion(id);
+        if (ok) {
+            const dbData = await reportDraftService.fetchVersionsFromDB();
+            setVersions(dbData.versions);
+            setActiveVersionId(dbData.activeVersionId);
+            toast.success('Versi Dihapus', 'Versi draft telah dihapus dari histori.');
+        }
+    };
 
     // Auto-sync Label Up Date Laporan when Tanggal Akhir Aktivitas changes
     useEffect(() => {
@@ -717,12 +810,6 @@ export default function TemplateLaporanPage() {
             return;
         }
         try {
-            const printWindow = window.open('', '_blank');
-            if (!printWindow) {
-                toast.error('Gagal', 'Popup terblokir oleh browser. Izinkan popup untuk mencetak PDF.');
-                return;
-            }
-
             const groupedRko = groupRkoTable(rkoTable);
 
             const rkoRowsHtml = groupedRko.flatMap((group, groupIdx) => {
@@ -832,47 +919,78 @@ export default function TemplateLaporanPage() {
                 }).join('');
             }
 
+            const now = new Date();
+            const formattedTimestamp = `${now.getMonth() + 1}/${now.getDate()}/${String(now.getFullYear()).slice(-2)}, ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
+
             const html = `
                 <!DOCTYPE html>
                 <html>
                 <head>
                     <meta charset="utf-8">
-                    <title>Laporan Kemitraan Produk Pengembangan ${rkoYear}</title>
+                    <title></title>
+                    <base href="${window.location.origin}/" />
                     <style>
-                        @page { size: portrait; margin: 10mm; }
-                        * { color: #000000 !important; font-family: Arial, sans-serif; }
-                        body { margin: 0; padding: 10px; font-size: 9pt; }
-                        .logo-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 12px; }
-                        .logo-header img { height: 42px; object-fit: contain; }
-                        .doc-title { text-align: center; font-size: 12pt; font-weight: bold; text-transform: uppercase; margin: 8px 0 14px 0; }
-                        .update-label { text-align: right; font-size: 8.5pt; font-weight: bold; margin-bottom: 6px; }
-                        .section-title { font-size: 9.5pt; font-weight: bold; margin: 14px 0 6px 0; background: #e2e8f0; padding: 4px 8px; border-left: 4px solid #000; display: flex; justify-content: space-between; }
-                        table { width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 8.5pt; }
-                        th { border: 1px solid #000; padding: 5px; background: #f1f5f9; text-align: center; font-weight: bold; }
-                        td { border: 1px solid #000; padding: 4px; }
-                        @media print {
-                            body { padding: 0; }
-                            * { color: #000000 !important; }
+                        @page { size: portrait; margin: 0; }
+                        * { color: #000000 !important; font-family: Arial, sans-serif; box-sizing: border-box; }
+                        html, body { margin: 0; padding: 0 6mm 18mm 6mm; font-size: 9pt; background: #ffffff; }
+
+                        /* Outer page-frame table — creates per-page top/bottom space */
+                        .page-frame, .page-frame > thead > tr > td, .page-frame > tfoot > tr > td, .page-frame > tbody > tr > td {
+                            border: none !important; padding: 0; margin: 0; background: none;
                         }
+                        .page-frame { width: 100%; border-collapse: collapse; }
+                        .page-frame > thead { display: table-header-group; }
+                        .page-frame > tfoot { display: table-footer-group; }
+                        .page-top-space { height: 10mm; }
+                        .page-bottom-space { height: 16mm; }
+
+                        /* Content area padding (left/right margins) */
+                        .page-content { padding: 0 12mm; }
+
+                        /* Fixed footer — rendered in the tfoot reserved space on every page */
+                        .doc-footer { position: fixed; bottom: 0; left: 0; right: 0; padding: 4px 12mm 5mm 12mm; border-top: 1px solid #ccc; font-size: 8pt; color: #444; text-align: left; background: #fff; }
+
+                        .logo-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 8px; }
+                        .logo-header img { height: 46px; object-fit: contain; }
+                        .update-label { text-align: right; font-size: 8.5pt; font-weight: bold; margin-bottom: 8px; }
+                        .section-title { font-size: 9.5pt; font-weight: bold; margin: 14px 0 6px 0; background: #e2e8f0; padding: 4px 8px; border-left: 4px solid #000; display: flex; justify-content: space-between; page-break-after: avoid; break-after: avoid; }
+
+                        /* Inner data tables */
+                        .data-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 8.5pt; page-break-inside: auto; }
+                        .data-table th { border: 1px solid #000; padding: 5px; background: #f1f5f9; text-align: center; font-weight: bold; }
+                        .data-table td { border: 1px solid #000; padding: 4px; vertical-align: top; }
+                        .data-table tr { page-break-inside: avoid; break-inside: avoid; }
+                        .data-table thead { display: table-header-group; }
+                        .data-table img { page-break-inside: avoid; break-inside: avoid; }
                     </style>
                 </head>
                 <body>
+                    <!-- Outer page-frame: thead/tfoot reserve space on EVERY printed page -->
+                    <table class="page-frame">
+                        <thead><tr><td><div class="page-top-space"></div></td></tr></thead>
+                        <tfoot><tr><td><div class="page-bottom-space"></div></td></tr></tfoot>
+                        <tbody><tr><td class="page-content">
+
                     <div class="logo-header">
-                        <img src="/images/logo-PG.webp" alt="Petrokimia Gresik" />
-                        <div style="text-align: right;">
-                            <div style="font-size: 11pt; font-weight: bold;">PT PETROKIMIA GRESIK</div>
-                            <div style="font-size: 8pt; color: #333;">Sistem Informasi Pengelolaan Produk</div>
+                        <div style="display: flex; align-items: center; width: 180px;">
+                            <img src="/images/logo-PG.webp" alt="Petrokimia Gresik" />
+                        </div>
+                        <div style="flex: 1; text-align: center; font-size: 12pt; font-weight: bold; text-transform: uppercase; padding: 0 8px; line-height: 1.3;">
+                            LAPORAN KEMITRAAN PRODUK PENGEMBANGAN
+                        </div>
+                        <div style="text-align: right; width: 180px;">
+                            <div style="font-size: 10pt; font-weight: bold;">PT PETROKIMIA GRESIK</div>
+                            <div style="font-size: 8pt; color: #333;">Sistem Informasi Produk Pengembangan</div>
                         </div>
                     </div>
 
-                    <div class="doc-title">LAPORAN KEMITRAAN PRODUK PENGEMBANGAN</div>
                     <div class="update-label">Up Date: ${updateDate}</div>
 
                     <div class="section-title">
                         <span>A. INFORMASI PRODUKSI DAN STOK PRODUK KPP TAHUN ${rkoYear}</span>
                         <span style="font-size: 8pt; font-weight: normal; font-style: italic;">(periode: ${tableADateLabel})</span>
                     </div>
-                    <table>
+                    <table class="data-table">
                         <thead>
                             <tr>
                                 <th rowSpan="2" style="width: 25px;">No</th>
@@ -891,11 +1009,11 @@ export default function TemplateLaporanPage() {
                     </table>
 
                     <div class="section-title">
-                        <span>B. UPDATE PROGRES & RANGKUMAN AKTIVITAS</span>
+                        <span>B. UPDATE PROGRES &amp; RANGKUMAN AKTIVITAS</span>
                         <span style="font-size: 8pt; font-weight: normal; font-style: italic;">(periode: ${startDate} s/d ${endDate})</span>
                     </div>
 
-                    <table>
+                    <table class="data-table">
                         <thead>
                             <tr>
                                 <th style="width: 150px;">Produk</th>
@@ -914,7 +1032,7 @@ export default function TemplateLaporanPage() {
                             <span style="font-size: 8pt; font-weight: normal; font-style: italic;">(periode: ${startDate} s/d ${endDate})</span>
                         </div>
 
-                        <table>
+                        <table class="data-table">
                             <thead>
                                 <tr>
                                     <th style="width: 150px;">Plan / Unit</th>
@@ -929,7 +1047,7 @@ export default function TemplateLaporanPage() {
                     ` : ''}
 
                     <div style="font-weight: bold; margin: 12px 0 6px 0; font-size: 9pt;">Catatan Tambahan:</div>
-                    <table>
+                    <table class="data-table">
                         <tbody>
                             <tr>
                                 <td style="padding: 8px; vertical-align: top;">
@@ -942,14 +1060,29 @@ export default function TemplateLaporanPage() {
                             </tr>
                         </tbody>
                     </table>
+
+                        </td></tr></tbody>
+                    </table>
+
+                    <!-- Fixed footer: appears on every page in CSS print -->
+                    <div class="doc-footer">
+                        <span>${formattedTimestamp}</span>
+                    </div>
                 </body>
                 </html>
             `;
 
-            printWindow.document.write(html);
-            printWindow.document.close();
+            const blob = new Blob([html], { type: 'text/html; charset=utf-8' });
+            const blobUrl = URL.createObjectURL(blob);
+            const printWindow = window.open(blobUrl, '_blank');
+            if (!printWindow) {
+                URL.revokeObjectURL(blobUrl);
+                toast.error('Gagal', 'Popup terblokir oleh browser. Izinkan popup untuk mencetak PDF.');
+                return;
+            }
             printWindow.onload = () => {
                 printWindow.print();
+                URL.revokeObjectURL(blobUrl);
             };
             toast.success('Berhasil', 'Membuka dialog cetak PDF Laporan.');
         } catch (err: any) {
@@ -1112,7 +1245,7 @@ export default function TemplateLaporanPage() {
                             </td>
                             <td style="border: none; text-align: right; vertical-align: middle;" colSpan="7">
                                 <div style="font-size: 11pt; font-weight: bold;">PT PETROKIMIA GRESIK</div>
-                                <div style="font-size: 8.5pt; color: #333333;">Sistem Informasi Pengelolaan Produk</div>
+                                <div style="font-size: 8.5pt; color: #333333;">Sistem Informasi Produk Pengembangan</div>
                             </td>
                         </tr>
                     </table>
@@ -1245,6 +1378,27 @@ export default function TemplateLaporanPage() {
                     </p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
+                    <AppButton
+                        variant="secondary"
+                        onClick={() => setIsSaveDraftModalOpen(true)}
+                        icon={<Bookmark className="size-4 text-emerald-600" />}
+                        title="Simpan versi draft laporan saat ini"
+                    >
+                        Simpan Draft
+                    </AppButton>
+                    <AppButton
+                        variant="secondary"
+                        onClick={() => setIsHistoryDrawerOpen(true)}
+                        icon={<History className="size-4 text-slate-700" />}
+                        title="Buka Histori Versi Laporan"
+                    >
+                        Histori Versi
+                        {versions.length > 0 && (
+                            <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-emerald-600 text-white rounded-full font-bold">
+                                {versions.length}
+                            </span>
+                        )}
+                    </AppButton>
                     <AppButton
                         variant="secondary"
                         onClick={handleResetDraft}
@@ -1406,7 +1560,7 @@ export default function TemplateLaporanPage() {
                         </div>
                         <div className="text-right">
                             <h2 className="text-base font-bold text-gray-900 leading-tight">PT PETROKIMIA GRESIK</h2>
-                            <p className="text-xs text-gray-600 font-medium">Sistem Informasi Pengelolaan Produk</p>
+                            <p className="text-xs text-gray-600 font-medium">Sistem Informasi Produk Pengembangan</p>
                         </div>
                     </div>
 
@@ -2039,6 +2193,25 @@ export default function TemplateLaporanPage() {
                     </div>
                 </div>
             )}
+
+            {/* Save Draft Modal */}
+            <SaveDraftModal
+                isOpen={isSaveDraftModalOpen}
+                onClose={() => setIsSaveDraftModalOpen(false)}
+                onSave={handleSaveDraft}
+            />
+
+            {/* Version History Drawer (Google Docs Style) */}
+            <VersionHistoryDrawer
+                isOpen={isHistoryDrawerOpen}
+                onClose={() => setIsHistoryDrawerOpen(false)}
+                versions={versions}
+                activeVersionId={activeVersionId}
+                onRestoreVersion={handleRestoreVersion}
+                onRenameVersion={handleRenameVersion}
+                onDeleteVersion={handleDeleteVersion}
+                userName={userName}
+            />
         </div>
     );
 }

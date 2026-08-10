@@ -141,12 +141,12 @@ export default function LoginPage() {
           <div className="flex items-center gap-3 mb-3">
             <div>
               <h1 className="text-white text-2xl lg:text-3xl font-bold tracking-tight">
-                SIPPro
+                SIPP
               </h1>
             </div>
           </div>
           <p className="text-white/70 text-sm lg:text-base max-w-xs leading-relaxed">
-            Sistem Informasi Pengelolaan Produk
+            Sistem Informasi Produk Pengembangan
           </p>
           <div className="mt-4 flex items-center gap-2">
             <span className="inline-block w-8 h-0.5 bg-emerald-400/60 rounded-full" />
@@ -289,7 +289,7 @@ export default function LoginPage() {
           {/* Footer */}
           <div className="text-center pt-4 border-t border-gray-100">
             <p className="text-xs text-gray-400">
-              © {new Date().getFullYear()} SIPPro — PT Petrokimia Gresik. Hak Cipta Dilindungi.
+              © {new Date().getFullYear()} SIPP — PT Petrokimia Gresik. Hak Cipta Dilindungi.
             </p>
           </div>
         </div>

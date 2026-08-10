@@ -408,8 +408,8 @@ export function Sidebar({
                     <div className="flex items-center gap-3">
                         <Image src="/images/logo-PG.webp" alt="Petrokimia Gresik" width={36} height={36} className="object-contain" />
                         <div>
-                            <p className="text-sm font-bold text-white leading-tight">SIPPro</p>
-                            <p className="text-[11px] text-emerald-300/70 leading-tight">Pengelolaan Produk</p>
+                            <p className="text-sm font-bold text-white leading-tight">SIPP</p>
+                            <p className="text-[11px] text-emerald-300/70 leading-tight">Produk Pengembangan</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="lg:hidden text-emerald-200 hover:text-white">

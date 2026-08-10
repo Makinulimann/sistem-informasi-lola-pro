@@ -11,8 +11,8 @@ const montserrat = Montserrat({
 });
 
 export const metadata: Metadata = {
-  title: 'SIPPro',
-  description: 'SIPPro Web Application',
+  title: 'SIPP',
+  description: 'SIPP Web Application',
   icons: {
     icon: '/images/logo-PG.webp',
   },

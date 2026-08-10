@@ -178,10 +178,10 @@ export default function RegisterPage() {
                     className="absolute bottom-8 left-8 lg:bottom-12 lg:left-12 z-10"
                 >
                     <div className="flex items-center gap-3 mb-3">
-                        <h1 className="text-white text-2xl lg:text-3xl font-bold tracking-tight">SIPPro</h1>
+                        <h1 className="text-white text-2xl lg:text-3xl font-bold tracking-tight">SIPP</h1>
                     </div>
                     <p className="text-white/70 text-sm lg:text-base max-w-xs leading-relaxed">
-                        Sistem Informasi Pengelolaan Produk
+                        Sistem Informasi Produk Pengembangan
                     </p>
                 </div>
             </div>
@@ -207,7 +207,7 @@ export default function RegisterPage() {
                             Buat Akun Baru
                         </h2>
                         <p className="mt-1.5 text-sm text-gray-500">
-                            Daftar untuk mulai menggunakan SIPPro
+                            Daftar untuk mulai menggunakan SIPP
                         </p>
                     </div>
 
@@ -376,7 +376,7 @@ export default function RegisterPage() {
                     {/* Footer */}
                     <div className="text-center pt-3 border-t border-gray-100">
                         <p className="text-xs text-gray-400">
-                            © {new Date().getFullYear()} SIPPro — PT Petrokimia Gresik. Hak Cipta Dilindungi.
+                            © {new Date().getFullYear()} SIPP — PT Petrokimia Gresik. Hak Cipta Dilindungi.
                         </p>
                     </div>
                 </div>

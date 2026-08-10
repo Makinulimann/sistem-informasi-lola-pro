@@ -36,17 +36,17 @@ export async function POST(
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sistem-informasi-pp.vercel.app';
         const loginUrl = `${appUrl}/`;
 
-        const emailSubject = 'Akun SIPPro Anda Telah Diverifikasi';
+        const emailSubject = 'Akun SIPP Anda Telah Diverifikasi';
         const emailHtml = `
             <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; background-color: #ffffff; color: #374151;">
                 <div style="text-align: center; margin-bottom: 24px; border-bottom: 1px solid #f3f4f6; padding-bottom: 16px;">
-                    <h2 style="color: #059669; margin: 0; font-size: 24px; font-weight: bold; letter-spacing: -0.025em;">SIPPro</h2>
-                    <p style="font-size: 12px; color: #6b7280; margin: 4px 0 0 0;">Sistem Informasi Pengelolaan Produk - PT Petrokimia Gresik</p>
+                    <h2 style="color: #059669; margin: 0; font-size: 24px; font-weight: bold; letter-spacing: -0.025em;">SIPP</h2>
+                    <p style="font-size: 12px; color: #6b7280; margin: 4px 0 0 0;">Sistem Informasi Produk Pengembangan - PT Petrokimia Gresik</p>
                 </div>
                 <div style="margin-bottom: 24px; line-height: 1.6;">
                     <p style="font-size: 16px; margin-top: 0;">Halo, <strong>${user.full_name}</strong>,</p>
-                    <p style="font-size: 14px;">Selamat! Akun SIPPro Anda dengan email <strong>${user.email}</strong> telah <strong>diverifikasi</strong> oleh Administrator.</p>
-                    <p style="font-size: 14px;">Sekarang Anda dapat masuk ke dalam sistem dan mengakses semua fitur pengelolaan produk menggunakan tautan di bawah ini:</p>
+                    <p style="font-size: 14px;">Selamat! Akun SIPP Anda dengan email <strong>${user.email}</strong> telah <strong>diverifikasi</strong> oleh Administrator.</p>
+                    <p style="font-size: 14px;">Sekarang Anda dapat masuk ke dalam sistem dan mengakses semua fitur produk pengembangan menggunakan tautan di bawah ini:</p>
                 </div>
                 <div style="text-align: center; margin-bottom: 28px; margin-top: 28px;">
                     <a href="${loginUrl}" style="display: inline-block; padding: 12px 28px; background-color: #059669; color: #ffffff; text-decoration: none; font-weight: bold; font-size: 14px;">Masuk ke Aplikasi</a>

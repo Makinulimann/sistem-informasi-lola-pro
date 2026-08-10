@@ -42,16 +42,16 @@ export async function POST(request: Request) {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sistem-informasi-pp.vercel.app';
         const resetUrl = `${appUrl}/forgot-password?token=${encodeURIComponent(resetToken)}`;
 
-        const emailSubject = 'Reset Kata Sandi Akun SIPPro Anda';
+        const emailSubject = 'Reset Kata Sandi Akun SIPP Anda';
         const emailHtml = `
             <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; background-color: #ffffff; color: #374151;">
                 <div style="text-align: center; margin-bottom: 24px; border-bottom: 1px solid #f3f4f6; padding-bottom: 16px;">
-                    <h2 style="color: #059669; margin: 0; font-size: 24px; font-weight: bold; letter-spacing: -0.025em;">SIPPro</h2>
-                    <p style="font-size: 12px; color: #6b7280; margin: 4px 0 0 0;">Sistem Informasi Pengelolaan Produk - PT Petrokimia Gresik</p>
+                    <h2 style="color: #059669; margin: 0; font-size: 24px; font-weight: bold; letter-spacing: -0.025em;">SIPP</h2>
+                    <p style="font-size: 12px; color: #6b7280; margin: 4px 0 0 0;">Sistem Informasi Produk Pengembangan - PT Petrokimia Gresik</p>
                 </div>
                 <div style="margin-bottom: 24px; line-height: 1.6;">
                     <p style="font-size: 16px; margin-top: 0;">Halo, <strong>${user.full_name}</strong>,</p>
-                    <p style="font-size: 14px;">Kami menerima permintaan untuk mereset kata sandi akun SIPPro Anda.</p>
+                    <p style="font-size: 14px;">Kami menerima permintaan untuk mereset kata sandi akun SIPP Anda.</p>
                     <p style="font-size: 14px; color: #dc2626;"><strong>Penting:</strong> Link reset kata sandi ini hanya berlaku selama 1 jam.</p>
                     <p style="font-size: 14px;">Silakan klik tombol di bawah ini untuk mengatur ulang kata sandi Anda:</p>
                 </div>

@@ -154,7 +154,7 @@ function ForgotPasswordContent() {
                 </h1>
                 <p className="mt-2 text-sm text-gray-500 leading-relaxed">
                     {token
-                        ? 'Silakan masukkan kata sandi baru Anda untuk akun SIPPro.'
+                        ? 'Silakan masukkan kata sandi baru Anda untuk akun SIPP.'
                         : 'Masukkan alamat email Anda yang terdaftar untuk menerima tautan pemulihan.'}
                 </p>
             </div>
@@ -291,7 +291,7 @@ function ForgotPasswordContent() {
 
             {/* Footer */}
             <div className="text-center pt-4 border-t border-gray-100 text-xs text-gray-400">
-                © {new Date().getFullYear()} SIPPro — PT Petrokimia Gresik. Hak Cipta Dilindungi.
+                © {new Date().getFullYear()} SIPP — PT Petrokimia Gresik. Hak Cipta Dilindungi.
             </div>
         </div>
     );

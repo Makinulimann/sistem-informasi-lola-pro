@@ -30,7 +30,7 @@ export async function sendMail({ to, subject, html }: SendMailParams) {
 
     try {
         const info = await transporter.sendMail({
-            from: `"SIPPro" <${smtpUser}>`,
+            from: `"SIPP" <${smtpUser}>`,
             to,
             subject,
             html,
