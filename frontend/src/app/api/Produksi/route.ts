@@ -300,6 +300,39 @@ export async function POST(request: Request) {
             }
         }
 
+        // Sync to analisas table (Create or update pending sampling request)
+        if (batchKodeValue) {
+            try {
+                const { data: existingAnalisaList } = await db.from<any>('analisas').select('*').eq('product_slug', productSlug).execute();
+                const existingAnalisa = (existingAnalisaList || []).find((a: any) => a.no_bapc === batchKodeValue);
+
+                const kuantumValue = parseFloat(bsValue || psValue || '0');
+
+                if (!existingAnalisa) {
+                    await db.from<any>('analisas').insert({
+                        product_slug: productSlug,
+                        bulan: targetUtc.getMonth() + 1,
+                        tahun: targetUtc.getFullYear(),
+                        tanggal_sampling: targetUtc.toISOString(),
+                        no_bapc: batchKodeValue,
+                        kuantum: kuantumValue,
+                        lembaga: '',
+                        hasil_analisa: 'Pending',
+                        tanggal_analisa: targetUtc.toISOString()
+                    });
+                } else if (existingAnalisa.hasil_analisa === 'Pending') {
+                    await db.from<any>('analisas').update({
+                        kuantum: kuantumValue > 0 ? kuantumValue : existingAnalisa.kuantum,
+                        tanggal_sampling: targetUtc.toISOString(),
+                        bulan: targetUtc.getMonth() + 1,
+                        tahun: targetUtc.getFullYear()
+                    }).eq('id', existingAnalisa.id);
+                }
+            } catch (analisaErr) {
+                console.error('Failed to sync with analisas table in Produksi POST:', analisaErr);
+            }
+        }
+
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error('Error saving produksi:', error);

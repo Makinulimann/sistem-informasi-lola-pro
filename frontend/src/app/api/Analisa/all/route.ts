@@ -20,12 +20,12 @@ export async function GET(request: Request) {
 
         if (bulanStr) {
             const bulan = parseInt(bulanStr, 10);
-            filteredData = filteredData.filter((item: any) => item.bulan === bulan);
+            filteredData = filteredData.filter((item: any) => item.bulan === bulan || item.hasil_analisa === 'Pending');
         }
 
         if (tahunStr) {
             const tahun = parseInt(tahunStr, 10);
-            filteredData = filteredData.filter((item: any) => item.tahun === tahun);
+            filteredData = filteredData.filter((item: any) => item.tahun === tahun || item.hasil_analisa === 'Pending');
         }
 
         // Sort by tanggal_sampling desc (newest first)

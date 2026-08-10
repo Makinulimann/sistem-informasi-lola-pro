@@ -127,7 +127,7 @@ export default function TemplateLaporanPage() {
             dateGroups: [
                 {
                     id: 'pabrik-group-1',
-                    tanggal: '01/08/2026 s/d 07/08/2026',
+                    tanggal: '',
                     bullets: [
                         'Pembersihan filter pompa limbah & maintenance rutin.',
                         'Trial perbanyakan formula baru.'
@@ -483,9 +483,30 @@ export default function TemplateLaporanPage() {
     const handleResetDraft = () => {
         try {
             localStorage.removeItem(DRAFT_STORAGE_KEY);
+            setStartDate('');
+            setEndDate('');
+            setUpdateDate('');
+            setTableADateLabel(`01/01/${rkoYear}`);
             setHasGenerated(false);
             setCatatanTambahanBullets([]);
             setIsPabrikProgressActive(false);
+            setPabrikPlanBlocks([
+                {
+                    id: 'pabrik-plan-1',
+                    name: 'Pabrik Gladiators / NPK',
+                    image: '/images/petro-gladiator.webp',
+                    dateGroups: [
+                        {
+                            id: 'pabrik-group-1',
+                            tanggal: '',
+                            bullets: [
+                                'Pembersihan filter pompa limbah & maintenance rutin.',
+                                'Trial perbanyakan formula baru.'
+                            ]
+                        }
+                    ]
+                }
+            ]);
             if (availableProductsCatalog.length > 0) {
                 setProductBlocks(availableProductsCatalog.map(p => ({ ...p, dateGroups: [] })));
             } else {
