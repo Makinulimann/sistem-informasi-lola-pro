@@ -4,9 +4,26 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'edge';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/supabase';
+import { verifyToken } from '@/lib/auth';
+
+async function getAuthUser(request: Request) {
+    let token = request.headers.get('Authorization')?.split(' ')[1];
+    if (!token && 'cookies' in request) {
+        token = (request as any).cookies?.get?.('sippro_token')?.value;
+    }
+    if (!token) return null;
+    return await verifyToken(token);
+}
 
 export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
     try {
+        const user = await getAuthUser(request);
+        if (user) {
+            const role = String((user as any).role || '').toLowerCase().trim();
+            if (role !== 'admin' && role !== 'riset') {
+                return NextResponse.json({ message: 'Hanya Admin dan Riset yang dapat memperbarui data analisa.' }, { status: 403 });
+            }
+        }
         const params = await context.params;
         const id = parseInt(params.id, 10);
         if (isNaN(id)) {
@@ -107,6 +124,13 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
 
 export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
     try {
+        const user = await getAuthUser(request);
+        if (user) {
+            const role = String((user as any).role || '').toLowerCase().trim();
+            if (role !== 'admin' && role !== 'riset') {
+                return NextResponse.json({ message: 'Hanya Admin dan Riset yang dapat menghapus data analisa.' }, { status: 403 });
+            }
+        }
         const params = await context.params;
         const id = parseInt(params.id, 10);
         if (isNaN(id)) {

@@ -28,6 +28,7 @@ import { AppSelect } from '../ui/app-select';
 function PlusIcon() { return (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>); }
 function XIcon() { return (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>); }
 function FlaskIcon() { return (<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6" /><path d="M10 9V3" /><path d="M14 9V3" /><path d="M6.864 18.364 10 9h4l3.136 9.364a2 2 0 0 1-1.894 2.636H8.758a2 2 0 0 1-1.894-2.636Z" /></svg>); }
+function EyeIcon() { return (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></svg>); }
 
 /* ─── Product Name Helper ─── */
 const PRODUCT_LABELS: Record<string, string> = {
@@ -388,6 +389,84 @@ function VerifyModal({ isOpen, onClose, onSave, initialData }: VerifyModalProps)
 // }
 
 /* ═══════════════════════════════════════════ */
+/*  Detail View Modal (Read-Only)              */
+/* ═══════════════════════════════════════════ */
+
+interface DetailModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    data: AnalisaRow | null;
+}
+
+function AnalisaAllDetailModal({ isOpen, onClose, data }: DetailModalProps) {
+    if (!data) return null;
+
+    return (
+        <AppModal
+            isOpen={isOpen}
+            onClose={onClose}
+            title="Detail Data Analisa"
+            footer={
+                <AppButton type="button" variant="secondary" onClick={onClose}>
+                    Tutup
+                </AppButton>
+            }
+        >
+            <div className="space-y-4 text-sm">
+                <div className="bg-gray-50 border border-gray-200 p-4 space-y-3">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider block mb-1">Produk</span>
+                            <ProductBadge slug={data.productSlug} />
+                        </div>
+                        <div>
+                            <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider block mb-1">Batch</span>
+                            <p className="font-semibold text-gray-800">{data.noBAPC || '—'}</p>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-200">
+                        <div>
+                            <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider block mb-1">Tanggal Sampling</span>
+                            <p className="font-semibold text-gray-800">{formatDateShort(data.tanggalSampling)}</p>
+                        </div>
+                        <div>
+                            <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider block mb-1">Kuantum</span>
+                            <p className="font-mono font-semibold text-gray-800">{fmt(data.kuantum)} Kg</p>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-200">
+                        <div>
+                            <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider block mb-1">Hasil Analisa</span>
+                            <StatusBadge status={data.hasilAnalisa} />
+                        </div>
+                        <div>
+                            <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider block mb-1">Tanggal Verifikasi (COA)</span>
+                            <p className="font-medium text-gray-700">{formatDateShort(data.tanggalAnalisa)}</p>
+                        </div>
+                    </div>
+                    <div className="pt-2 border-t border-gray-200">
+                        <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider block mb-1">Dokumen Analisa</span>
+                        {data.dokumen ? (
+                            <a
+                                href={data.dokumen}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold hover:bg-emerald-100 transition-colors"
+                            >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                Lihat Dokumen
+                            </a>
+                        ) : (
+                            <p className="text-gray-400 font-mono">—</p>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </AppModal>
+    );
+}
+
+/* ═══════════════════════════════════════════ */
 /*  Main Component                             */
 /* ═══════════════════════════════════════════ */
 
@@ -402,9 +481,29 @@ export function AnalisaAllPage() {
 
     const [data, setData] = useState<AnalisaRow[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [userRole, setUserRole] = useState<string | null>(null);
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingData, setEditingData] = useState<AnalisaRow | null>(null);
+    const [detailData, setDetailData] = useState<AnalisaRow | null>(null);
+
+    const normRole = (userRole || '').toLowerCase().trim();
+    const isAdminOrRiset = normRole === 'admin' || normRole === 'riset';
+
+    useEffect(() => {
+        const fetchUser = async () => {
+            try {
+                const res = await fetch('/api/auth/me');
+                if (res.ok) {
+                    const info = await res.json();
+                    setUserRole(info.role || null);
+                }
+            } catch (err) {
+                console.error('Failed to fetch user info', err);
+            }
+        };
+        fetchUser();
+    }, []);
 
     const fetchData = useCallback(async () => {
         try {
@@ -506,6 +605,12 @@ export function AnalisaAllPage() {
                 initialData={editingData}
             />
 
+            <AnalisaAllDetailModal
+                isOpen={!!detailData}
+                onClose={() => setDetailData(null)}
+                data={detailData}
+            />
+
             {/* Breadcrumb */}
             <div className="flex items-center gap-2 text-sm text-gray-400 flex-wrap">
                 <span className="text-gray-500">Dashboard</span>
@@ -524,9 +629,6 @@ export function AnalisaAllPage() {
                     </p>
                 </div>
             </div>
-
-            {/* Summary Cards
-            {!isLoading && <SummaryCards data={data} />} */}
 
             {/* Main Content Card */}
             <div className="bg-white border border-gray-200 overflow-hidden flex flex-col min-h-[500px]">
@@ -632,16 +734,27 @@ export function AnalisaAllPage() {
                                                     </td>
                                                     <td className="px-4 py-3 text-center border border-gray-200"><StatusBadge status={row.hasilAnalisa} /></td>
                                                     <td className="px-4 py-3 text-center border border-gray-200">
-                                                        <button
-                                                            onClick={() => openVerifyModal(row)}
-                                                            className={`inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer rounded ${
-                                                                row.hasilAnalisa === 'Pending'
-                                                                    ? 'bg-amber-500 hover:bg-amber-600 text-white'
-                                                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200'
-                                                            }`}
-                                                        >
-                                                            {row.hasilAnalisa === 'Pending' ? 'Verifikasi' : 'Edit Verifikasi'}
-                                                        </button>
+                                                        {isAdminOrRiset ? (
+                                                            <button
+                                                                onClick={() => openVerifyModal(row)}
+                                                                className={`inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer rounded ${
+                                                                    row.hasilAnalisa === 'Pending'
+                                                                        ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                                                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200'
+                                                                }`}
+                                                            >
+                                                                {row.hasilAnalisa === 'Pending' ? 'Verifikasi' : 'Edit Verifikasi'}
+                                                            </button>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => setDetailData(row)}
+                                                                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold bg-gray-50 hover:bg-emerald-50 text-gray-700 hover:text-emerald-700 border border-gray-200 hover:border-emerald-200 transition-all cursor-pointer rounded"
+                                                                title="Lihat Detail"
+                                                            >
+                                                                <EyeIcon />
+                                                                <span>Detail</span>
+                                                            </button>
+                                                        )}
                                                     </td>
                                                 </tr>
                                             ))
@@ -665,16 +778,25 @@ export function AnalisaAllPage() {
                                                 </div>
                                                 <div className="flex flex-col items-end gap-1.5">
                                                     <StatusBadge status={row.hasilAnalisa} />
-                                                    <button
-                                                        onClick={() => openVerifyModal(row)}
-                                                        className={`text-xs font-semibold px-2.5 py-1 rounded transition-all ${
-                                                            row.hasilAnalisa === 'Pending'
-                                                                ? 'bg-amber-500 text-white'
-                                                                : 'bg-gray-100 text-gray-700 border border-gray-200'
-                                                        }`}
-                                                    >
-                                                        {row.hasilAnalisa === 'Pending' ? 'Verifikasi' : 'Edit'}
-                                                    </button>
+                                                    {isAdminOrRiset ? (
+                                                        <button
+                                                            onClick={() => openVerifyModal(row)}
+                                                            className={`text-xs font-semibold px-2.5 py-1 rounded transition-all ${
+                                                                row.hasilAnalisa === 'Pending'
+                                                                    ? 'bg-amber-500 text-white'
+                                                                    : 'bg-gray-100 text-gray-700 border border-gray-200'
+                                                            }`}
+                                                        >
+                                                            {row.hasilAnalisa === 'Pending' ? 'Verifikasi' : 'Edit'}
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => setDetailData(row)}
+                                                            className="text-xs font-semibold px-2.5 py-1 rounded transition-all bg-gray-50 hover:bg-emerald-50 text-gray-700 hover:text-emerald-700 border border-gray-200 flex items-center gap-1"
+                                                        >
+                                                            <EyeIcon /> Detail
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-2 gap-2 text-sm">

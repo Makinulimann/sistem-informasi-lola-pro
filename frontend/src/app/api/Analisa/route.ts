@@ -4,6 +4,16 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'edge';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/supabase';
+import { verifyToken } from '@/lib/auth';
+
+async function getAuthUser(request: Request) {
+    let token = request.headers.get('Authorization')?.split(' ')[1];
+    if (!token && 'cookies' in request) {
+        token = (request as any).cookies?.get?.('sippro_token')?.value;
+    }
+    if (!token) return null;
+    return await verifyToken(token);
+}
 
 export async function GET(request: Request) {
     try {
@@ -62,6 +72,14 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
     try {
+        const user = await getAuthUser(request);
+        if (user) {
+            const role = String((user as any).role || '').toLowerCase().trim();
+            if (role !== 'admin' && role !== 'riset') {
+                return NextResponse.json({ message: 'Hanya Admin dan Riset yang dapat menambahkan data analisa.' }, { status: 403 });
+            }
+        }
+
         const body = await request.json();
 
         if (!body.productSlug || !body.tanggalSampling || !body.noBAPC || !body.kuantum || !body.hasilAnalisa) {

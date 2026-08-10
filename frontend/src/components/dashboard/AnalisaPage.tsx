@@ -39,6 +39,7 @@ function XIcon() { return (<svg width="16" height="16" viewBox="0 0 24 24" fill=
 function TrashIcon() { return (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /></svg>); }
 function AlertTriangleIcon() { return (<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>); }
 function PencilIcon() { return (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" /></svg>); }
+function EyeIcon() { return (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></svg>); }
 
 /* ─── Types ─── */
 
@@ -504,6 +505,80 @@ function AnalisaFormModal({ isOpen, onClose, onSave, initialData, productSlug, u
 }
 
 /* ═══════════════════════════════════════════ */
+/*  Detail View Modal (Read-Only)              */
+/* ═══════════════════════════════════════════ */
+
+interface DetailModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    data: AnalisaRow | null;
+}
+
+function AnalisaDetailModal({ isOpen, onClose, data }: DetailModalProps) {
+    if (!data) return null;
+
+    return (
+        <AppModal
+            isOpen={isOpen}
+            onClose={onClose}
+            title="Detail Data Analisa"
+            footer={
+                <AppButton type="button" variant="secondary" onClick={onClose}>
+                    Tutup
+                </AppButton>
+            }
+        >
+            <div className="space-y-4 text-sm">
+                <div className="bg-gray-50 border border-gray-200 p-4 space-y-3">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider block mb-1">Tanggal Sampling</span>
+                            <p className="font-semibold text-gray-800">{formatDateShort(data.tanggalSampling)}</p>
+                        </div>
+                        <div>
+                            <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider block mb-1">Batch</span>
+                            <p className="font-semibold text-gray-800">{data.noBAPC || '—'}</p>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-200">
+                        <div>
+                            <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider block mb-1">Kuantum</span>
+                            <p className="font-mono font-semibold text-gray-800">{fmt(data.kuantum)} Kg</p>
+                        </div>
+                        <div>
+                            <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider block mb-1">Hasil Analisa</span>
+                            <StatusBadge status={data.hasilAnalisa} />
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-200">
+                        <div>
+                            <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider block mb-1">Tanggal Verifikasi (COA)</span>
+                            <p className="font-medium text-gray-700">{formatDateShort(data.tanggalAnalisa)}</p>
+                        </div>
+                        <div>
+                            <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider block mb-1">Dokumen Analisa</span>
+                            {data.dokumen ? (
+                                <a
+                                    href={data.dokumen}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold hover:bg-emerald-100 transition-colors"
+                                >
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                    Lihat Dokumen
+                                </a>
+                            ) : (
+                                <p className="text-gray-400 font-mono">—</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </AppModal>
+    );
+}
+
+/* ═══════════════════════════════════════════ */
 /*  Main Component                             */
 /* ═══════════════════════════════════════════ */
 
@@ -528,10 +603,16 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingData, setEditingData] = useState<AnalisaRow | null>(null);
+    const [detailData, setDetailData] = useState<AnalisaRow | null>(null);
 
     const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; id: number | null }>({ isOpen: false, id: null });
     const [isDeleting, setIsDeleting] = useState(false);
     const [pageError, setPageError] = useState<string | null>(null);
+
+    const normRole = (userRole || '').toLowerCase().trim();
+    const isAdmin = normRole === 'admin';
+    const isRiset = normRole === 'riset';
+    const isAdminOrRiset = isAdmin || isRiset;
 
     useEffect(() => {
         const fetchUser = async () => {
@@ -647,6 +728,12 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
                 userRole={userRole}
             />
 
+            <AnalisaDetailModal
+                isOpen={!!detailData}
+                onClose={() => setDetailData(null)}
+                data={detailData}
+            />
+
             {deleteModal.isOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
                     <div className="bg-white shadow-xl max-w-sm w-full p-6 animate-in fade-in zoom-in-95 duration-200">
@@ -699,8 +786,8 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
                 <div className="flex items-center justify-between border-b border-gray-100 p-4 bg-gray-50/30">
                     <div className="text-sm font-semibold text-gray-700"></div>
 
-                    {/* Actions */}
-                    {userRole !== 'Riset' && (
+                    {/* Actions: Only Admin and Riset can Add Data */}
+                    {isAdminOrRiset && (
                         <AppButton
                             variant="primary"
                             size="md"
@@ -755,7 +842,7 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
                                             <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-right whitespace-nowrap">Kuantum</th>
                                             <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-left whitespace-nowrap">Dokumen</th>
                                             <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-center whitespace-nowrap">Hasil Analisa</th>
-                                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-center w-24">Aksi</th>
+                                            <th className="px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-gray-200 text-center w-28">Aksi</th>
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white">
@@ -787,7 +874,16 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
                                                     <td className="px-4 py-3 text-center border border-gray-200"><StatusBadge status={row.hasilAnalisa} /></td>
 
                                                     <td className="px-4 py-3 text-center border border-gray-200">
-                                                        {userRole === 'Riset' ? (
+                                                        {isAdmin ? (
+                                                            <div className="flex items-center justify-center gap-1">
+                                                                <button onClick={() => openEditModal(row)} className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors" title="Edit">
+                                                                    <PencilIcon />
+                                                                </button>
+                                                                <button onClick={() => setDeleteModal({ isOpen: true, id: row.id })} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Hapus">
+                                                                    <TrashIcon />
+                                                                </button>
+                                                            </div>
+                                                        ) : isRiset ? (
                                                             <div className="flex items-center justify-center">
                                                                 <button
                                                                     onClick={() => openEditModal(row)}
@@ -801,12 +897,14 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
                                                                 </button>
                                                             </div>
                                                         ) : (
-                                                            <div className="flex items-center justify-center gap-1">
-                                                                <button onClick={() => openEditModal(row)} className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors" title="Edit">
-                                                                    <PencilIcon />
-                                                                </button>
-                                                                <button onClick={() => setDeleteModal({ isOpen: true, id: row.id })} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Hapus">
-                                                                    <TrashIcon />
+                                                            <div className="flex items-center justify-center">
+                                                                <button
+                                                                    onClick={() => setDetailData(row)}
+                                                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold bg-gray-50 hover:bg-emerald-50 text-gray-700 hover:text-emerald-700 border border-gray-200 hover:border-emerald-200 transition-all cursor-pointer"
+                                                                    title="Lihat Detail"
+                                                                >
+                                                                    <EyeIcon />
+                                                                    <span>Detail</span>
                                                                 </button>
                                                             </div>
                                                         )}
@@ -831,16 +929,20 @@ export function AnalisaPage({ productCategory, productName, productSlug }: Anali
                                                     <p className="text-xs text-gray-500 font-mono mt-0.5">{row.noBAPC}</p>
                                                 </div>
                                                 <StatusBadge status={row.hasilAnalisa} />
-                                                <div className="absolute top-2 right-2 flex gap-1 bg-white opacity-0 group-hover:opacity-100 transition-opacity border border-gray-100 shadow-sm px-1 py-0.5">
-                                                    {userRole === 'Riset' ? (
-                                                        <button onClick={() => openEditModal(row)} className="text-xs text-amber-600 px-2 py-1 hover:bg-amber-50 rounded">
-                                                            {row.hasilAnalisa === 'Pending' ? 'Verifikasi' : 'Edit'}
-                                                        </button>
-                                                    ) : (
+                                                <div className="absolute top-2 right-2 flex gap-1 bg-white border border-gray-100 shadow-sm px-1 py-0.5">
+                                                    {isAdmin ? (
                                                         <>
                                                             <button onClick={() => openEditModal(row)} className="text-xs text-blue-600 px-2 py-1 hover:bg-blue-50 rounded">Edit</button>
                                                             <button onClick={() => setDeleteModal({ isOpen: true, id: row.id })} className="text-xs text-red-600 px-2 py-1 hover:bg-red-50 rounded">Hapus</button>
                                                         </>
+                                                    ) : isRiset ? (
+                                                        <button onClick={() => openEditModal(row)} className="text-xs text-amber-600 px-2 py-1 hover:bg-amber-50 rounded">
+                                                            {row.hasilAnalisa === 'Pending' ? 'Verifikasi' : 'Edit'}
+                                                        </button>
+                                                    ) : (
+                                                        <button onClick={() => setDetailData(row)} className="text-xs text-emerald-600 px-2 py-1 hover:bg-emerald-50 rounded font-semibold flex items-center gap-1">
+                                                            <EyeIcon /> Detail
+                                                        </button>
                                                     )}
                                                 </div>
                                             </div>
