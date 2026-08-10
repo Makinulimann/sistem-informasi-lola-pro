@@ -63,6 +63,7 @@ interface BelumSamplingModalProps {
     onSaved: () => void;
     productSlug: string;
     productFullName: string;
+    productSatuan?: string | null;
     tabId: number;
     tanggal: string; // yyyy-MM-dd
     currentBs: number;
@@ -143,6 +144,7 @@ export function BelumSamplingModal({
     onSaved,
     productSlug,
     productFullName,
+    productSatuan,
     tabId,
     tanggal,
     currentBs,
@@ -166,15 +168,18 @@ export function BelumSamplingModal({
     const [productMaterialsData, setProductMaterialsData] = useState<any[]>([]);
     const [selectedSubProduct, setSelectedSubProduct] = useState<string>('default');
 
-    const isLiquid = productFullName.toLowerCase().includes('cair') || productFullName.toLowerCase().includes('liquid');
-    const unitFamily = isLiquid ? ['Liter', 'mL', 'KL'] : ['Ton', 'Kwintal', 'Kg', 'Gram'];
+    const isLiquid = productSatuan
+        ? ['liter', 'ml', 'kl', 'l', 'lt'].includes(productSatuan.toLowerCase())
+        : (productFullName.toLowerCase().includes('cair') || productFullName.toLowerCase().includes('liquid'));
+    const baseUnitForProduct = productSatuan || (isLiquid ? 'Liter' : 'Kg');
+    const unitFamily = getUnitFamily(baseUnitForProduct);
 
     // Reset state when modal opens
     useEffect(() => {
         if (isOpen) {
             setStep(0);
             setBsValue(currentBs > 0 ? String(currentBs) : '');
-            setBsSatuan(isLiquid ? 'Liter' : 'Kg');
+            setBsSatuan(baseUnitForProduct);
             setBatchKode(currentBatchKode || '');
             setKeterangan('');
             setMaterials([]);
@@ -185,7 +190,7 @@ export function BelumSamplingModal({
             setSuccess(false);
             setError(null);
         }
-    }, [isOpen, currentBs, currentBatchKode]);
+    }, [isOpen, currentBs, currentBatchKode, baseUnitForProduct]);
 
     // Load materials when moving to step 2
     const loadMaterials = async () => {
@@ -389,7 +394,6 @@ export function BelumSamplingModal({
                 jenis: m.jenis === 'Bahan Baku' ? 'Baku' : 'Penolong',
             }));
 
-            const baseUnitForProduct = isLiquid ? 'Liter' : 'Kg';
             const convertedBs = convertUnit(Number(bsValue), bsSatuan, baseUnitForProduct);
 
             await saveProduksiWithMaterials({

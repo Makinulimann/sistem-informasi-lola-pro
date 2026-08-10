@@ -128,6 +128,28 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
     const [tabsLoading, setTabsLoading] = useState(true);
     const [subTab, setSubTab] = useState<'produksi' | 'bom'>('produksi');
     const [userRole, setUserRole] = useState<string | null>(null);
+    const [productSatuan, setProductSatuan] = useState<string | null>(null);
+
+    useEffect(() => {
+        const fetchProductConfig = async () => {
+            try {
+                const menus = await sidebarService.getAllFlat();
+                const childMenu = menus.find(m => m.href && m.href.includes(`/${slug}/`));
+                const parentMenu = childMenu ? menus.find(m => m.id === childMenu.parentId) : null;
+                if (parentMenu && parentMenu.satuan) {
+                    setProductSatuan(parentMenu.satuan);
+                } else {
+                    const directMenu = menus.find(m => m.href && (m.href.endsWith(`/${slug}`) || m.href.includes(`/${slug}/`)));
+                    if (directMenu && directMenu.satuan) {
+                        setProductSatuan(directMenu.satuan);
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to load product configuration:', err);
+            }
+        };
+        fetchProductConfig();
+    }, [slug]);
 
     useEffect(() => {
         const fetchUser = async () => {
@@ -445,8 +467,11 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
     /* ═══════════════════════════════════════════ */
     const activeTabObj = tabs.find(t => t.id === activeTabId);
     const activeTabName = activeTabObj?.nama || '';
-    const isActiveCair = getProductFullName(productName, activeTabName).toLowerCase().includes('cair') || getProductFullName(productName, activeTabName).toLowerCase().includes('liquid');
-    const baseUnit = isActiveCair ? 'Liter' : 'Kg';
+    const fullProdName = getProductFullName(productName, activeTabName);
+    const isLiquid = productSatuan
+        ? ['liter', 'ml', 'kl', 'l', 'lt'].includes(productSatuan.toLowerCase())
+        : (fullProdName.toLowerCase().includes('cair') || fullProdName.toLowerCase().includes('liquid'));
+    const baseUnit = productSatuan || (isLiquid ? 'Liter' : 'Kg');
     const unitFamily = getUnitFamily(baseUnit);
     const currentUnit = displayUnit && unitFamily.includes(displayUnit) ? displayUnit : baseUnit;
 
@@ -814,6 +839,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                 onSaved={() => fetchData()}
                 productSlug={slug}
                 productFullName={getProductFullName(productName, tabs.find(t => t.id === activeTabId)?.nama || '')}
+                productSatuan={productSatuan}
                 tabId={activeTabId || 0}
                 tanggal={bsModal.tanggal}
                 currentBs={bsModal.currentBs}
