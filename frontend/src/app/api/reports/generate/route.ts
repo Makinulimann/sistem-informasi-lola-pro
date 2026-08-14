@@ -316,27 +316,32 @@ export async function POST(request: Request) {
             slugVariantsMap.get(v.productSlug)!.push(v);
         });
 
+        const extractVariantFromKet = (ket: string): string => {
+            const m = (ket || '').match(/\[Varian:\s*([^\]\-]+)/i);
+            return m ? m[1].trim().toLowerCase() : '';
+        };
+
         const isExplicitVariantMatch = (p: any, v: DynamicVariant): boolean => {
             if (p.product_slug !== v.productSlug) return false;
 
             const ket = (p.keterangan || '').toLowerCase();
-            const kem = v.kemasan.toLowerCase().replace('@', '').trim();
+            const kem = (v.kemasan || '').toLowerCase().replace('@', '').trim();
             const kemNoSpace = kem.replace(/\s+/g, '');
 
             if (!kem) return true;
 
-            // Direct match in keterangan
-            if (ket && (ket.includes(kem) || (kemNoSpace && ket.includes(kemNoSpace)))) {
-                return true;
-            }
-
-            // Direct match in batch code mapping
-            if (p.batch_kode && batchToVariantMap.has(p.batch_kode.toLowerCase())) {
-                const mappedVar = (batchToVariantMap.get(p.batch_kode.toLowerCase()) || '').toLowerCase();
-                const mappedNoSpace = mappedVar.replace(/\s+/g, '');
-                if (mappedVar.includes(kem) || (kemNoSpace && mappedNoSpace.includes(kemNoSpace))) {
+            // 1. Direct check for extracted variant tag in keterangan (e.g. "[Varian: 5KG - Batch: B05]")
+            const explicitKetVar = extractVariantFromKet(p.keterangan || '');
+            if (explicitKetVar) {
+                const explicitNoSpace = explicitKetVar.replace(/\s+/g, '');
+                if (explicitKetVar === kem || explicitNoSpace === kemNoSpace || explicitKetVar.includes(kem) || kem.includes(explicitKetVar)) {
                     return true;
                 }
+            }
+
+            // 2. Direct match in keterangan text
+            if (ket && (ket.includes(kem) || (kemNoSpace && ket.includes(kemNoSpace)))) {
+                return true;
             }
 
             return false;

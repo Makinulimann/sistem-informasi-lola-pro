@@ -8,7 +8,7 @@ import { db } from '@/lib/supabase';
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { productSlug, tabId, tanggal, batchKode, ps } = body;
+        const { productSlug, tabId, tanggal, batchKode, variantName, ps } = body;
 
         // Basic validation
         if (!productSlug || !tabId || !tanggal || !batchKode) {
@@ -28,11 +28,23 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'ProduksiTab not found.' }, { status: 404 });
         }
 
+        const extractVariantTag = (ket: string): string => {
+            const m = (ket || '').match(/\[Varian:\s*([^-\]]+)/i);
+            return m ? m[1].trim().toLowerCase() : '';
+        };
+
+        const reqVariant = (variantName || '').trim().toLowerCase();
+
         // Fetch the target batch filtered by tab
         const { data: allProduksi } = await db.from<any>('produksis').select('*').eq('produksi_tab_id', tabId).execute();
-        let targetBatch = (allProduksi || []).find((p: any) => 
-            p.batch_kode === batchKode && p.bs > 0
-        );
+        let targetBatch = (allProduksi || []).find((p: any) => {
+            const isSameBatch = p.batch_kode && p.batch_kode.toLowerCase() === batchKode.toLowerCase();
+            const rowVar = extractVariantTag(p.keterangan || '');
+            if (reqVariant) {
+                return isSameBatch && rowVar === reqVariant && Number(p.bs || 0) > 0;
+            }
+            return isSameBatch && Number(p.bs || 0) > 0;
+        });
 
         if (!targetBatch) {
             targetBatch = (allProduksi || []).find((p: any) => 

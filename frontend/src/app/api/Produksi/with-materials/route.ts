@@ -76,12 +76,24 @@ export async function POST(request: Request) {
 
         // 1. Upsert Produksi
         const reqId = body.id || body.Id || body.produksiId;
+
+        const extractVariantTag = (ket: string): string => {
+            const m = (ket || '').match(/\[Varian:\s*([^-\]]+)/i);
+            return m ? m[1].trim().toLowerCase() : '';
+        };
+
         const { data: records } = await db.from<any>('produksis').select('*').eq('product_slug', productSlug).execute();
         const existing = (records || []).find((r: any) => {
             if (reqId && Number(r.id) === Number(reqId)) return true;
             if (r.produksi_tab_id !== tabId) return false;
-            if (batchKodeValue && r.batch_kode && r.batch_kode.toLowerCase() === batchKodeValue.toLowerCase() && r.bs > 0) return true;
-            return isSameDate(r.tanggal, dateStr);
+
+            const rowVariant = extractVariantTag(r.keterangan || '');
+            const reqVariant = (variantNameValue && variantNameValue !== 'default') ? variantNameValue.trim().toLowerCase() : '';
+
+            const isSameBatch = batchKodeValue && r.batch_kode && r.batch_kode.toLowerCase() === batchKodeValue.toLowerCase();
+            const isSameVar = rowVariant === reqVariant;
+
+            return isSameDate(r.tanggal, dateStr) && isSameBatch && isSameVar;
         });
 
         if (existing) {

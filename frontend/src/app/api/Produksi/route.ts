@@ -82,15 +82,30 @@ export async function GET(request: Request) {
                 return localD.getDate() === date.getDate() && localD.getMonth() === date.getMonth();
             });
 
-            const bs = dayMatches.reduce((max, r) => Math.max(max, Number(r.bs || 0)), 0);
-            const ps = dayMatches.reduce((max, r) => Math.max(max, Number(r.ps || 0)), 0);
-            const coa = dayMatches.reduce((max, r) => Math.max(max, Number(r.coa || 0)), 0);
-            const pg = dayMatches.reduce((max, r) => Math.max(max, Number(r.pg || 0)), 0);
-            const ket = dayMatches.map((r: any) => r.keterangan).filter(Boolean).join(' ') || "";
+            const bs = dayMatches.reduce((sum, r) => sum + Number(r.bs || 0), 0);
+            const ps = dayMatches.reduce((sum, r) => sum + Number(r.ps || 0), 0);
+            const coa = dayMatches.reduce((sum, r) => sum + Number(r.coa || 0), 0);
+            const pg = dayMatches.reduce((sum, r) => sum + Number(r.pg || 0), 0);
+            const ket = dayMatches.map((r: any) => r.keterangan).filter(Boolean).join(' | ') || "";
             const id = dayMatches.find((r: any) => r.id)?.id ?? 0;
-            const batchKode = dayMatches.find((r: any) => r.batch_kode)?.batch_kode ?? "";
-            const psBatchKode = dayMatches.find((r: any) => r.ps_batch_kode)?.ps_batch_kode ?? "";
-            const coaBatchKode = dayMatches.find((r: any) => r.coa_batch_kode)?.coa_batch_kode ?? "";
+            
+            const batchSet = new Set<string>();
+            dayMatches.forEach((r: any) => {
+                if (r.batch_kode) batchSet.add(r.batch_kode);
+            });
+            const batchKode = Array.from(batchSet).join(', ');
+
+            const psBatchSet = new Set<string>();
+            dayMatches.forEach((r: any) => {
+                if (r.ps_batch_kode) psBatchSet.add(r.ps_batch_kode);
+            });
+            const psBatchKode = Array.from(psBatchSet).join(', ');
+
+            const coaBatchSet = new Set<string>();
+            dayMatches.forEach((r: any) => {
+                if (r.coa_batch_kode) coaBatchSet.add(r.coa_batch_kode);
+            });
+            const coaBatchKode = Array.from(coaBatchSet).join(', ');
 
             runningKumulatif += bs;
             runningStok += (bs - pg);
@@ -116,7 +131,12 @@ export async function GET(request: Request) {
         }
 
         // --- Calculate Batch WIP available globally ---
-        const batchMap: { [kode: string]: { bs: number, ps: number, coa: number } } = {};
+        const extractVariantTag = (ket: string): string => {
+            const m = (ket || '').match(/\[Varian:\s*([^-\]]+)/i);
+            return m ? m[1].trim() : '';
+        };
+
+        const batchMap: { [key: string]: { kode: string, variant: string, bs: number, ps: number, coa: number } } = {};
         for (const r of tabFilteredRecords) {
             const bsNum = Number(r.bs || 0);
             const psNum = Number(r.ps || 0);
@@ -135,21 +155,26 @@ export async function GET(request: Request) {
                     db.from<any>('produksis').update({ batch_kode: effectiveBatch }).eq('id', r.id).then(() => {}).catch(() => {});
                 }
 
+                const variant = extractVariantTag(r.keterangan || '');
+                const key = variant ? `${effectiveBatch}||${variant}` : effectiveBatch;
+
                 if (effectiveBatch && bsNum > 0) {
-                    if (!batchMap[effectiveBatch]) batchMap[effectiveBatch] = { bs: 0, ps: 0, coa: 0 };
-                    batchMap[effectiveBatch].bs += bsNum;
+                    if (!batchMap[key]) batchMap[key] = { kode: effectiveBatch, variant, bs: 0, ps: 0, coa: 0 };
+                    batchMap[key].bs += bsNum;
                 }
 
                 const effectivePsBatch = (r.ps_batch_kode || '').trim() || effectiveBatch;
                 if (effectivePsBatch && psNum > 0) {
-                    if (!batchMap[effectivePsBatch]) batchMap[effectivePsBatch] = { bs: 0, ps: 0, coa: 0 };
-                    batchMap[effectivePsBatch].ps += psNum;
+                    const psKey = variant ? `${effectivePsBatch}||${variant}` : effectivePsBatch;
+                    if (!batchMap[psKey]) batchMap[psKey] = { kode: effectivePsBatch, variant, bs: 0, ps: 0, coa: 0 };
+                    batchMap[psKey].ps += psNum;
                 }
 
                 const effectiveCoaBatch = (r.coa_batch_kode || '').trim() || effectivePsBatch || effectiveBatch;
                 if (effectiveCoaBatch && coaNum > 0) {
-                    if (!batchMap[effectiveCoaBatch]) batchMap[effectiveCoaBatch] = { bs: 0, ps: 0, coa: 0 };
-                    batchMap[effectiveCoaBatch].coa += coaNum;
+                    const coaKey = variant ? `${effectiveCoaBatch}||${variant}` : effectiveCoaBatch;
+                    if (!batchMap[coaKey]) batchMap[coaKey] = { kode: effectiveCoaBatch, variant, bs: 0, ps: 0, coa: 0 };
+                    batchMap[coaKey].coa += coaNum;
                 }
             }
         }
@@ -157,8 +182,8 @@ export async function GET(request: Request) {
         let globalBelumSampling = 0;
         let globalProsesSampling = 0;
 
-        for (const kode in batchMap) {
-            const b = batchMap[kode];
+        for (const key in batchMap) {
+            const b = batchMap[key];
             globalBelumSampling += Math.max(0, b.bs - b.ps);
             globalProsesSampling += Math.max(0, b.ps - b.coa);
         }
@@ -175,13 +200,14 @@ export async function GET(request: Request) {
         };
 
         const availableBatches = [];
-        for (const kode in batchMap) {
-            const b = batchMap[kode];
+        for (const key in batchMap) {
+            const b = batchMap[key];
             const bsWip = Math.max(0, b.bs - b.ps);
             const psWip = Math.max(0, b.ps - b.coa);
             const coaWip = Math.max(0, b.ps - b.coa);
             if (bsWip > 0 || psWip > 0 || coaWip > 0) {
-                availableBatches.push({ kode, bsWip, psWip, coaWip });
+                const label = b.variant ? `${b.kode} (Varian: ${b.variant})` : b.kode;
+                availableBatches.push({ kode: b.kode, variantName: b.variant, label, bsWip, psWip, coaWip });
             }
         }
 
@@ -249,12 +275,25 @@ export async function POST(request: Request) {
 
         // Check for existing record
         const reqId = body.id || body.Id || body.produksiId;
+        const variantNameValue = body.variantName || body.VariantName || body.variant_name || '';
+
+        const extractVariantTag = (ket: string): string => {
+            const m = (ket || '').match(/\[Varian:\s*([^-\]]+)/i);
+            return m ? m[1].trim().toLowerCase() : '';
+        };
+
         const { data: existingArr } = await db.from<any>('produksis').select('*').eq('produksi_tab_id', tabId).execute();
         const existing = (existingArr || []).find((r: any) => {
             if (reqId && Number(r.id) === Number(reqId)) return true;
             if (r.produksi_tab_id !== tabId) return false;
-            if (batchKodeValue && r.batch_kode && r.batch_kode.toLowerCase() === batchKodeValue.toLowerCase() && r.bs > 0) return true;
-            return isSameDate(r.tanggal, dateStr);
+
+            const rowVariant = extractVariantTag(r.keterangan || '');
+            const reqVariant = (variantNameValue && variantNameValue !== 'default') ? variantNameValue.trim().toLowerCase() : '';
+
+            const isSameBatch = batchKodeValue && r.batch_kode && r.batch_kode.toLowerCase() === batchKodeValue.toLowerCase();
+            const isSameVar = rowVariant === reqVariant;
+
+            return isSameDate(r.tanggal, dateStr) && isSameBatch && isSameVar;
         });
 
         if (existing) {

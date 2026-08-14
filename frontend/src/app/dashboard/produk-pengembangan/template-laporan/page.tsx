@@ -32,6 +32,126 @@ function formatYmdToDmy(dateStr: string): string {
     return dateStr;
 }
 
+/* ─── Helper: Format markdown bold/italic syntax or pass HTML safely ─── */
+function renderFormattedHtml(text: string): string {
+    if (!text) return '';
+    let html = text
+        .replace(/\*\*\*(.*?)\*\*\*/g, '<b><i>$1</i></b>')
+        .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+        .replace(/\*(.*?)\*/g, '<i>$1</i>');
+
+    return html;
+}
+
+interface RichBulletInputProps {
+    value: string;
+    onChange: (val: string) => void;
+    onDelete?: () => void;
+    placeholder?: string;
+    className?: string;
+}
+
+const RichBulletInput: React.FC<RichBulletInputProps> = ({
+    value,
+    onChange,
+    onDelete,
+    placeholder = 'Ketik poin...',
+    className = ''
+}) => {
+    const editorRef = useRef<HTMLDivElement>(null);
+
+    // Sync innerHTML when value changes externally (e.g. draft load/reset)
+    useEffect(() => {
+        if (editorRef.current) {
+            const currentHTML = editorRef.current.innerHTML;
+            if (currentHTML !== (value || '')) {
+                editorRef.current.innerHTML = value || '';
+            }
+        }
+    }, [value]);
+
+    const handleInput = () => {
+        if (editorRef.current) {
+            let html = editorRef.current.innerHTML;
+            if (html === '<br>') html = '';
+            onChange(html);
+        }
+    };
+
+    const applyFormat = (command: 'bold' | 'italic') => {
+        if (editorRef.current) {
+            editorRef.current.focus();
+            document.execCommand(command, false);
+            handleInput();
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+        const isCmdOrCtrl = e.ctrlKey || e.metaKey;
+        if (isCmdOrCtrl) {
+            if (e.key.toLowerCase() === 'b') {
+                e.preventDefault();
+                applyFormat('bold');
+            } else if (e.key.toLowerCase() === 'i') {
+                e.preventDefault();
+                applyFormat('italic');
+            }
+        }
+        if (e.key === 'Enter') {
+            e.preventDefault();
+        }
+    };
+
+    return (
+        <div className="w-full flex items-center gap-1.5 group relative">
+            <div
+                ref={editorRef}
+                contentEditable
+                suppressContentEditableWarning
+                onInput={handleInput}
+                onKeyDown={handleKeyDown}
+                data-placeholder={placeholder}
+                className={`w-full bg-transparent outline-none focus:bg-emerald-50/60 rounded px-1.5 py-0.5 border-b border-transparent focus:border-emerald-500 text-xs min-h-[24px] cursor-text empty:before:content-[attr(data-placeholder)] empty:before:text-gray-400 empty:before:italic ${className}`}
+            />
+            <div className="flex items-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity bg-white border border-gray-200 rounded px-1 shadow-2xs shrink-0">
+                <button
+                    type="button"
+                    onMouseDown={(e) => {
+                        e.preventDefault();
+                        applyFormat('bold');
+                    }}
+                    className="px-1 py-0.5 text-[10px] font-bold text-gray-700 hover:text-emerald-700 hover:bg-emerald-50 rounded transition-colors cursor-pointer"
+                    title="Tebal / Bold (Ctrl+B)"
+                >
+                    B
+                </button>
+                <button
+                    type="button"
+                    onMouseDown={(e) => {
+                        e.preventDefault();
+                        applyFormat('italic');
+                    }}
+                    className="px-1.5 py-0.5 text-[10px] font-semibold italic text-gray-700 hover:text-emerald-700 hover:bg-emerald-50 rounded transition-colors cursor-pointer"
+                    title="Miring / Italic (Ctrl+I)"
+                >
+                    I
+                </button>
+            </div>
+            {onDelete && (
+                <button
+                    type="button"
+                    onClick={onDelete}
+                    className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 transition-opacity p-0.5 cursor-pointer shrink-0"
+                    title="Hapus Poin"
+                >
+                    <Trash2 className="size-3.5" />
+                </button>
+            )}
+        </div>
+    );
+};
+
+
 /* ─── Types ─── */
 interface RkoRow {
     no: number;
@@ -856,7 +976,7 @@ export default function TemplateLaporanPage() {
                     ` : '';
                     const bulletList = g.bullets.length === 0 ? '' : `
                         <ul style="margin: 0; padding-left: 16px; font-size: 8.5pt; line-height: 1.5;">
-                            ${g.bullets.map(b => `<li>${b}</li>`).join('')}
+                            ${g.bullets.map(b => `<li>${renderFormattedHtml(b)}</li>`).join('')}
                         </ul>
                     `;
                     return `
@@ -901,7 +1021,7 @@ export default function TemplateLaporanPage() {
                         ` : '';
                         const bulletList = g.bullets.length === 0 ? '' : `
                             <ul style="margin: 0; padding-left: 16px; font-size: 8.5pt; line-height: 1.5;">
-                                ${g.bullets.map(b => `<li>${b}</li>`).join('')}
+                                ${g.bullets.map(b => `<li>${renderFormattedHtml(b)}</li>`).join('')}
                             </ul>
                         `;
                         return `
@@ -1053,7 +1173,7 @@ export default function TemplateLaporanPage() {
                                 <td style="padding: 8px; vertical-align: top;">
                                     ${catatanTambahanBullets.length === 0 ? '<div style="color: #666; font-style: italic;">Tidak ada catatan tambahan pada periode terpilih.</div>' : `
                                         <ul style="margin: 0; padding-left: 16px; font-size: 8.5pt; line-height: 1.5;">
-                                            ${catatanTambahanBullets.map(b => `<li>${b}</li>`).join('')}
+                                            ${catatanTambahanBullets.map(b => `<li>${renderFormattedHtml(b)}</li>`).join('')}
                                         </ul>
                                     `}
                                 </td>
@@ -1144,7 +1264,7 @@ export default function TemplateLaporanPage() {
                     ` : '';
                     const bulletList = g.bullets.length === 0 ? '<i style="color:#888;">Belum ada aktivitas.</i>' : `
                         <ul style="margin: 0; padding-left: 16px; line-height: 1.5;">
-                            ${g.bullets.map(b => `<li>${b}</li>`).join('')}
+                            ${g.bullets.map(b => `<li>${renderFormattedHtml(b)}</li>`).join('')}
                         </ul>
                     `;
                     return `
@@ -1189,7 +1309,7 @@ export default function TemplateLaporanPage() {
                         ` : '';
                         const bulletList = g.bullets.length === 0 ? '<i style="color:#888;">Belum ada aktivitas.</i>' : `
                             <ul style="margin: 0; padding-left: 16px; line-height: 1.5;">
-                                ${g.bullets.map(b => `<li>${b}</li>`).join('')}
+                                ${g.bullets.map(b => `<li>${renderFormattedHtml(b)}</li>`).join('')}
                             </ul>
                         `;
                         return `
@@ -1327,7 +1447,7 @@ export default function TemplateLaporanPage() {
                                 <td colSpan="8" style="padding: 8px; vertical-align: top;">
                                     ${catatanTambahanBullets.length === 0 ? '<div style="color: #666; font-style: italic;">Tidak ada catatan tambahan pada periode terpilih.</div>' : `
                                         <ul style="margin: 0; padding-left: 16px; font-size: 8.5pt; line-height: 1.5;">
-                                            ${catatanTambahanBullets.map(b => `<li>${b}</li>`).join('')}
+                                            ${catatanTambahanBullets.map(b => `<li>${renderFormattedHtml(b)}</li>`).join('')}
                                         </ul>
                                     `}
                                 </td>
@@ -1801,27 +1921,17 @@ export default function TemplateLaporanPage() {
                                                                 {group.bullets.length === 0 ? (
                                                                     <span className="text-gray-400 italic text-xs">Belum ada poin aktivitas pada tanggal ini.</span>
                                                                 ) : (
-                                                                    <ul className="list-disc list-outside ml-4 space-y-1.5 text-xs text-gray-800">
-                                                                        {group.bullets.map((bullet, bIdx) => (
-                                                                            <li key={bIdx} className="group relative">
-                                                                                <div className="flex items-center gap-1.5">
-                                                                                    <input
-                                                                                        type="text"
-                                                                                        value={bullet}
-                                                                                        onChange={(e) => handleBulletChange(block.id, group.id, bIdx, e.target.value)}
-                                                                                        className="w-full bg-transparent outline-none focus:bg-emerald-50/60 rounded px-1.5 py-0.5 border-b border-transparent focus:border-emerald-500 text-xs"
-                                                                                    />
-                                                                                    <button
-                                                                                        onClick={() => handleDeleteBullet(block.id, group.id, bIdx)}
-                                                                                        className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 transition-opacity p-0.5 cursor-pointer"
-                                                                                        title="Hapus Poin"
-                                                                                    >
-                                                                                        <Trash2 className="size-3.5" />
-                                                                                    </button>
-                                                                                </div>
-                                                                            </li>
-                                                                        ))}
-                                                                    </ul>
+                                                                     <ul className="list-disc list-outside ml-4 space-y-2 text-xs text-gray-800">
+                                                                         {group.bullets.map((bullet, bIdx) => (
+                                                                             <li key={bIdx}>
+                                                                                 <RichBulletInput
+                                                                                     value={bullet}
+                                                                                     onChange={(val) => handleBulletChange(block.id, group.id, bIdx, val)}
+                                                                                     onDelete={() => handleDeleteBullet(block.id, group.id, bIdx)}
+                                                                                 />
+                                                                             </li>
+                                                                         ))}
+                                                                     </ul>
                                                                 )}
 
                                                                 <div className="pt-1 flex items-center gap-3">
@@ -2042,24 +2152,14 @@ export default function TemplateLaporanPage() {
                                                                         {group.bullets.length === 0 ? (
                                                                             <span className="text-gray-400 italic text-xs">Belum ada poin aktivitas progres.</span>
                                                                         ) : (
-                                                                            <ul className="list-disc list-outside ml-4 space-y-1.5 text-xs text-gray-800">
+                                                                            <ul className="list-disc list-outside ml-4 space-y-2 text-xs text-gray-800">
                                                                                 {group.bullets.map((bullet, bIdx) => (
-                                                                                    <li key={bIdx} className="group relative">
-                                                                                        <div className="flex items-center gap-1.5">
-                                                                                            <input
-                                                                                                type="text"
-                                                                                                value={bullet}
-                                                                                                onChange={(e) => handlePabrikBulletChange(plan.id, group.id, bIdx, e.target.value)}
-                                                                                                className="w-full bg-transparent outline-none focus:bg-emerald-50/60 rounded px-1.5 py-0.5 border-b border-transparent focus:border-emerald-500 text-xs"
-                                                                                            />
-                                                                                            <button
-                                                                                                onClick={() => handleDeletePabrikBullet(plan.id, group.id, bIdx)}
-                                                                                                className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 transition-opacity p-0.5 cursor-pointer"
-                                                                                                title="Hapus Poin"
-                                                                                            >
-                                                                                                <Trash2 className="size-3.5" />
-                                                                                            </button>
-                                                                                        </div>
+                                                                                    <li key={bIdx}>
+                                                                                        <RichBulletInput
+                                                                                            value={bullet}
+                                                                                            onChange={(val) => handlePabrikBulletChange(plan.id, group.id, bIdx, val)}
+                                                                                            onDelete={() => handleDeletePabrikBullet(plan.id, group.id, bIdx)}
+                                                                                        />
                                                                                     </li>
                                                                                 ))}
                                                                             </ul>
@@ -2107,28 +2207,18 @@ export default function TemplateLaporanPage() {
                                 {catatanTambahanBullets.length === 0 ? (
                                     <p className="text-xs text-gray-400 italic">Tidak ada catatan tambahan pada periode terpilih.</p>
                                 ) : (
-                                    <ul className="list-disc list-outside ml-4 space-y-1.5 text-xs text-gray-800">
+                                    <ul className="list-disc list-outside ml-4 space-y-2 text-xs text-gray-800">
                                         {catatanTambahanBullets.map((bullet, idx) => (
-                                            <li key={idx} className="group relative">
-                                                <div className="flex items-center gap-1.5">
-                                                    <input
-                                                        type="text"
-                                                        value={bullet}
-                                                        onChange={(e) => {
-                                                            const next = [...catatanTambahanBullets];
-                                                            next[idx] = e.target.value;
-                                                            setCatatanTambahanBullets(next);
-                                                        }}
-                                                        className="w-full bg-transparent outline-none focus:bg-white rounded px-1.5 py-0.5 border-b border-transparent focus:border-emerald-500 text-xs"
-                                                    />
-                                                    <button
-                                                        onClick={() => setCatatanTambahanBullets(prev => prev.filter((_, i) => i !== idx))}
-                                                        className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 transition-opacity p-0.5 cursor-pointer"
-                                                        title="Hapus Catatan"
-                                                    >
-                                                        <Trash2 className="size-3.5" />
-                                                    </button>
-                                                </div>
+                                            <li key={idx}>
+                                                <RichBulletInput
+                                                    value={bullet}
+                                                    onChange={(val) => {
+                                                        const next = [...catatanTambahanBullets];
+                                                        next[idx] = val;
+                                                        setCatatanTambahanBullets(next);
+                                                    }}
+                                                    onDelete={() => setCatatanTambahanBullets(prev => prev.filter((_, i) => i !== idx))}
+                                                />
                                             </li>
                                         ))}
                                     </ul>

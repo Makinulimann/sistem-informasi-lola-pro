@@ -255,7 +255,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
     useEffect(() => { fetchTabs(); }, [fetchTabs]);
 
     // ─── Fetch Data ───
-    const [availableBatches, setAvailableBatches] = useState<{ kode: string, bsWip: number, psWip: number, coaWip: number }[]>([]);
+    const [availableBatches, setAvailableBatches] = useState<{ kode: string, variantName?: string, label?: string, bsWip: number, psWip: number, coaWip: number }[]>([]);
 
     const fetchData = useCallback(async () => {
         if (!activeTabId) return;
@@ -965,7 +965,9 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                 className="w-full flex items-center justify-between text-left text-base text-gray-900 px-4 py-3 bg-white border-2 border-amber-200 hover:border-amber-400 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all"
                             >
                                 {psBatchKode ? (
-                                    <span className="font-medium">{psBatchKode}</span>
+                                    <span className="font-medium">
+                                        {psAvailableBatches.find(b => b.kode === psBatchKode)?.label || psBatchKode}
+                                    </span>
                                 ) : (
                                     <span className="text-gray-400">Pilih kode batch...</span>
                                 )}
@@ -981,9 +983,9 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                         if (list.length === 0) {
                                             return <div className="px-4 py-3 text-sm text-gray-400 text-center">Tidak ada batch tersedia</div>;
                                         }
-                                        return list.map(b => (
+                                        return list.map((b, idx) => (
                                             <button
-                                                key={b.kode}
+                                                key={`${b.kode}-${b.variantName || idx}`}
                                                 type="button"
                                                 onClick={() => {
                                                     setPsBatchKode(b.kode);
@@ -995,7 +997,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                                 }}
                                                 className={`w-full text-left px-4 py-3 flex items-center justify-between hover:bg-amber-50 transition-colors ${psBatchKode === b.kode ? 'bg-amber-50 border-l-3 border-amber-500' : ''}`}
                                             >
-                                                <span className="font-medium text-gray-800">{b.kode}</span>
+                                                <span className="font-medium text-gray-800">{b.label || b.kode}</span>
                                                 {b.bsWip < 999999 && (
                                                     <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">Tersedia: {fmt(convertValue(b.bsWip, baseUnit, currentUnit))}</span>
                                                 )}
@@ -1043,6 +1045,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                             tabId: activeTabId || 0,
                                             tanggal: psModal.tanggal,
                                             batchKode: psBatchKode,
+                                            variantName: selectedBatch?.variantName,
                                             ps: valRaw,
                                         });
                                         setPsModal({ isOpen: false, tanggal: '' });
@@ -1081,7 +1084,9 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                 className="w-full flex items-center justify-between text-left text-base text-gray-900 px-4 py-3 bg-white border-2 border-blue-200 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                             >
                                 {coaBatchKode ? (
-                                    <span className="font-medium">{coaBatchKode}</span>
+                                    <span className="font-medium">
+                                        {coaAvailableBatches.find(b => b.kode === coaBatchKode)?.label || coaBatchKode}
+                                    </span>
                                 ) : (
                                     <span className="text-gray-400">Pilih kode batch...</span>
                                 )}
@@ -1092,20 +1097,24 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                     {coaAvailableBatches.length === 0 ? (
                                         <div className="px-4 py-3 text-sm text-gray-400 text-center">Tidak ada batch tersedia</div>
                                     ) : (
-                                        coaAvailableBatches.map(b => (
+                                        coaAvailableBatches.map((b, idx) => (
                                             <button
-                                                key={b.kode}
+                                                key={`${b.kode}-${b.variantName || idx}`}
                                                 type="button"
                                                 onClick={() => {
                                                     setCoaBatchKode(b.kode);
-                                                    setCoaValue(String(Math.round(convertValue(b.coaWip, baseUnit, currentUnit) * 1000) / 1000));
+                                                    if (b.coaWip < 999999) {
+                                                        setCoaValue(String(Math.round(convertValue(b.coaWip, baseUnit, currentUnit) * 1000) / 1000));
+                                                    }
                                                     setCoaDropdownOpen(false);
                                                     setCoaError(null);
                                                 }}
                                                 className={`w-full text-left px-4 py-3 flex items-center justify-between hover:bg-blue-50 transition-colors ${coaBatchKode === b.kode ? 'bg-blue-50 border-l-3 border-blue-500' : ''}`}
                                             >
-                                                <span className="font-medium text-gray-800">{b.kode}</span>
-                                                <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-blue-100 text-blue-700">Tersedia: {fmt(convertValue(b.coaWip, baseUnit, currentUnit))}</span>
+                                                <span className="font-medium text-gray-800">{b.label || b.kode}</span>
+                                                {b.coaWip < 999999 && (
+                                                    <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-blue-100 text-blue-700">Tersedia: {fmt(convertValue(b.coaWip, baseUnit, currentUnit))}</span>
+                                                )}
                                             </button>
                                         ))
                                     )}
@@ -1149,6 +1158,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                                             tabId: activeTabId || 0,
                                             tanggal: coaModal.tanggal,
                                             batchKode: coaBatchKode,
+                                            variantName: selectedBatch?.variantName,
                                             coa: valRaw,
                                         });
                                         setCoaModal({ isOpen: false, tanggal: '' });

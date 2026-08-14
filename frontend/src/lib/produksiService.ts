@@ -34,6 +34,8 @@ export interface ProduksiSummary {
 
 export interface AvailableBatch {
     kode: string;
+    variantName?: string;
+    label?: string;
     bsWip: number;
     psWip: number;
     coaWip: number;
@@ -154,6 +156,7 @@ export interface UpdateSamplingRequest {
     tabId: number;
     tanggal: string;
     batchKode: string;
+    variantName?: string;
     ps: number;
 }
 
@@ -168,6 +171,7 @@ export interface UpdateCOARequest {
     tabId: number;
     tanggal: string;
     batchKode: string;
+    variantName?: string;
     coa: number;
 }
 

@@ -244,20 +244,9 @@ export async function GET(request: Request) {
                 });
                 const tabMonthlyRecords = monthlyRecords.filter((r: any) => (r.produksi_tab_id || r.ProduksiTabId) === tabId);
 
-                // --- 1. Monthly totals (BS, PG, COA) ---
-                const groupedMonthly: { [key: string]: any } = {};
-                for (const r of tabMonthlyRecords) {
-                    const rTanggal = r.tanggal || r.Tanggal;
-                    const localD = new Date(new Date(rTanggal).getTime() + utcOffset);
-                    const key = localD.toISOString().split('T')[0];
-                    if (!groupedMonthly[key]) {
-                        groupedMonthly[key] = r;
-                    }
-                }
-                const dedupedMonthly: any[] = Object.values(groupedMonthly);
-                const bs = dedupedMonthly.reduce((s: number, r: any) => s + (r.bs || r.BS || 0), 0);
-                const pg = dedupedMonthly.reduce((s: number, r: any) => s + (r.pg || r.PG || 0), 0);
-                const coa = dedupedMonthly.reduce((s: number, r: any) => s + (r.coa || r.COA || 0), 0);
+                const bs = tabMonthlyRecords.reduce((s: number, r: any) => s + (r.bs || r.BS || 0), 0);
+                const pg = tabMonthlyRecords.reduce((s: number, r: any) => s + (r.pg || r.PG || 0), 0);
+                const coa = tabMonthlyRecords.reduce((s: number, r: any) => s + (r.coa || r.COA || 0), 0);
 
                 totalBS += bs;
                 totalPG += pg;

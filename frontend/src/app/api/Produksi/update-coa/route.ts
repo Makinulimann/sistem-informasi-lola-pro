@@ -8,7 +8,7 @@ import { db } from '@/lib/supabase';
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { productSlug, tabId, tanggal, batchKode, coa } = body;
+        const { productSlug, tabId, tanggal, batchKode, variantName, coa } = body;
 
         if (!productSlug || tabId === undefined || !tanggal || !batchKode) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -27,11 +27,23 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'ProduksiTab not found.' }, { status: 404 });
         }
 
+        const extractVariantTag = (ket: string): string => {
+            const m = (ket || '').match(/\[Varian:\s*([^-\]]+)/i);
+            return m ? m[1].trim().toLowerCase() : '';
+        };
+
+        const reqVariant = (variantName || '').trim().toLowerCase();
+
         // Fetch target batch filtered by tab
         const { data: allProduksi } = await db.from<any>('produksis').select('*').eq('produksi_tab_id', tabId).execute();
-        const targetBatch = (allProduksi || []).find((p: any) => 
-            (p.batch_kode === batchKode || p.ps_batch_kode === batchKode) && Number(p.ps || 0) > 0
-        );
+        const targetBatch = (allProduksi || []).find((p: any) => {
+            const isSameBatch = (p.batch_kode && p.batch_kode.toLowerCase() === batchKode.toLowerCase()) || (p.ps_batch_kode && p.ps_batch_kode.toLowerCase() === batchKode.toLowerCase());
+            const rowVar = extractVariantTag(p.keterangan || '');
+            if (reqVariant) {
+                return isSameBatch && rowVar === reqVariant && Number(p.ps || 0) > 0;
+            }
+            return isSameBatch && Number(p.ps || 0) > 0;
+        });
 
         if (!targetBatch) {
             return NextResponse.json({ error: `Kode Batch ${batchKode} tidak ditemukan atau belum dilakukan proses sampling (PS).` }, { status: 404 });
