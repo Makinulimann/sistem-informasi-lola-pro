@@ -34,21 +34,6 @@ export async function POST(request: Request) {
 
         const reqVariant = (variantName || '').trim().toLowerCase();
 
-        // Fetch target batch filtered by tab
-        const { data: allProduksi } = await db.from<any>('produksis').select('*').eq('produksi_tab_id', tabId).execute();
-        const targetBatch = (allProduksi || []).find((p: any) => {
-            const isSameBatch = (p.batch_kode && p.batch_kode.toLowerCase() === batchKode.toLowerCase()) || (p.ps_batch_kode && p.ps_batch_kode.toLowerCase() === batchKode.toLowerCase());
-            const rowVar = extractVariantTag(p.keterangan || '');
-            if (reqVariant) {
-                return isSameBatch && rowVar === reqVariant && Number(p.ps || 0) > 0;
-            }
-            return isSameBatch && Number(p.ps || 0) > 0;
-        });
-
-        if (!targetBatch) {
-            return NextResponse.json({ error: `Kode Batch ${batchKode} tidak ditemukan atau belum dilakukan proses sampling (PS).` }, { status: 404 });
-        }
-
         if (coa < 0) {
             return NextResponse.json({ error: 'Nilai COA tidak boleh negatif' }, { status: 400 });
         }
@@ -83,11 +68,37 @@ export async function POST(request: Request) {
             return false;
         };
 
-        let existingRecord = targetBatch || (allProduksi || []).find((p: any) => {
-            if (p.batch_kode && p.batch_kode.toLowerCase() === batchKode.toLowerCase()) return true;
-            if (p.ps_batch_kode && p.ps_batch_kode.toLowerCase() === batchKode.toLowerCase()) return true;
-            return isSameDate(p.tanggal, tanggal);
+        // Fetch target batch filtered by tab
+        const { data: allProduksi } = await db.from<any>('produksis').select('*').eq('produksi_tab_id', tabId).execute();
+
+        // 1. First priority: match exact row date and batch/variant
+        let existingRecord = (allProduksi || []).find((p: any) => {
+            if (!isSameDate(p.tanggal, tanggal)) return false;
+            const rowVar = extractVariantTag(p.keterangan || '');
+            if (reqVariant && rowVar && rowVar !== reqVariant) return false;
+            if (batchKode && (p.batch_kode || p.ps_batch_kode)) {
+                const b = (p.batch_kode || p.ps_batch_kode).toLowerCase();
+                return b === batchKode.toLowerCase();
+            }
+            return true;
         });
+
+        // 2. Second priority: match exact row date
+        if (!existingRecord) {
+            existingRecord = (allProduksi || []).find((p: any) => isSameDate(p.tanggal, tanggal));
+        }
+
+        // 3. Fallback: match target batch with ps > 0
+        if (!existingRecord) {
+            existingRecord = (allProduksi || []).find((p: any) => {
+                const isSameBatch = (p.batch_kode && p.batch_kode.toLowerCase() === batchKode.toLowerCase()) || (p.ps_batch_kode && p.ps_batch_kode.toLowerCase() === batchKode.toLowerCase());
+                const rowVar = extractVariantTag(p.keterangan || '');
+                if (reqVariant) {
+                    return isSameBatch && rowVar === reqVariant && Number(p.ps || 0) > 0;
+                }
+                return isSameBatch && Number(p.ps || 0) > 0;
+            });
+        }
 
         if (existingRecord) {
             const { error: updateError } = await db.from<any>('produksis').update({
