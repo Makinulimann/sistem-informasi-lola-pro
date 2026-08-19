@@ -109,7 +109,7 @@ export default function MonitoringHarianPage() {
               const localSaved: MonitoringRow[] = JSON.parse(localSavedStr);
               if (Array.isArray(localSaved) && localSaved.length > 0) {
                 finalRows = finalRows.map((r) => {
-                  const localMatch = localSaved.find((l) => l.id === r.id || l.name === r.name);
+                  const localMatch = localSaved.find((l) => l.id === r.id || (l.name && l.name === r.name));
                   if (localMatch) {
                     const psg = r.gudangPsg || localMatch.gudangPsg || 0;
                     const lolaMitra = r.gudangLolaMitra || localMatch.gudangLolaMitra || 0;
@@ -131,6 +131,14 @@ export default function MonitoringHarianPage() {
                   }
                   return r;
                 });
+
+                // Append any custom rows from localStorage missing in finalRows
+                for (const lItem of localSaved) {
+                  const exists = finalRows.some((fr) => fr.id === lItem.id || (fr.name && fr.name === lItem.name));
+                  if (!exists) {
+                    finalRows.push(lItem);
+                  }
+                }
               }
             }
           } catch (e) {
@@ -138,7 +146,11 @@ export default function MonitoringHarianPage() {
           }
         }
 
-        setRows(finalRows);
+        // Preserve any pending local unsaved new rows currently in state
+        setRows((prev) => {
+          const pendingNewRows = prev.filter((p) => !finalRows.some((fr) => fr.id === p.id || (p.name && fr.name === p.name)));
+          return [...finalRows, ...pendingNewRows];
+        });
       }
     } catch (err) {
       console.error('Failed to load monitoring harian:', err);
@@ -146,11 +158,15 @@ export default function MonitoringHarianPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedMonth, selectedYear, selectedDate, toast]);
+  }, [selectedMonth, selectedYear, selectedDate]);
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+    // Depend on primitive filter values, NOT the fetchData function reference.
+    // This prevents accidental re-fetches when unrelated state changes cause
+    // React to recreate the fetchData reference during re-renders.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMonth, selectedYear, selectedDate]);
 
   /* ─── Cell Input Handlers ─── */
   const handleCellChange = (
@@ -212,6 +228,7 @@ export default function MonitoringHarianPage() {
       soOutstanding: 0,
       stokAkhir: 0,
     };
+    setSearchQuery('');
     setRows((prev) => [...prev, newRow]);
     toast.success('Produk Ditambahkan', 'Baris produk baru berhasil ditambahkan. Silakan isi nama produk.');
   };
@@ -404,10 +421,12 @@ export default function MonitoringHarianPage() {
   };
 
   // Filtered rows for UI table search
-  const filteredRows = rows.filter((r) =>
-    r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    r.satuan.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredRows = rows.filter((r) => {
+    if (!searchQuery) return true;
+    const nameMatch = (r.name || '').toLowerCase().includes(searchQuery.toLowerCase());
+    const satuanMatch = (r.satuan || '').toLowerCase().includes(searchQuery.toLowerCase());
+    return nameMatch || satuanMatch;
+  });
 
   // Compute Totals for KPI Header Cards
   const totalProduksiBulan = rows.reduce((sum, r) => sum + (r.produksiBulanIni || 0), 0);
@@ -434,6 +453,7 @@ export default function MonitoringHarianPage() {
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button
+            type="button"
             onClick={handleAddRow}
             className="flex items-center gap-2 px-3.5 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-300 text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
             title="Tambah Baris Produk Baru"
@@ -443,6 +463,7 @@ export default function MonitoringHarianPage() {
           </button>
 
           <button
+            type="button"
             onClick={handleSyncProduksi}
             disabled={syncing}
             className="flex items-center gap-2 px-3.5 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-200 text-xs font-semibold shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
@@ -453,6 +474,7 @@ export default function MonitoringHarianPage() {
           </button>
 
           <button
+            type="button"
             onClick={handleExportExcel}
             className="flex items-center gap-2 px-3.5 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-200 text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
             title="Export ke Excel"
@@ -462,6 +484,7 @@ export default function MonitoringHarianPage() {
           </button>
 
           <button
+            type="button"
             onClick={handleExportPDF}
             className="flex items-center gap-2 px-3.5 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-200 text-xs font-bold shadow-2xs transition-colors cursor-pointer"
             title="Export / Cetak Laporan PDF Resmi"
@@ -471,6 +494,7 @@ export default function MonitoringHarianPage() {
           </button>
 
           <button
+            type="button"
             onClick={handleSave}
             disabled={saving}
             className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer disabled:opacity-50"
@@ -872,6 +896,7 @@ export default function MonitoringHarianPage() {
         <div className="bg-gray-50 border-t border-gray-200 px-4 py-3 flex flex-wrap items-center justify-between text-xs text-gray-500 gap-2">
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={handleAddRow}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 text-xs font-semibold rounded shadow-2xs transition-colors cursor-pointer"
             >
@@ -882,11 +907,12 @@ export default function MonitoringHarianPage() {
 
           <div className="flex items-center gap-3 font-medium">
             <button
+              type="button"
               onClick={handleSave}
               disabled={saving}
-              className="text-emerald-700 hover:text-emerald-900 font-semibold cursor-pointer underline"
+              className="text-emerald-700 hover:text-emerald-900 font-semibold cursor-pointer underline disabled:opacity-50"
             >
-              Simpan Perubahan
+              {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
             </button>
           </div>
         </div>

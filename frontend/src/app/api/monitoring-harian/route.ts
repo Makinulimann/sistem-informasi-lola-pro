@@ -44,11 +44,15 @@ export async function GET(request: Request) {
       productionMap[p.id] = { monthBs: 0, ytdBs: 0 };
     });
 
+    const utcOffset = 7 * 60 * 60 * 1000; // UTC+7 WIB
+
     for (const r of produksiList) {
       if (!r.tanggal) continue;
-      const d = new Date(r.tanggal);
-      const rYear = d.getFullYear();
-      const rMonth = d.getMonth() + 1; // 1-12
+      const dRaw = new Date(r.tanggal);
+      if (isNaN(dRaw.getTime())) continue;
+      const localD = new Date(dRaw.getTime() + utcOffset);
+      const rYear = localD.getUTCFullYear();
+      const rMonth = localD.getUTCMonth() + 1; // 1-12
       const slug = (r.product_slug || '').toLowerCase().trim();
       const bs = Number(r.bs || 0);
 
@@ -57,19 +61,19 @@ export async function GET(request: Request) {
 
       let matchedId: number | null = null;
 
-      if (slug === 'petro-fish') {
+      if (slug.includes('petro-fish') || slug.includes('fish')) {
         matchedId = 1;
-      } else if (slug === 'petro-gladiator-cair') {
+      } else if (slug.includes('petro-gladiator-cair') || slug.includes('gladiator-cair')) {
         if (tabName.includes('500') || ket.includes('500')) {
           matchedId = 3;
         } else {
           matchedId = 2;
         }
-      } else if (slug === 'phonska-oca') {
+      } else if (slug.includes('phonska')) {
         matchedId = 4;
-      } else if (slug === 'fit-rice') {
+      } else if (slug.includes('fit-rice') || slug.includes('rice')) {
         matchedId = 5;
-      } else if (slug === 'bio-fertil') {
+      } else if (slug.includes('bio-fertil') || slug.includes('fertil')) {
         if (tabName.includes('10') || ket.includes('10')) {
           matchedId = 6;
         } else if (tabName.includes('2') || ket.includes('2')) {
@@ -77,7 +81,7 @@ export async function GET(request: Request) {
         } else {
           matchedId = 8; // Default 5 Kg
         }
-      } else if (slug === 'petro-gladiator') {
+      } else if (slug.includes('petro-gladiator') || slug.includes('gladiator')) {
         if (tabName.includes('2') || ket.includes('2')) {
           matchedId = 10;
         } else {
@@ -147,13 +151,14 @@ export async function GET(request: Request) {
       // Ignore
     }
 
-    // 3. Build 10 product rows
+    // 3. Build official product rows
     const rows = OFFICIAL_PRODUCTS.map((prod) => {
       const prodStats = productionMap[prod.id] || { monthBs: 0, ytdBs: 0 };
       const saved = savedMap[`id_${prod.id}`] || savedMap[`name_${prod.name}`] || {};
 
-      const prodBulanIni = saved.produksiBulanIni !== undefined ? Number(saved.produksiBulanIni) : prodStats.monthBs;
-      const prodSdBulanIni = saved.produksiSdBulanIni !== undefined ? Number(saved.produksiSdBulanIni) : prodStats.ytdBs;
+      // Always use live sum of 'Produksi Belum Sampling' (bs) for official products
+      const prodBulanIni = prodStats.monthBs;
+      const prodSdBulanIni = prodStats.ytdBs;
 
       const psg = Number(saved.gudangPsg ?? saved.gudang_psg ?? 0);
       const lolaMitra = Number(saved.gudangLolaMitra ?? saved.gudang_lola_mitra ?? 0);
@@ -166,15 +171,19 @@ export async function GET(request: Request) {
 
       const stokAkhir = saved.stokAkhir !== undefined ? Number(saved.stokAkhir) : (totalStok - soOutstanding);
 
+      // Use saved name/satuan if user has edited them, otherwise use official defaults
+      const savedName = saved.name || saved.productName || saved.product_name;
+      const savedSatuan = saved.satuan || saved.Satuan;
+
       return {
         id: prod.id,
         no: prod.id,
-        name: prod.name,
+        name: savedName || prod.name,
         cleanName: prod.cleanName,
         bentuk: prod.bentuk,
         kemasan: prod.kemasan,
         slug: prod.slug,
-        satuan: prod.satuan,
+        satuan: savedSatuan || prod.satuan,
         produksiBulanIni: prodBulanIni,
         produksiSdBulanIni: prodSdBulanIni,
         gudangPsg: psg,
@@ -187,6 +196,57 @@ export async function GET(request: Request) {
         stokAkhir: stokAkhir,
       };
     });
+
+    // 4. Include custom rows added by user (not in OFFICIAL_PRODUCTS)
+    const customKeys = Object.keys(savedMap);
+    const addedCustomIds = new Set<string>();
+
+    for (const key of customKeys) {
+      const savedItem = savedMap[key];
+      if (!savedItem) continue;
+      const itemId = savedItem.id || savedItem.no;
+      const itemName = savedItem.name || savedItem.productName || savedItem.product_name;
+
+      if (!itemName && !itemId) continue;
+
+      const isOfficial = OFFICIAL_PRODUCTS.some(p => p.id === itemId || p.name === itemName);
+      if (isOfficial) continue;
+
+      const itemKey = `${itemId}_${itemName}`;
+      if (addedCustomIds.has(itemKey)) continue;
+      addedCustomIds.add(itemKey);
+
+      const psg = Number(savedItem.gudangPsg ?? savedItem.gudang_psg ?? 0);
+      const lolaMitra = Number(savedItem.gudangLolaMitra ?? savedItem.gudang_lola_mitra ?? 0);
+      const gmg = Number(savedItem.gudangGmg ?? savedItem.gudang_gmg ?? 0);
+      const totalStok = psg + lolaMitra + gmg;
+
+      const kuantumSoBulanIni = Number(savedItem.kuantumSoBulanIni ?? savedItem.kuantum_so_bulan_ini ?? 0);
+      const kuantumSoSdBulanIni = Number(savedItem.kuantumSoSdBulanIni ?? savedItem.kuantum_so_sd_bulan_ini ?? 0);
+      const soOutstanding = Number(savedItem.soOutstanding ?? savedItem.so_outstanding ?? 0);
+      const stokAkhir = savedItem.stokAkhir !== undefined ? Number(savedItem.stokAkhir) : (totalStok - soOutstanding);
+
+      rows.push({
+        id: itemId || Date.now(),
+        no: rows.length + 1,
+        name: itemName || 'Produk Baru',
+        cleanName: savedItem.cleanName || itemName,
+        bentuk: savedItem.bentuk || 'Padat',
+        kemasan: savedItem.kemasan || '',
+        slug: savedItem.slug || `produk-${itemId}`,
+        satuan: savedItem.satuan || 'Kg',
+        produksiBulanIni: Number(savedItem.produksiBulanIni || 0),
+        produksiSdBulanIni: Number(savedItem.produksiSdBulanIni || 0),
+        gudangPsg: psg,
+        gudangLolaMitra: lolaMitra,
+        gudangGmg: gmg,
+        totalStok: totalStok,
+        kuantumSoBulanIni: kuantumSoBulanIni,
+        kuantumSoSdBulanIni: kuantumSoSdBulanIni,
+        soOutstanding: soOutstanding,
+        stokAkhir: stokAkhir,
+      });
+    }
 
     return NextResponse.json({
       tahun,
