@@ -48,6 +48,7 @@ export interface ProduksiResponse {
 }
 
 export interface SaveProduksiRequest {
+    id?: number;
     productSlug: string;
     tabId: number;
     tanggal: string;

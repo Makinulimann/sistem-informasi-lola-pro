@@ -83,29 +83,36 @@ export async function POST(request: Request) {
         };
 
         const { data: records } = await db.from<any>('produksis').select('*').eq('product_slug', productSlug).execute();
-        const existing = (records || []).find((r: any) => {
-            if (reqId && Number(r.id) === Number(reqId)) return true;
+        const existingMatches = (records || []).filter((r: any) => {
+            if (reqId && Number(reqId) > 0 && Number(r.id) === Number(reqId)) return true;
             if (r.produksi_tab_id !== tabId) return false;
 
             const rowVariant = extractVariantTag(r.keterangan || '');
             const reqVariant = (variantNameValue && variantNameValue !== 'default') ? variantNameValue.trim().toLowerCase() : '';
 
-            const isSameBatch = batchKodeValue && r.batch_kode && r.batch_kode.toLowerCase() === batchKodeValue.toLowerCase();
-            const isSameVar = rowVariant === reqVariant;
+            const isSameBatch = batchKodeValue
+                ? (r.batch_kode && r.batch_kode.toLowerCase() === batchKodeValue.toLowerCase())
+                : true;
+            const isSameVar = reqVariant ? (rowVariant === reqVariant) : true;
 
             return isSameDate(r.tanggal, dateStr) && isSameBatch && isSameVar;
         });
 
-        if (existing) {
+        if (existingMatches.length > 0) {
+            const primary = existingMatches[0];
             const { error: updateErr } = await db.from<any>('produksis').update({
                 bs: bsValue,
-                batch_kode: batchKodeValue,
+                batch_kode: batchKodeValue || primary.batch_kode,
                 keterangan: ketValue,
-            }).eq('id', existing.id);
+            }).eq('id', primary.id);
 
             if (updateErr) {
                 console.error('Error updating produksis:', updateErr);
                 return NextResponse.json({ message: 'Failed to update produksis record: ' + JSON.stringify(updateErr) }, { status: 500 });
+            }
+
+            for (let i = 1; i < existingMatches.length; i++) {
+                await db.from<any>('produksis').delete().eq('id', existingMatches[i].id);
             }
         } else {
             const { error: insertErr } = await db.from<any>('produksis').insert({

@@ -344,6 +344,28 @@ export function Sidebar({
                             });
                         }
                     }
+
+                    // Ensure Monitoring Harian is included in Produk Pengembangan
+                    for (const section of mapped) {
+                        if (section.label === 'Produk Pengembangan' && section.children) {
+                            const hasMonitoring = section.children.some(
+                                c => c.label === 'Monitoring Harian' || c.href === '/dashboard/produk-pengembangan/monitoring-harian'
+                            );
+                            if (!hasMonitoring) {
+                                const aktIdx = section.children.findIndex(c => c.label === 'Aktivitas Harian');
+                                const monitoringItem = {
+                                    label: 'Monitoring Harian',
+                                    href: '/dashboard/produk-pengembangan/monitoring-harian',
+                                };
+                                if (aktIdx !== -1) {
+                                    section.children.splice(aktIdx, 0, monitoringItem);
+                                } else {
+                                    section.children.push(monitoringItem);
+                                }
+                            }
+                        }
+                    }
+
                     setMenuItems(mapped);
                 } else {
                     setMenuItems(navigation);

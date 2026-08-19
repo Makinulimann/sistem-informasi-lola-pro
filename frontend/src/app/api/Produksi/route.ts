@@ -283,20 +283,23 @@ export async function POST(request: Request) {
         };
 
         const { data: existingArr } = await db.from<any>('produksis').select('*').eq('produksi_tab_id', tabId).execute();
-        const existing = (existingArr || []).find((r: any) => {
-            if (reqId && Number(r.id) === Number(reqId)) return true;
+        const existingMatches = (existingArr || []).filter((r: any) => {
+            if (reqId && Number(reqId) > 0 && Number(r.id) === Number(reqId)) return true;
             if (r.produksi_tab_id !== tabId) return false;
 
             const rowVariant = extractVariantTag(r.keterangan || '');
             const reqVariant = (variantNameValue && variantNameValue !== 'default') ? variantNameValue.trim().toLowerCase() : '';
 
-            const isSameBatch = batchKodeValue && r.batch_kode && r.batch_kode.toLowerCase() === batchKodeValue.toLowerCase();
-            const isSameVar = rowVariant === reqVariant;
+            const isSameBatch = batchKodeValue
+                ? (r.batch_kode && r.batch_kode.toLowerCase() === batchKodeValue.toLowerCase())
+                : true;
+            const isSameVar = reqVariant ? (rowVariant === reqVariant) : true;
 
             return isSameDate(r.tanggal, dateStr) && isSameBatch && isSameVar;
         });
 
-        if (existing) {
+        if (existingMatches.length > 0) {
+            const primary = existingMatches[0];
             // Update existing
             const { error: updateError } = await db.from<any>('produksis').update({
                 bs: bsValue,
@@ -304,16 +307,21 @@ export async function POST(request: Request) {
                 coa: coaValue,
                 pg: pgValue,
                 keterangan: ketValue,
-                batch_kode: batchKodeValue,
-                ps_batch_kode: psBatchKodeValue || existing.ps_batch_kode,
-                coa_batch_kode: coaBatchKodeValue || existing.coa_batch_kode,
+                batch_kode: batchKodeValue || primary.batch_kode,
+                ps_batch_kode: psBatchKodeValue || primary.ps_batch_kode,
+                coa_batch_kode: coaBatchKodeValue || primary.coa_batch_kode,
                 kumulatif: 0,
                 stok_akhir: 0
-            }).eq('id', existing.id);
+            }).eq('id', primary.id);
 
             if (updateError) {
                 console.error('Error updating produksi:', updateError);
                 return NextResponse.json({ message: 'Failed to update' }, { status: 500 });
+            }
+
+            // Deduplicate if multiple records exist for the exact same date & tab
+            for (let i = 1; i < existingMatches.length; i++) {
+                await db.from<any>('produksis').delete().eq('id', existingMatches[i].id);
             }
         } else {
             // Insert new

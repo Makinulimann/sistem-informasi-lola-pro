@@ -339,6 +339,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
 
         try {
             await saveProduksi({
+                id: original.id,
                 productSlug: slug,
                 tabId: activeTabId,
                 tanggal: original.tanggal,
