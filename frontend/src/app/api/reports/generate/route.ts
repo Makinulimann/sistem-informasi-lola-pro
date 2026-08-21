@@ -1,5 +1,4 @@
 export const dynamic = 'force-dynamic';
-export const runtime = 'edge';
 
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/supabase';
@@ -57,6 +56,8 @@ export async function POST(request: Request) {
         }
 
         const year = rkoYear ? parseInt(rkoYear, 10) : new Date().getFullYear();
+        const endD = new Date(endDate);
+        const month = !isNaN(endD.getTime()) ? endD.getMonth() + 1 : new Date().getMonth() + 1;
 
         // Date range for Activity Summaries (Section B): [startDate, endDate]
         const actStartMs = new Date(startDate + 'T00:00:00.000Z').getTime();
@@ -74,13 +75,21 @@ export async function POST(request: Request) {
             { data: tabsData },
             { data: bomData },
             { data: productsTableData },
+            { data: monitoringData },
+            { data: settingsData },
+            { data: bahanBakuMutasiData },
+            { data: masterItemsData },
         ] = await Promise.all([
             db.from<any>('produksis').select('*').execute(),
             db.from<any>('aktivitas_harians').select('*').execute(),
             db.from<any>('sidebar_menus').select('*').execute(),
             db.from<any>('produksi_tabs').select('*').execute(),
-            db.from<any>('bill_of_materials').select('product_slug,produksi_tab_id,variant_name').execute(),
+            db.from<any>('bill_of_materials').select('*').execute(),
             db.from<any>('products').select('slug,nama').execute(),
+            db.from<any>('monitoring_harians').select('*').execute(),
+            db.from<any>('app_settings').select('*').execute(),
+            db.from<any>('bahan_bakus').select('*').eq('tipe', 'Mutasi').execute(),
+            db.from<any>('master_items').select('*').execute(),
         ]);
 
         // Build dynamic products map
@@ -395,9 +404,278 @@ export async function POST(request: Request) {
             });
         });
 
+        // Build lookup map for monitoring harian values (Stok GMG, Kuantum SO, SO Outstanding)
+        const monitoringMap = new Map<string, any>();
+        const normAlphanum = (str: string) => (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+        const indexMonitoringItem = (rawItem: any) => {
+            if (!rawItem) return;
+            const item = {
+                ...rawItem,
+                gudangGmg: Number(rawItem.gudangGmg ?? rawItem.gudang_gmg ?? 0),
+                kuantumSoSdBulanIni: Number(rawItem.kuantumSoSdBulanIni ?? rawItem.kuantum_so_sd_bulan_ini ?? 0),
+                soOutstanding: Number(rawItem.soOutstanding ?? rawItem.so_outstanding ?? 0),
+                cleanName: rawItem.cleanName || rawItem.clean_name || rawItem.product_name || rawItem.name || '',
+                name: rawItem.name || rawItem.product_name || '',
+                slug: rawItem.slug || rawItem.product_slug || '',
+                kemasan: rawItem.kemasan || '',
+            };
+
+            const slug = (item.slug || '').toLowerCase().trim();
+            const kemNorm = normAlphanum(item.kemasan || item.name || '');
+            const nameNorm = normAlphanum(item.name || item.cleanName || '');
+            const cleanNorm = normAlphanum(item.cleanName || '');
+
+            if (slug && item.kemasan) {
+                monitoringMap.set(`${slug}||${kemNorm}`, item);
+            }
+            if (cleanNorm && item.kemasan) {
+                monitoringMap.set(`${cleanNorm}||${kemNorm}`, item);
+            }
+            if (nameNorm) {
+                monitoringMap.set(nameNorm, item);
+            }
+            if (item.id !== undefined) {
+                monitoringMap.set(`id_${item.id}`, item);
+            }
+        };
+
+        const targetSettingsKey = `monitoring_harian_${year}_${month}`;
+        const sortedSettings = (settingsData || []).filter((s: any) => s.key && s.key.startsWith('monitoring_harian_'));
+        sortedSettings.sort((a: any, b: any) => (a.key === targetSettingsKey ? 1 : b.key === targetSettingsKey ? -1 : (a.key < b.key ? -1 : 1)));
+
+        sortedSettings.forEach((s: any) => {
+            try {
+                const parsed = JSON.parse(s.value);
+                if (Array.isArray(parsed)) {
+                    parsed.forEach((item: any) => indexMonitoringItem(item));
+                }
+            } catch (e) {}
+        });
+
+        (monitoringData || []).forEach((m: any) => indexMonitoringItem(m));
+
+        // Build lookup map for master_items by ID
+        const masterItemMap = new Map<number, any>();
+        (masterItemsData || []).forEach((mi: any) => {
+            if (mi.id) masterItemMap.set(Number(mi.id), mi);
+        });
+
+        // Build lookup map for Dus / Kardus consumption using ID-based BOM & master_items mapping
+        const variantDusMap = new Map<number, number>();
+
+        // 1. Filter mutasi records up to tableAEndMs & deduplicate by date + product + material + kuantum + keterangan
+        const validMutasiList = (bahanBakuMutasiData || []).filter((bb: any) => {
+            if (!bb.tanggal) return true;
+            const t = new Date(bb.tanggal).getTime();
+            return isNaN(t) || t <= tableAEndMs;
+        });
+
+        const dedupMutasiMap = new Map<string, any>();
+        validMutasiList.forEach((bb: any) => {
+            const dateStr = bb.tanggal ? bb.tanggal.split('T')[0] : '';
+            const sig = `${bb.product_slug}||${(bb.nama_bahan || '').toLowerCase().trim()}||${bb.kuantum}||${dateStr}||${(bb.keterangan || '').trim()}`;
+            if (!dedupMutasiMap.has(sig)) {
+                dedupMutasiMap.set(sig, bb);
+            }
+        });
+        const cleanMutasiList = Array.from(dedupMutasiMap.values());
+
+        // Helper to check if a master item is a Box/Dus material (and not stiker/label)
+        const isBoxMasterItem = (item: any): boolean => {
+            if (!item) return false;
+            const nama = (item.nama || '').toLowerCase().trim();
+            const isBoxOrDus = nama.startsWith('box ') || nama.startsWith('box_') || nama.startsWith('dus ') || nama.startsWith('dus_') || nama.startsWith('carton');
+            const isKardusNotStiker = nama.includes('kardus') && !nama.includes('stiker') && !nama.includes('label') && !nama.includes('kemasan');
+            return isBoxOrDus || isKardusNotStiker;
+        };
+
+        // 2. Calculate Dus for each official variant using ID-based BOM material_id & shared material allocation
+        // Pre-compute expected BOM Dus and target box material for each variant
+        interface VariantBoxInfo {
+            variant: DynamicVariant;
+            vProd: number;
+            boxMaterialName: string;
+            expectedBomDus: number;
+            explicitMutasiQty: number;
+            hasExplicitTag: boolean;
+        }
+
+        const variantBoxInfoList: VariantBoxInfo[] = [];
+
+        officialVariants.forEach((v) => {
+            const tracking = resultRealization.get(v.id) || { realProd: 0, realPeng: 0 };
+            const vProd = tracking.realProd;
+
+            if (vProd <= 0) {
+                variantDusMap.set(v.id, 0);
+                return;
+            }
+
+            const kemNorm = (v.kemasan || '').toLowerCase().replace(/\s+/g, '');
+            const bomRows = (bomData || []).filter((b: any) => b.produksi_tab_id === v.tabId);
+
+            const hasVariantBomRows = bomRows.some((b: any) => {
+                const vName = (b.variant_name || '').toLowerCase().trim();
+                const pSlug = (b.product_slug || '').toLowerCase();
+                return (vName && vName !== 'default') || pSlug.includes('::variant::');
+            });
+
+            const targetBoxMaterialNames = new Set<string>();
+            let variantBomBoxQty = 0;
+            let variantBomBaseQty = Number(bomRows[0]?.base_quantity || 1000);
+
+            bomRows.forEach((b: any) => {
+                const matId = Number(b.material_id);
+                if (matId <= 0) return;
+
+                const mi = masterItemMap.get(matId);
+                if (isBoxMasterItem(mi)) {
+                    const vName = (b.variant_name || '').toLowerCase().replace(/\s+/g, '');
+                    const pSlug = (b.product_slug || '').toLowerCase();
+                    const matName = (mi?.nama || '').toLowerCase().replace(/\s+/g, '');
+
+                    let isVariantMatch = false;
+                    if (hasVariantBomRows) {
+                        isVariantMatch = (vName === kemNorm) || (pSlug.includes(`::variant::${kemNorm}`));
+                    } else {
+                        isVariantMatch = (!vName || vName === 'default') && (matName.includes(kemNorm) || bomRows.filter((row: any) => isBoxMasterItem(masterItemMap.get(row.material_id))).length === 1);
+                    }
+
+                    if (isVariantMatch) {
+                        if (mi?.nama) targetBoxMaterialNames.add(mi.nama.toLowerCase().trim());
+                        if (Number(b.material_quantity) > 0) {
+                            variantBomBoxQty = Number(b.material_quantity);
+                            if (Number(b.base_quantity) > 0) variantBomBaseQty = Number(b.base_quantity);
+                        }
+                    }
+                }
+            });
+
+            const primaryBoxName = Array.from(targetBoxMaterialNames)[0] || '';
+            const expectedBomDus = (variantBomBoxQty > 0 && variantBomBaseQty > 0)
+                ? Math.round((vProd / variantBomBaseQty) * variantBomBoxQty)
+                : 0;
+
+            const prodMutasis = cleanMutasiList.filter((bb: any) => {
+                const pSlug = (bb.product_slug || '').toLowerCase();
+                return pSlug === v.productSlug || pSlug.startsWith(`${v.productSlug}::variant::`);
+            });
+
+            let explicitMutasiQty = 0;
+            let hasExplicitTag = false;
+
+            prodMutasis.forEach((bb: any) => {
+                const nama = (bb.nama_bahan || bb.NamaBahan || '').toLowerCase().trim();
+                const tagMatch = (bb.keterangan || '').match(/\[Varian:\s*([^-\]]+)/i);
+                const tagNorm = tagMatch ? tagMatch[1].toLowerCase().replace(/\s+/g, '') : '';
+
+                const matchesByMasterName = targetBoxMaterialNames.has(nama);
+                const matchesByVariantTag = tagNorm ? (tagNorm === kemNorm && isBoxMasterItem({ nama })) : false;
+
+                const matchesFallback = targetBoxMaterialNames.size === 0 && (
+                    (kemNorm === '500ml' && nama.includes('500ml')) ||
+                    (kemNorm === '1liter' && (nama.includes('1liter') || nama.includes('1l'))) ||
+                    (kemNorm === '1kg' && nama.includes('1kg')) ||
+                    (kemNorm === '2kg' && nama.includes('2kg')) ||
+                    (kemNorm === '5kg' && nama.includes('5kg')) ||
+                    (kemNorm === '10kg' && nama.includes('10kg')) ||
+                    (kemNorm === '20kg' && nama.includes('20kg'))
+                );
+
+                if (matchesByVariantTag) {
+                    explicitMutasiQty += Number(bb.kuantum || 0);
+                    hasExplicitTag = true;
+                } else if (matchesByMasterName || matchesFallback) {
+                    explicitMutasiQty += Number(bb.kuantum || 0);
+                }
+            });
+
+            variantBoxInfoList.push({
+                variant: v,
+                vProd,
+                boxMaterialName: primaryBoxName,
+                expectedBomDus,
+                explicitMutasiQty,
+                hasExplicitTag
+            });
+        });
+
+        // Group active variants by product & boxMaterialName to allocate shared mutasis
+        const sharedGroupMap = new Map<string, VariantBoxInfo[]>();
+        variantBoxInfoList.forEach(info => {
+            const groupKey = `${info.variant.productSlug}||${info.boxMaterialName}`;
+            if (!sharedGroupMap.has(groupKey)) sharedGroupMap.set(groupKey, []);
+            sharedGroupMap.get(groupKey)!.push(info);
+        });
+
+        sharedGroupMap.forEach((group) => {
+            if (group.length === 1) {
+                // Single active variant for this box material
+                const info = group[0];
+                const finalDus = info.explicitMutasiQty > 0 ? info.explicitMutasiQty : info.expectedBomDus;
+                variantDusMap.set(info.variant.id, finalDus);
+            } else {
+                // Multiple active variants share the same box material (e.g. Bio Fertil 2KG & 5KG sharing Box Kardus 20Kg)
+                const totalSharedMutasi = group[0].explicitMutasiQty; // Physical mutasi recorded for this box material
+                const totalExpectedBom = group.reduce((sum, g) => sum + g.expectedBomDus, 0);
+
+                group.forEach(info => {
+                    if (info.hasExplicitTag) {
+                        variantDusMap.set(info.variant.id, info.explicitMutasiQty);
+                    } else if (totalSharedMutasi > 0 && totalExpectedBom > 0) {
+                        // Allocate shared physical mutasi proportionally based on BOM expected consumption
+                        const portion = Math.round((info.expectedBomDus / totalExpectedBom) * totalSharedMutasi);
+                        variantDusMap.set(info.variant.id, portion);
+                    } else {
+                        variantDusMap.set(info.variant.id, info.expectedBomDus);
+                    }
+                });
+            }
+        });
+
         const rkoSummary = officialVariants.map((v, idx) => {
             const tracking = resultRealization.get(v.id) || { realProd: 0, realPeng: 0 };
             const stokAkhir = Math.max(0, tracking.realProd - tracking.realPeng);
+
+            const kemNorm = normAlphanum(v.kemasan);
+            const slugKey = `${v.productSlug}||${kemNorm}`;
+            const cleanKey = `${normAlphanum(v.name)}||${kemNorm}`;
+            const fullComboKey = normAlphanum(`${v.name} ${v.kemasan}`);
+
+            let monInfo = monitoringMap.get(slugKey) || monitoringMap.get(cleanKey) || monitoringMap.get(fullComboKey) || {};
+
+            if (!monInfo || Object.keys(monInfo).length === 0) {
+                // Fallback search across all cached monitoring items
+                const baseNameNorm = normAlphanum(v.name);
+                for (const item of Array.from(monitoringMap.values())) {
+                    const itemKem = normAlphanum(item.kemasan || '');
+                    const itemName = normAlphanum(item.name || item.cleanName || '');
+                    const itemSlug = (item.slug || '').toLowerCase();
+
+                    const isSlugMatch = itemSlug === v.productSlug;
+                    const isNameMatch = itemName.includes(baseNameNorm) || baseNameNorm.includes(itemName);
+                    const isKemMatch = !v.kemasan || itemKem.includes(kemNorm) || kemNorm.includes(itemKem);
+
+                    if ((isSlugMatch || isNameMatch) && isKemMatch) {
+                        monInfo = item;
+                        break;
+                    }
+                }
+            }
+
+            const stokGmg = Number(monInfo.totalStok ?? monInfo.total_stok ?? monInfo.gudangGmg ?? monInfo.gudang_gmg ?? 0);
+            const kuantumSo = Number(monInfo.kuantumSoSdBulanIni ?? monInfo.kuantum_so_sd_bulan_ini ?? monInfo.kuantumSoBulanIni ?? monInfo.kuantum_so_bulan_ini ?? 0);
+            const soOutstanding = Number(monInfo.soOutstanding ?? monInfo.so_outstanding ?? 0);
+
+            // Per User Directive:
+            // 1. Realisasi Pengambilan strictly = Kuantum SO 2026 - SO Outstanding 2026
+            const realisasiPengambilan = Math.max(0, kuantumSo - soOutstanding);
+
+            // 2. Stok Akhir = Stok GMG - SO Outstanding
+            const finalStokAkhir = Math.max(0, stokGmg - soOutstanding);
+
+            const totalDus = variantDusMap.get(v.id) || 0;
 
             return {
                 no: idx + 1,
@@ -405,8 +683,12 @@ export async function POST(request: Request) {
                 bentuk: v.bentuk,
                 kemasan: v.kemasan,
                 realisasiProduksi: tracking.realProd,
-                realisasiPengambilan: tracking.realPeng,
-                stokAkhir: stokAkhir,
+                totalDus: totalDus,
+                stokGmg: stokGmg,
+                kuantumSo: kuantumSo,
+                soOutstanding: soOutstanding,
+                realisasiPengambilan: realisasiPengambilan,
+                stokAkhir: finalStokAkhir,
                 satuan: v.satuan,
             };
         });

@@ -159,9 +159,13 @@ interface RkoRow {
     bentuk: string;
     kemasan: string;
     realisasiProduksi: number;
+    stokGmg: number;
+    kuantumSo: number;
+    soOutstanding: number;
     realisasiPengambilan: number;
     stokAkhir: number;
     satuan: string;
+    totalDus: number;
 }
 
 interface GroupedRkoProduct {
@@ -479,13 +483,13 @@ export default function TemplateLaporanPage() {
 
     // 7 Official RKO Product Variants
     const [rkoTable, setRkoTable] = useState<RkoRow[]>([
-        { no: 1, name: 'Phonska OCA Plus', bentuk: 'Cair', kemasan: '1 Liter', realisasiProduksi: 0, realisasiPengambilan: 0, stokAkhir: 0, satuan: 'Liter' },
-        { no: 2, name: 'Petro Fish', bentuk: 'Cair', kemasan: '1 Liter', realisasiProduksi: 0, realisasiPengambilan: 0, stokAkhir: 0, satuan: 'Liter' },
-        { no: 3, name: 'Petro Gladiator Padat', bentuk: 'Padat', kemasan: '1 Kg', realisasiProduksi: 0, realisasiPengambilan: 0, stokAkhir: 0, satuan: 'Kg' },
-        { no: 4, name: 'Petro Gladiator Padat', bentuk: 'Padat', kemasan: '2 Kg', realisasiProduksi: 0, realisasiPengambilan: 0, stokAkhir: 0, satuan: 'Kg' },
-        { no: 5, name: 'Petro Bio Fertil', bentuk: 'Padat', kemasan: '5 Kg', realisasiProduksi: 0, realisasiPengambilan: 0, stokAkhir: 0, satuan: 'Kg' },
-        { no: 6, name: 'Petro Gladiator Cair', bentuk: 'Cair', kemasan: '1 Liter', realisasiProduksi: 0, realisasiPengambilan: 0, stokAkhir: 0, satuan: 'Liter' },
-        { no: 7, name: 'Petro Gladiator Cair', bentuk: 'Cair', kemasan: '500 ml', realisasiProduksi: 0, realisasiPengambilan: 0, stokAkhir: 0, satuan: 'Liter' },
+        { no: 1, name: 'Phonska OCA Plus', bentuk: 'Cair', kemasan: '1 Liter', realisasiProduksi: 0, stokGmg: 0, kuantumSo: 0, soOutstanding: 0, realisasiPengambilan: 0, stokAkhir: 0, satuan: 'Liter', totalDus: 0 },
+        { no: 2, name: 'Petro Fish', bentuk: 'Cair', kemasan: '1 Liter', realisasiProduksi: 0, stokGmg: 0, kuantumSo: 0, soOutstanding: 0, realisasiPengambilan: 0, stokAkhir: 0, satuan: 'Liter', totalDus: 0 },
+        { no: 3, name: 'Petro Gladiator Padat', bentuk: 'Padat', kemasan: '1 Kg', realisasiProduksi: 0, stokGmg: 0, kuantumSo: 0, soOutstanding: 0, realisasiPengambilan: 0, stokAkhir: 0, satuan: 'Kg', totalDus: 0 },
+        { no: 4, name: 'Petro Gladiator Padat', bentuk: 'Padat', kemasan: '2 Kg', realisasiProduksi: 0, stokGmg: 0, kuantumSo: 0, soOutstanding: 0, realisasiPengambilan: 0, stokAkhir: 0, satuan: 'Kg', totalDus: 0 },
+        { no: 5, name: 'Petro Bio Fertil', bentuk: 'Padat', kemasan: '5 Kg', realisasiProduksi: 0, stokGmg: 0, kuantumSo: 0, soOutstanding: 0, realisasiPengambilan: 0, stokAkhir: 0, satuan: 'Kg', totalDus: 0 },
+        { no: 6, name: 'Petro Gladiator Cair', bentuk: 'Cair', kemasan: '1 Liter', realisasiProduksi: 0, stokGmg: 0, kuantumSo: 0, soOutstanding: 0, realisasiPengambilan: 0, stokAkhir: 0, satuan: 'Liter', totalDus: 0 },
+        { no: 7, name: 'Petro Gladiator Cair', bentuk: 'Cair', kemasan: '500 ml', realisasiProduksi: 0, stokGmg: 0, kuantumSo: 0, soOutstanding: 0, realisasiPengambilan: 0, stokAkhir: 0, satuan: 'Liter', totalDus: 0 },
     ]);
 
     const [productBlocks, setProductBlocks] = useState<ProductBlock[]>([
@@ -816,9 +820,14 @@ export default function TemplateLaporanPage() {
         setRkoTable(prev => {
             const next = [...prev];
             const updated = { ...next[index], [field]: value };
-            if (field === 'realisasiProduksi' || field === 'realisasiPengambilan') {
-                updated.stokAkhir = Math.max(0, (updated.realisasiProduksi || 0) - (updated.realisasiPengambilan || 0));
+
+            if (field === 'stokGmg' || field === 'soOutstanding') {
+                updated.stokAkhir = Math.max(0, (updated.stokGmg || 0) - (updated.soOutstanding || 0));
             }
+            if (field === 'kuantumSo' || field === 'soOutstanding') {
+                updated.realisasiPengambilan = Math.max(0, (updated.kuantumSo || 0) - (updated.soOutstanding || 0));
+            }
+
             next[index] = updated;
             return next;
         });
@@ -940,13 +949,14 @@ export default function TemplateLaporanPage() {
                             <td rowspan="${group.rows.length}" style="border: 1px solid #000; padding: 4px; font-weight: bold; vertical-align: middle;">${group.productName}</td>
                             <td rowspan="${group.rows.length}" style="text-align: center; border: 1px solid #000; padding: 4px; vertical-align: middle;">${group.bentuk}</td>
                         ` : ''}
-                        <td style="text-align: center; border: 1px solid #000; padding: 4px;">${r.kemasan}</td>
+                        <td style="text-align: center; border: 1px solid #000; padding: 4px;">${r.kemasan || '-'}</td>
                         <td style="text-align: right; border: 1px solid #000; padding: 4px;">${(r.realisasiProduksi || 0).toLocaleString('id-ID')}</td>
-                        <td style="text-align: right; border: 1px solid #000; padding: 4px;">${(r.realisasiPengambilan || 0).toLocaleString('id-ID')}</td>
-                        <td style="text-align: right; border: 1px solid #000; padding: 4px; font-weight: bold; background: #ecfdf5;">${(r.stokAkhir || 0).toLocaleString('id-ID')}</td>
-                        ${rowIdx === 0 ? `
-                            <td rowspan="${group.rows.length}" style="text-align: center; border: 1px solid #000; padding: 4px; vertical-align: middle;">${group.satuan}</td>
-                        ` : ''}
+                        <td style="text-align: right; border: 1px solid #000; padding: 4px;">${(r.totalDus || 0).toLocaleString('id-ID')}</td>
+                        <td style="text-align: right; border: 1px solid #000; padding: 4px;">${(r.stokGmg || 0).toLocaleString('id-ID')}</td>
+                        <td style="text-align: right; border: 1px solid #000; padding: 4px;">${(r.kuantumSo || 0).toLocaleString('id-ID')}</td>
+                        <td style="text-align: right; border: 1px solid #000; padding: 4px;">${(r.soOutstanding || 0).toLocaleString('id-ID')}</td>
+                        <td style="text-align: right; border: 1px solid #000; padding: 4px; font-weight: normal;">${(r.realisasiPengambilan || 0).toLocaleString('id-ID')}</td>
+                        <td style="text-align: right; border: 1px solid #000; padding: 4px; font-weight: bold; background: #ecfdf5;">${(r.stokAkhir || 0).toLocaleString('id-ID')} ${r.satuan}</td>
                     </tr>
                 `);
             }).join('');
@@ -1113,14 +1123,17 @@ export default function TemplateLaporanPage() {
                     <table class="data-table">
                         <thead>
                             <tr>
-                                <th rowSpan="2" style="width: 25px;">No</th>
-                                <th rowSpan="2">Nama Produk</th>
-                                <th rowSpan="2">Bentuk</th>
-                                <th rowSpan="2">Kemasan</th>
-                                <th rowSpan="2">Realisasi Produksi</th>
-                                <th rowSpan="2">Realisasi Pengambilan</th>
-                                <th rowSpan="2">Stok Akhir</th>
-                                <th rowSpan="2">Satuan</th>
+                                <th style="width: 25px;">No</th>
+                                <th>Nama Produk</th>
+                                <th style="width: 45px;">Bentuk</th>
+                                <th style="width: 60px;">Kemasan</th>
+                                <th>Realisasi Produksi</th>
+                                <th style="width: 45px;">Dus</th>
+                                <th>Stok GMG</th>
+                                <th>Kuantum SO ${rkoYear}</th>
+                                <th>SO Outstanding ${rkoYear}</th>
+                                <th>Realisasi Pengambilan</th>
+                                <th>Stok Akhir</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1228,13 +1241,14 @@ export default function TemplateLaporanPage() {
                             <td rowspan="${group.rows.length}" valign="middle" style="border: 1px solid #000; font-weight: bold; vertical-align: middle;">${group.productName}</td>
                             <td rowspan="${group.rows.length}" align="center" valign="middle" style="border: 1px solid #000; text-align: center; vertical-align: middle;">${group.bentuk}</td>
                         ` : ''}
-                        <td align="center" style="border: 1px solid #000; text-align: center;">${r.kemasan}</td>
+                        <td align="center" style="border: 1px solid #000; text-align: center;">${r.kemasan || '-'}</td>
                         <td align="right" style="border: 1px solid #000; text-align: right; mso-number-format:'\\#\\,\\#\\#0';">${(r.realisasiProduksi || 0).toLocaleString('id-ID')}</td>
+                        <td align="right" style="border: 1px solid #000; text-align: right; mso-number-format:'\\#\\,\\#\\#0';">${(r.totalDus || 0).toLocaleString('id-ID')} Dus</td>
+                        <td align="right" style="border: 1px solid #000; text-align: right; mso-number-format:'\\#\\,\\#\\#0';">${(r.stokGmg || 0).toLocaleString('id-ID')}</td>
+                        <td align="right" style="border: 1px solid #000; text-align: right; mso-number-format:'\\#\\,\\#\\#0';">${(r.kuantumSo || 0).toLocaleString('id-ID')}</td>
+                        <td align="right" style="border: 1px solid #000; text-align: right; mso-number-format:'\\#\\,\\#\\#0';">${(r.soOutstanding || 0).toLocaleString('id-ID')}</td>
                         <td align="right" style="border: 1px solid #000; text-align: right; mso-number-format:'\\#\\,\\#\\#0';">${(r.realisasiPengambilan || 0).toLocaleString('id-ID')}</td>
-                        <td align="right" style="border: 1px solid #000; text-align: right; font-weight: bold; background-color: #ecfdf5; mso-number-format:'\\#\\,\\#\\#0';">${(r.stokAkhir || 0).toLocaleString('id-ID')}</td>
-                        ${rowIdx === 0 ? `
-                            <td rowspan="${group.rows.length}" align="center" valign="middle" style="border: 1px solid #000; text-align: center; vertical-align: middle;">${group.satuan}</td>
-                        ` : ''}
+                        <td align="right" style="border: 1px solid #000; text-align: right; font-weight: bold; background-color: #ecfdf5;">${(r.stokAkhir || 0).toLocaleString('id-ID')} ${r.satuan}</td>
                     </tr>
                 `);
             }).join('');
@@ -1375,7 +1389,7 @@ export default function TemplateLaporanPage() {
 
                     <table style="border: none; margin-bottom: 4px;">
                         <tr>
-                            <td class="section-title" colSpan="8">
+                            <td class="section-title" colSpan="11">
                                 A. INFORMASI PRODUKSI DAN STOK PRODUK KPP TAHUN ${rkoYear} <i style="font-weight: normal; font-size: 8pt;">(periode: ${tableADateLabel})</i>
                             </td>
                         </tr>
@@ -1383,14 +1397,17 @@ export default function TemplateLaporanPage() {
                     <table>
                         <thead>
                             <tr>
-                                <th rowSpan="2" style="width: 35px;">No</th>
-                                <th rowSpan="2" style="width: 160px;">Nama Produk</th>
-                                <th rowSpan="2" style="width: 80px;">Bentuk</th>
-                                <th rowSpan="2" style="width: 80px;">Kemasan</th>
-                                <th rowSpan="2" style="width: 120px;">Realisasi Produksi</th>
-                                <th rowSpan="2" style="width: 130px;">Realisasi Pengambilan</th>
-                                <th rowSpan="2" style="width: 100px;">Stok Akhir</th>
-                                <th rowSpan="2" style="width: 80px;">Satuan</th>
+                                <th style="width: 35px;">No</th>
+                                <th style="width: 160px;">Nama Produk</th>
+                                <th style="width: 70px;">Bentuk</th>
+                                <th style="width: 80px;">Kemasan</th>
+                                <th style="width: 110px;">Realisasi Produksi</th>
+                                <th style="width: 70px;">Dus</th>
+                                <th style="width: 90px;">Stok GMG</th>
+                                <th style="width: 110px;">Kuantum SO ${rkoYear}</th>
+                                <th style="width: 120px;">SO Outstanding ${rkoYear}</th>
+                                <th style="width: 120px;">Realisasi Pengambilan</th>
+                                <th style="width: 110px;">Stok Akhir</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1709,15 +1726,18 @@ export default function TemplateLaporanPage() {
                         <div className="overflow-x-auto">
                             <table className="w-full text-xs border-collapse border border-gray-300">
                                 <thead>
-                                    <tr className="bg-gray-100 text-gray-800 uppercase font-bold text-center">
-                                        <th className="border border-gray-300 px-2 py-2 w-8">No</th>
-                                        <th className="border border-gray-300 px-3 py-2 text-left">Nama Produk</th>
-                                        <th className="border border-gray-300 px-2 py-2 w-16">Bentuk</th>
-                                        <th className="border border-gray-300 px-2 py-2 w-20">Kemasan</th>
-                                        <th className="border border-gray-300 px-3 py-2">Realisasi Produksi</th>
-                                        <th className="border border-gray-300 px-3 py-2">Realisasi Pengambilan</th>
-                                        <th className="border border-gray-300 px-3 py-2 bg-emerald-50">Stok Akhir</th>
-                                        <th className="border border-gray-300 px-2 py-2 w-16">Satuan</th>
+                                    <tr className="bg-gray-100 text-gray-800 uppercase font-bold text-center text-[11px]">
+                                        <th className="border border-gray-300 px-1 py-2 w-8">No</th>
+                                        <th className="border border-gray-300 px-2 py-2 text-left">Nama Produk</th>
+                                        <th className="border border-gray-300 px-1 py-2 w-14">Bentuk</th>
+                                        <th className="border border-gray-300 px-1 py-2 w-16">Kemasan</th>
+                                        <th className="border border-gray-300 px-2 py-2">Realisasi Produksi</th>
+                                        <th className="border border-gray-300 px-1 py-2 w-16 bg-blue-50/40 text-blue-950">Dus</th>
+                                        <th className="border border-gray-300 px-2 py-2">Stok GMG</th>
+                                        <th className="border border-gray-300 px-2 py-2">Kuantum SO {rkoYear}</th>
+                                        <th className="border border-gray-300 px-2 py-2">SO Outstanding {rkoYear}</th>
+                                        <th className="border border-gray-300 px-2 py-2">Realisasi Pengambilan</th>
+                                        <th className="border border-gray-300 px-2 py-2 bg-emerald-50 text-emerald-950">Stok Akhir</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1725,7 +1745,7 @@ export default function TemplateLaporanPage() {
                                         return group.rows.map((row, rowIdx) => {
                                             const globalRowIdx = group.originalIndices[rowIdx];
                                             return (
-                                                <tr key={`${groupIdx}-${rowIdx}`} className="hover:bg-gray-50">
+                                                <tr key={`${groupIdx}-${rowIdx}`} className="hover:bg-gray-50 text-xs">
                                                     {rowIdx === 0 && (
                                                         <>
                                                             <td
@@ -1748,47 +1768,89 @@ export default function TemplateLaporanPage() {
                                                             </td>
                                                         </>
                                                     )}
-                                                     <td className="border border-gray-300 p-0">
-                                                         <input
-                                                             type="text"
-                                                             value={row.kemasan}
-                                                             onChange={(e) => handleRkoChange(globalRowIdx, 'kemasan', e.target.value)}
-                                                             className="w-full text-center px-2 py-1 outline-none font-semibold focus:bg-emerald-50 text-xs"
-                                                             placeholder="-"
-                                                         />
-                                                     </td>
+                                                    {/* Kemasan */}
+                                                    <td className="border border-gray-300 p-0">
+                                                        <input
+                                                            type="text"
+                                                            value={row.kemasan || ''}
+                                                            onChange={(e) => handleRkoChange(globalRowIdx, 'kemasan', e.target.value)}
+                                                            className="w-full text-center px-1 py-1 outline-none font-semibold focus:bg-emerald-50 text-xs"
+                                                            placeholder="-"
+                                                        />
+                                                    </td>
+                                                    {/* Realisasi Produksi */}
                                                     <td className="border border-gray-300 p-0">
                                                         <input
                                                             type="number"
-                                                            value={row.realisasiProduksi}
+                                                            value={row.realisasiProduksi || ''}
                                                             onChange={(e) => handleRkoChange(globalRowIdx, 'realisasiProduksi', parseFloat(e.target.value) || 0)}
-                                                            className="w-full text-right px-2 py-1 outline-none font-medium focus:bg-emerald-50"
+                                                            className="w-full text-right px-1.5 py-1 outline-none font-medium focus:bg-emerald-50"
+                                                            placeholder="0"
                                                         />
                                                     </td>
+                                                    {/* Dus */}
+                                                    <td className="border border-gray-300 p-0 bg-blue-50/20">
+                                                        <input
+                                                            type="number"
+                                                            value={row.totalDus || ''}
+                                                            onChange={(e) => handleRkoChange(globalRowIdx, 'totalDus', parseFloat(e.target.value) || 0)}
+                                                            className="w-full text-right px-1.5 py-1 outline-none font-medium focus:bg-blue-100 text-blue-950"
+                                                            placeholder="0"
+                                                        />
+                                                    </td>
+                                                    {/* Stok GMG */}
+                                                    <td className="border border-gray-300 p-0 bg-amber-50/20">
+                                                        <input
+                                                            type="number"
+                                                            value={row.stokGmg || ''}
+                                                            onChange={(e) => handleRkoChange(globalRowIdx, 'stokGmg', parseFloat(e.target.value) || 0)}
+                                                            className="w-full text-right px-1.5 py-1 outline-none font-medium focus:bg-amber-100"
+                                                            placeholder="0"
+                                                        />
+                                                    </td>
+                                                    {/* Kuantum SO */}
                                                     <td className="border border-gray-300 p-0">
                                                         <input
                                                             type="number"
-                                                            value={row.realisasiPengambilan}
-                                                            onChange={(e) => handleRkoChange(globalRowIdx, 'realisasiPengambilan', parseFloat(e.target.value) || 0)}
-                                                            className="w-full text-right px-2 py-1 outline-none font-medium focus:bg-emerald-50"
+                                                            value={row.kuantumSo || ''}
+                                                            onChange={(e) => handleRkoChange(globalRowIdx, 'kuantumSo', parseFloat(e.target.value) || 0)}
+                                                            className="w-full text-right px-1.5 py-1 outline-none font-medium focus:bg-emerald-50"
+                                                            placeholder="0"
                                                         />
                                                     </td>
-                                                    <td className="border border-gray-300 p-0 bg-emerald-50/50">
+                                                    {/* SO Outstanding */}
+                                                    <td className="border border-gray-300 p-0 bg-rose-50/20">
                                                         <input
                                                             type="number"
-                                                            value={row.stokAkhir}
-                                                            onChange={(e) => handleRkoChange(globalRowIdx, 'stokAkhir', parseFloat(e.target.value) || 0)}
-                                                            className="w-full text-right px-2 py-1 outline-none font-bold text-emerald-900 bg-transparent focus:bg-emerald-100"
+                                                            value={row.soOutstanding || ''}
+                                                            onChange={(e) => handleRkoChange(globalRowIdx, 'soOutstanding', parseFloat(e.target.value) || 0)}
+                                                            className="w-full text-right px-1.5 py-1 outline-none font-medium focus:bg-rose-100 text-rose-800"
+                                                            placeholder="0"
                                                         />
                                                     </td>
-                                                    {rowIdx === 0 && (
-                                                        <td
-                                                            rowSpan={group.rows.length}
-                                                            className="border border-gray-300 text-center py-1 align-middle bg-white"
-                                                        >
-                                                            {group.satuan}
-                                                        </td>
-                                                    )}
+                                                    {/* Realisasi Pengambilan */}
+                                                    <td className="border border-gray-300 p-0">
+                                                        <input
+                                                            type="number"
+                                                            value={row.realisasiPengambilan || ''}
+                                                            onChange={(e) => handleRkoChange(globalRowIdx, 'realisasiPengambilan', parseFloat(e.target.value) || 0)}
+                                                            className="w-full text-right px-1.5 py-1 outline-none font-medium focus:bg-emerald-50"
+                                                            placeholder="0"
+                                                        />
+                                                    </td>
+                                                    {/* Stok Akhir & Satuan (Editable) */}
+                                                    <td className="border border-gray-300 p-0 bg-emerald-50/60 font-bold text-emerald-950 text-right whitespace-nowrap">
+                                                        <div className="flex items-center justify-end px-1">
+                                                            <input
+                                                                type="number"
+                                                                value={row.stokAkhir ?? ''}
+                                                                onChange={(e) => handleRkoChange(globalRowIdx, 'stokAkhir', parseFloat(e.target.value) || 0)}
+                                                                className="w-full text-right bg-transparent px-1 py-1 outline-none font-bold text-emerald-950 focus:bg-emerald-100"
+                                                                placeholder="0"
+                                                            />
+                                                            <span className="text-[10px] text-gray-500 ml-1 select-none">{row.satuan}</span>
+                                                        </div>
+                                                    </td>
                                                 </tr>
                                             );
                                         });

@@ -111,11 +111,11 @@ export default function MonitoringHarianPage() {
                 finalRows = finalRows.map((r) => {
                   const localMatch = localSaved.find((l) => l.id === r.id || (l.name && l.name === r.name));
                   if (localMatch) {
-                    const psg = r.gudangPsg || localMatch.gudangPsg || 0;
-                    const lolaMitra = r.gudangLolaMitra || localMatch.gudangLolaMitra || 0;
-                    const gmg = r.gudangGmg || localMatch.gudangGmg || 0;
+                    const psg = r.gudangPsg ?? localMatch.gudangPsg ?? 0;
+                    const lolaMitra = r.gudangLolaMitra ?? localMatch.gudangLolaMitra ?? 0;
+                    const gmg = r.gudangGmg ?? localMatch.gudangGmg ?? 0;
                     const totalStok = psg + lolaMitra + gmg;
-                    const soOut = r.soOutstanding || localMatch.soOutstanding || 0;
+                    const soOut = r.soOutstanding ?? localMatch.soOutstanding ?? 0;
 
                     return {
                       ...r,
@@ -123,8 +123,8 @@ export default function MonitoringHarianPage() {
                       gudangLolaMitra: lolaMitra,
                       gudangGmg: gmg,
                       totalStok: totalStok,
-                      kuantumSoBulanIni: r.kuantumSoBulanIni || localMatch.kuantumSoBulanIni || 0,
-                      kuantumSoSdBulanIni: r.kuantumSoSdBulanIni || localMatch.kuantumSoSdBulanIni || 0,
+                      kuantumSoBulanIni: r.kuantumSoBulanIni ?? localMatch.kuantumSoBulanIni ?? 0,
+                      kuantumSoSdBulanIni: r.kuantumSoSdBulanIni ?? localMatch.kuantumSoSdBulanIni ?? 0,
                       soOutstanding: soOut,
                       stokAkhir: totalStok - soOut,
                     };

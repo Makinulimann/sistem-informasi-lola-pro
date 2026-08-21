@@ -1,5 +1,4 @@
 export const dynamic = 'force-dynamic';
-export const runtime = 'edge';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/supabase';
 
@@ -8,9 +7,9 @@ const globalMemoryStore = new Map<string, any[]>();
 
 // Official 10 products catalog matching Petrokimia report specs
 const OFFICIAL_PRODUCTS = [
-  { id: 1, name: 'Petro Fish Cair @1Liter 1000961', cleanName: 'Petro Fish', bentuk: 'Cair', kemasan: '1 Liter', slug: 'petro-fish', satuan: 'Liter' },
-  { id: 2, name: 'Petro Gladiator Cair @1 Liter 1001205', cleanName: 'Petro Gladiator Cair', bentuk: 'Cair', kemasan: '1 Liter', slug: 'petro-gladiator-cair', satuan: 'Liter' },
-  { id: 3, name: 'Petro Gladiator Cair @500 ml 1001204', cleanName: 'Petro Gladiator Cair', bentuk: 'Cair', kemasan: '500 ml', slug: 'petro-gladiator-cair', satuan: 'Liter' },
+  { id: 1, name: 'Petro Fish Cair @1Liter', cleanName: 'Petro Fish', bentuk: 'Cair', kemasan: '1 Liter', slug: 'petro-fish', satuan: 'Liter' },
+  { id: 2, name: 'Petro Gladiator Cair @1 Liter', cleanName: 'Petro Gladiator Cair', bentuk: 'Cair', kemasan: '1 Liter', slug: 'petro-gladiator-cair', satuan: 'Liter' },
+  { id: 3, name: 'Petro Gladiator Cair @500 ml', cleanName: 'Petro Gladiator Cair', bentuk: 'Cair', kemasan: '500 ml', slug: 'petro-gladiator-cair', satuan: 'Liter' },
   { id: 4, name: 'Phonska Oca Plus @1 Liter', cleanName: 'Phonska Oca Plus', bentuk: 'Cair', kemasan: '1 Liter', slug: 'phonska-oca', satuan: 'Liter' },
   { id: 5, name: 'Fit Rice @2 Kg', cleanName: 'Fit Rice', bentuk: 'Padat', kemasan: '2 Kg', slug: 'fit-rice', satuan: 'Kg' },
   { id: 6, name: 'Petro Bio Fertil @10 Kg', cleanName: 'Petro Bio Fertil', bentuk: 'Padat', kemasan: '10 Kg', slug: 'bio-fertil', satuan: 'Kg' },
@@ -102,9 +101,8 @@ export async function GET(request: Request) {
     }
 
     // 2. Fetch saved monitoring harian inputs from:
-    // a) Memory store
-    // b) app_settings table
-    // c) monitoring_harians table
+    // a) relational monitoring_harians table (Primary)
+    // b) app_settings table (Fallback)
     const settingsKey = `monitoring_harian_${tahun}_${bulan}`;
     let savedMap: Record<string, any> = {};
 
@@ -112,7 +110,7 @@ export async function GET(request: Request) {
       if (!Array.isArray(items)) return;
       for (const item of items) {
         const idVal = item.id || item.no || item.idVal;
-        const nameVal = item.name || item.productName || item.product_name;
+        const nameVal = item.name || item.cleanName || item.productName || item.product_name;
 
         if (idVal !== undefined) {
           savedMap[`id_${idVal}`] = item;
@@ -123,29 +121,24 @@ export async function GET(request: Request) {
       }
     };
 
-    // Layer 1: Memory cache
-    const memData = globalMemoryStore.get(settingsKey);
-    if (memData) {
-      addItemsToSavedMap(memData);
-    }
-
-    // Layer 2: app_settings table
-    try {
-      const { data: settingsData } = await db.from<any>('app_settings').select('*').eq('key', settingsKey).single();
-      if (settingsData && settingsData.value) {
-        const parsed = JSON.parse(settingsData.value);
-        addItemsToSavedMap(parsed);
-      }
-    } catch (err) {
-      // Ignore
-    }
-
-    // Layer 3: monitoring_harians table
+    // Layer 1: monitoring_harians table (Primary relational source)
     try {
       const { data: tableData } = await db.from<any>('monitoring_harians').select('*').execute();
       if (tableData && tableData.length > 0) {
         const filteredTable = tableData.filter((t: any) => Number(t.tahun) === tahun && Number(t.bulan) === bulan);
         addItemsToSavedMap(filteredTable);
+      }
+    } catch (err) {
+      console.error('Error fetching from monitoring_harians:', err);
+    }
+
+    // Layer 2: app_settings table (Fallback)
+    try {
+      const { data: settingsRows } = await db.from<any>('app_settings').select('*').eq('key', settingsKey).execute();
+      const settingsData = (settingsRows || [])[0];
+      if (settingsData && settingsData.value) {
+        const parsed = JSON.parse(settingsData.value);
+        addItemsToSavedMap(parsed);
       }
     } catch (err) {
       // Ignore
@@ -277,7 +270,8 @@ export async function POST(request: Request) {
     // 2. Persist to app_settings table
     const payloadJson = JSON.stringify(rows);
     try {
-      const { data: existingSetting } = await db.from<any>('app_settings').select('*').eq('key', settingsKey).single();
+      const { data: existingRows } = await db.from<any>('app_settings').select('*').eq('key', settingsKey).execute();
+      const existingSetting = (existingRows || [])[0];
       if (existingSetting) {
         await db.from<any>('app_settings').update({
           value: payloadJson,
@@ -294,7 +288,7 @@ export async function POST(request: Request) {
       console.error('Failed to write to app_settings:', appErr);
     }
 
-    // 3. Persist to monitoring_harians table if present
+    // 1. Primary: Persist directly to relational monitoring_harians table
     try {
       const { data: allMonitoring } = await db.from<any>('monitoring_harians').select('*').execute();
       const existingList = allMonitoring || [];
@@ -304,6 +298,9 @@ export async function POST(request: Request) {
           tahun: Number(tahun),
           bulan: Number(bulan),
           product_name: r.name || r.productName,
+          clean_name: r.cleanName || r.name || '',
+          kemasan: r.kemasan || '',
+          slug: r.slug || '',
           satuan: r.satuan || 'Liter',
           produksi_bulan_ini: Number(r.produksiBulanIni || 0),
           produksi_sd_bulan_ini: Number(r.produksiSdBulanIni || 0),
@@ -321,7 +318,7 @@ export async function POST(request: Request) {
         const existingRow = existingList.find((m: any) =>
           Number(m.tahun) === Number(tahun) &&
           Number(m.bulan) === Number(bulan) &&
-          m.product_name === itemData.product_name
+          (m.product_name === itemData.product_name || (m.slug && m.slug === itemData.slug && m.kemasan === itemData.kemasan))
         );
 
         if (existingRow) {
@@ -331,7 +328,7 @@ export async function POST(request: Request) {
         }
       }
     } catch (tableErr) {
-      // Ignore
+      console.error('Error writing to monitoring_harians table:', tableErr);
     }
 
     return NextResponse.json({ success: true, message: 'Data monitoring harian berhasil disimpan.' });
