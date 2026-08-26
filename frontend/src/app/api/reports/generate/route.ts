@@ -636,7 +636,7 @@ export async function POST(request: Request) {
 
         const rkoSummary = officialVariants.map((v, idx) => {
             const tracking = resultRealization.get(v.id) || { realProd: 0, realPeng: 0 };
-            const stokAkhir = Math.max(0, tracking.realProd - tracking.realPeng);
+            const stokAkhir = tracking.realProd - tracking.realPeng;
 
             const kemNorm = normAlphanum(v.kemasan);
             const slugKey = `${v.productSlug}||${kemNorm}`;
@@ -670,10 +670,10 @@ export async function POST(request: Request) {
 
             // Per User Directive:
             // 1. Realisasi Pengambilan strictly = Kuantum SO 2026 - SO Outstanding 2026
-            const realisasiPengambilan = Math.max(0, kuantumSo - soOutstanding);
+            const realisasiPengambilan = kuantumSo - soOutstanding;
 
             // 2. Stok Akhir = Stok GMG - SO Outstanding
-            const finalStokAkhir = Math.max(0, stokGmg - soOutstanding);
+            const finalStokAkhir = stokGmg - soOutstanding;
 
             const totalDus = variantDusMap.get(v.id) || 0;
 

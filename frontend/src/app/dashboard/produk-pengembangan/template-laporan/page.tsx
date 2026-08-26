@@ -822,10 +822,10 @@ export default function TemplateLaporanPage() {
             const updated = { ...next[index], [field]: value };
 
             if (field === 'stokGmg' || field === 'soOutstanding') {
-                updated.stokAkhir = Math.max(0, (updated.stokGmg || 0) - (updated.soOutstanding || 0));
+                updated.stokAkhir = (updated.stokGmg || 0) - (updated.soOutstanding || 0);
             }
             if (field === 'kuantumSo' || field === 'soOutstanding') {
-                updated.realisasiPengambilan = Math.max(0, (updated.kuantumSo || 0) - (updated.soOutstanding || 0));
+                updated.realisasiPengambilan = (updated.kuantumSo || 0) - (updated.soOutstanding || 0);
             }
 
             next[index] = updated;

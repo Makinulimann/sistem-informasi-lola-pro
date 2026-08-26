@@ -370,7 +370,7 @@ export default function MonitoringHarianPage() {
         r.kuantumSoBulanIni ? r.kuantumSoBulanIni.toLocaleString('id-ID') : '-',
         r.kuantumSoSdBulanIni ? r.kuantumSoSdBulanIni.toLocaleString('id-ID') : '-',
         r.soOutstanding ? r.soOutstanding.toLocaleString('id-ID') : '-',
-        r.stokAkhir ? r.stokAkhir.toLocaleString('id-ID') : '-',
+        r.stokAkhir !== undefined && r.stokAkhir !== null ? r.stokAkhir.toLocaleString('id-ID') : '-',
       ]);
 
       // 4. Render Grid Table
@@ -869,7 +869,7 @@ export default function MonitoringHarianPage() {
 
                         {/* Stok Akhir (Calculated) */}
                         <td className="border border-gray-300 p-2 text-right font-bold text-gray-900 bg-amber-100/50">
-                          {r.stokAkhir ? r.stokAkhir.toLocaleString('id-ID') : '-'}
+                          {r.stokAkhir !== undefined && r.stokAkhir !== null ? r.stokAkhir.toLocaleString('id-ID') : '-'}
                         </td>
 
                         {/* Aksi (Hapus) */}
