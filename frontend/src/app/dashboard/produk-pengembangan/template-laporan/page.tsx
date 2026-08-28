@@ -1693,7 +1693,7 @@ export default function TemplateLaporanPage() {
                     {/* Header Logo */}
                     <div className="flex items-center justify-between border-b-2 border-gray-900 pb-3">
                         <div className="flex items-center gap-3">
-                            <img src="/images/logo-PG.webp" alt="Petrokimia Gresik" className="h-12 object-contain" />
+                            <img src="/images/logo-PG.webp" alt="Petrokimia Gresik" className="h-12 w-auto object-contain shrink-0" />
                         </div>
                         <div className="text-right">
                             <h2 className="text-base font-bold text-gray-900 leading-tight">PT PETROKIMIA GRESIK</h2>

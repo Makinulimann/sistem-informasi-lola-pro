@@ -14,7 +14,9 @@ export const metadata: Metadata = {
   title: 'SIPP',
   description: 'SIPP Web Application',
   icons: {
-    icon: '/images/logo-PG.webp',
+    icon: '/images/logo-pkg.png',
+    shortcut: '/images/logo-pkg.png',
+    apple: '/images/logo-pkg.png',
   },
 };
 
