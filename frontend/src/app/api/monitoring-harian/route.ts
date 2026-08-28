@@ -58,33 +58,46 @@ export async function GET(request: Request) {
       const tabName = tabsMap[r.produksi_tab_id || r.ProduksiTabId] || '';
       const ket = (r.keterangan || '').toLowerCase();
 
+      // Extract variant tag from keterangan, e.g. "[Varian: 1KG - Batch: b12]" => "1kg"
+      const varianMatch = (r.keterangan || '').match(/\[Varian:\s*([^\]\-]+)/i);
+      const explicitVarian = varianMatch ? varianMatch[1].trim().toLowerCase() : '';
+      const fullText = `${tabName} ${ket}`.toLowerCase();
+
       let matchedId: number | null = null;
 
       if (slug.includes('petro-fish') || slug.includes('fish')) {
         matchedId = 1;
       } else if (slug.includes('petro-gladiator-cair') || slug.includes('gladiator-cair')) {
-        if (tabName.includes('500') || ket.includes('500')) {
-          matchedId = 3;
+        if (explicitVarian.includes('500') || /\b500\b/i.test(fullText)) {
+          matchedId = 3; // 500 ml
         } else {
-          matchedId = 2;
+          matchedId = 2; // 1 Liter
         }
       } else if (slug.includes('phonska')) {
         matchedId = 4;
       } else if (slug.includes('fit-rice') || slug.includes('rice')) {
         matchedId = 5;
       } else if (slug.includes('bio-fertil') || slug.includes('fertil')) {
-        if (tabName.includes('10') || ket.includes('10')) {
-          matchedId = 6;
-        } else if (tabName.includes('2') || ket.includes('2')) {
-          matchedId = 7;
+        if (explicitVarian.includes('10') || /\b10\s*kg\b|\b10kg\b/i.test(fullText)) {
+          matchedId = 6; // 10 Kg
+        } else if (explicitVarian.includes('2') || /\b2\s*kg\b|\b2kg\b/i.test(fullText)) {
+          matchedId = 7; // 2 Kg
         } else {
           matchedId = 8; // Default 5 Kg
         }
       } else if (slug.includes('petro-gladiator') || slug.includes('gladiator')) {
-        if (tabName.includes('2') || ket.includes('2')) {
-          matchedId = 10;
+        if (explicitVarian) {
+          if (/\b2\s*kg\b|\b2kg\b|\b2\b/i.test(explicitVarian)) {
+            matchedId = 10; // 2 Kg
+          } else {
+            matchedId = 9; // 1 Kg
+          }
         } else {
-          matchedId = 9; // Default 1 Kg
+          if (/\b2\s*kg\b|\b2kg\b/i.test(fullText)) {
+            matchedId = 10; // 2 Kg
+          } else {
+            matchedId = 9; // 1 Kg
+          }
         }
       }
 
