@@ -1132,8 +1132,8 @@ export default function TemplateLaporanPage() {
                                 <th>Stok GMG</th>
                                 <th>Kuantum SO ${rkoYear}</th>
                                 <th>SO Outstanding ${rkoYear}</th>
-                                <th>Realisasi Pengambilan</th>
-                                <th>Stok Akhir</th>
+                                <th style="width: 60px;">Realisasi Pengambilan</th>
+                                <th style="width: 100px;">Stok Akhir</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1401,12 +1401,12 @@ export default function TemplateLaporanPage() {
                                 <th style="width: 160px;">Nama Produk</th>
                                 <th style="width: 70px;">Bentuk</th>
                                 <th style="width: 80px;">Kemasan</th>
-                                <th style="width: 110px;">Realisasi Produksi</th>
+                                <th style="width: 100px;">Realisasi Produksi</th>
                                 <th style="width: 70px;">Dus</th>
                                 <th style="width: 90px;">Stok GMG</th>
                                 <th style="width: 110px;">Kuantum SO ${rkoYear}</th>
-                                <th style="width: 120px;">SO Outstanding ${rkoYear}</th>
-                                <th style="width: 120px;">Realisasi Pengambilan</th>
+                                <th style="width: 110px;">SO Outstanding ${rkoYear}</th>
+                                <th style="width: 110px;">Realisasi Pengambilan</th>
                                 <th style="width: 110px;">Stok Akhir</th>
                             </tr>
                         </thead>
