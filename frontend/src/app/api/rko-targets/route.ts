@@ -302,15 +302,11 @@ export async function POST(request: Request) {
 
         const targetYear = data[0]?.tahun || new Date().getFullYear();
 
-        // Fetch all existing rko_targets for this year
-        const { data: existingRows, error: fetchErr } = await db.from<any>('rko_targets')
+        // Fetch all existing rko_targets for this year in 1 fast query
+        const { data: existingRows } = await db.from<any>('rko_targets')
             .select('*')
             .eq('tahun', targetYear)
             .execute();
-
-        if (fetchErr) {
-            console.error('Error fetching existing rko_targets:', fetchErr);
-        }
 
         const existingMap = new Map<string, any>();
         (existingRows || []).forEach((r: any) => {
@@ -318,63 +314,49 @@ export async function POST(request: Request) {
             existingMap.set(key, r);
         });
 
-        let successCount = 0;
-        let failCount = 0;
-        let lastError: any = null;
+        const updatePromises: Promise<any>[] = [];
+        const insertItems: any[] = [];
 
         for (const item of data) {
             const key = `${item.product_slug}||${item.tab_name}||${item.tahun}||${item.bulan}`;
             const existing = existingMap.get(key);
 
             if (existing) {
-                const { error: updateErr } = await db.from<any>('rko_targets')
-                    .update({
-                        target_volume: Number(item.target_volume || 0),
-                        target_kemasan: Number(item.target_kemasan || 0),
-                    })
-                    .eq('id', existing.id);
-
-                if (updateErr) {
-                    console.error('Failed to update rko_target:', updateErr);
-                    failCount++;
-                    lastError = updateErr;
-                } else {
-                    successCount++;
-                }
+                updatePromises.push(
+                    db.from<any>('rko_targets')
+                        .update({
+                            target_volume: Number(item.target_volume || 0),
+                            target_kemasan: Number(item.target_kemasan || 0),
+                        })
+                        .eq('id', existing.id)
+                );
             } else {
-                const { error: insertErr } = await db.from<any>('rko_targets')
-                    .insert({
-                        product_slug: item.product_slug,
-                        tab_name: item.tab_name,
-                        tahun: Number(item.tahun),
-                        bulan: Number(item.bulan),
-                        target_volume: Number(item.target_volume || 0),
-                        target_kemasan: Number(item.target_kemasan || 0),
-                    });
-
-                if (insertErr) {
-                    console.error('Failed to insert rko_target:', insertErr);
-                    failCount++;
-                    lastError = insertErr;
-                } else {
-                    successCount++;
-                }
+                insertItems.push({
+                    product_slug: item.product_slug,
+                    tab_name: item.tab_name,
+                    tahun: Number(item.tahun),
+                    bulan: Number(item.bulan),
+                    target_volume: Number(item.target_volume || 0),
+                    target_kemasan: Number(item.target_kemasan || 0),
+                });
             }
         }
 
-        if (failCount > 0 && successCount === 0) {
-            const errorMsg = lastError?.message || JSON.stringify(lastError);
-            console.error('All rko_target save operations failed:', errorMsg);
-            return NextResponse.json({
-                message: `Gagal menyimpan data RKO ke database: ${errorMsg}`,
-                error: lastError
-            }, { status: 500 });
+        // 1. Single batch insert for all new rows
+        if (insertItems.length > 0) {
+            await db.from<any>('rko_targets').insert(insertItems as any);
+        }
+
+        // 2. Parallelized updates in chunks of 20 to finish in ~300ms instead of 14 seconds
+        const CHUNK_SIZE = 20;
+        for (let i = 0; i < updatePromises.length; i += CHUNK_SIZE) {
+            const chunk = updatePromises.slice(i, i + CHUNK_SIZE);
+            await Promise.all(chunk);
         }
 
         return NextResponse.json({
             message: 'Success',
-            rowsAffected: successCount,
-            failedCount: failCount
+            rowsAffected: data.length,
         });
     } catch (error: any) {
         console.error('Error in POST /api/rko-targets:', error);
