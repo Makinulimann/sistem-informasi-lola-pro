@@ -51,11 +51,20 @@ export interface CategorySummaryResponse {
 
 export async function getCategorySummary(
     category: string,
-    bulan?: number,
-    tahun?: number
+    bulan?: number | null,
+    tahun?: number | null,
+    startMonth?: number | null,
+    startYear?: number | null,
+    endMonth?: number | null,
+    endYear?: number | null
 ): Promise<CategorySummaryResponse> {
     const params = new URLSearchParams({ category });
     if (bulan) params.set('bulan', String(bulan));
     if (tahun) params.set('tahun', String(tahun));
+    if (startMonth) params.set('startMonth', String(startMonth));
+    if (startYear) params.set('startYear', String(startYear));
+    if (endMonth) params.set('endMonth', String(endMonth));
+    if (endYear) params.set('endYear', String(endYear));
     return api.get<CategorySummaryResponse>(`/dashboard/category-summary?${params.toString()}`);
 }
+

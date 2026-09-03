@@ -160,33 +160,46 @@ export async function GET(request: Request) {
             }
         });
 
+        const extractVariantFromKet = (ket: string): string => {
+            const m = (ket || '').match(/\[Varian:\s*([^\]\-]+)/i);
+            return m ? m[1].trim().toLowerCase() : '';
+        };
+
         // Helper for matching variant in production log keterangan or batch code
         const matchesVariant = (pr: any, kemasan: string): boolean => {
             if (!kemasan) return false;
-            const ket = (pr.keterangan || '').toLowerCase();
-            const kem = kemasan.toLowerCase();
-            const cleanKem = kem.replace('@', '').trim();
-            const cleanKet = ket.replace('@', '').trim();
-            
-            if (cleanKet.includes(cleanKem) || ket.includes(kem)) return true;
-            if (kem.includes('1kg') || kem.includes('1 kg')) {
-                if ((cleanKet.includes('1kg') || cleanKet.includes('1 kg')) && !cleanKet.includes('10kg')) return true;
-            }
-            if (kem.includes('2kg') || kem.includes('2 kg')) {
-                if (cleanKet.includes('2kg') || cleanKet.includes('2 kg')) return true;
-            }
-            if (kem.includes('1 liter') || kem.includes('1l')) {
-                if (cleanKet.includes('1 liter') || cleanKet.includes('1l') || cleanKet.includes('1 lt')) return true;
-            }
-            if (kem.includes('500 ml') || kem.includes('500ml')) {
-                if (cleanKet.includes('500 ml') || cleanKet.includes('500ml')) return true;
+            const kem = kemasan.toLowerCase().replace('@', '').trim();
+            const kemNoSpace = kem.replace(/\s+/g, '');
+
+            // 1. Explicit [Varian: ...] tag in keterangan is ground truth
+            const explicitKetVar = extractVariantFromKet(pr.keterangan || '');
+            if (explicitKetVar) {
+                const explicitNoSpace = explicitKetVar.replace(/\s+/g, '');
+                if (explicitKetVar === kem || explicitNoSpace === kemNoSpace || explicitKetVar.includes(kem) || kem.includes(explicitKetVar)) {
+                    return true;
+                }
+                // Record has explicit tag that does NOT match this variant -> reject immediately
+                return false;
             }
 
+            // 2. Direct text match in keterangan
+            const ket = (pr.keterangan || '').toLowerCase();
+            const cleanKet = ket.replace('@', '').trim();
+            const cleanNoSpace = cleanKet.replace(/\s+/g, '');
+
+            if (cleanKet.includes(kem) || (kemNoSpace && cleanNoSpace.includes(kemNoSpace))) {
+                return true;
+            }
+
+            // 3. Fallback to batch code mapping
             const bCodes = [pr.batch_kode, pr.ps_batch_kode, pr.coa_batch_kode].filter(Boolean);
             for (const bc of bCodes) {
                 const mappedVarian = batchToVariantMap.get(bc.toLowerCase());
-                if (mappedVarian && mappedVarian.toLowerCase().includes(cleanKem)) {
-                    return true;
+                if (mappedVarian) {
+                    const mappedNorm = mappedVarian.toLowerCase().replace(/\s+/g, '');
+                    if (mappedNorm === kemNoSpace || mappedNorm.includes(kemNoSpace) || kemNoSpace.includes(mappedNorm)) {
+                        return true;
+                    }
                 }
             }
 

@@ -83,13 +83,21 @@ export async function deleteTab(id: number): Promise<void> {
 export async function getProduksi(
     productSlug: string,
     tabId?: number,
-    bulan?: number,
-    tahun?: number
+    bulan?: number | null,
+    tahun?: number | null,
+    startMonth?: number | null,
+    startYear?: number | null,
+    endMonth?: number | null,
+    endYear?: number | null
 ): Promise<ProduksiResponse> {
     const params = new URLSearchParams({ productSlug });
     if (tabId !== undefined) params.append('tabId', String(tabId));
-    if (bulan !== undefined) params.append('bulan', String(bulan));
-    if (tahun !== undefined) params.append('tahun', String(tahun));
+    if (bulan) params.append('bulan', String(bulan));
+    if (tahun) params.append('tahun', String(tahun));
+    if (startMonth) params.append('startMonth', String(startMonth));
+    if (startYear) params.append('startYear', String(startYear));
+    if (endMonth) params.append('endMonth', String(endMonth));
+    if (endYear) params.append('endYear', String(endYear));
     return api.get<ProduksiResponse>(`/Produksi?${params.toString()}`);
 }
 

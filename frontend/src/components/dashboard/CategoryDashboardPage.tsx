@@ -116,10 +116,20 @@ export function CategoryDashboardPage({
 
     const [matBulan, setMatBulan] = useState<number | null>(now.getMonth() + 1);
     const [matTahun, setMatTahun] = useState<number | null>(now.getFullYear());
+    
     const [prodBulan, setProdBulan] = useState<number | null>(now.getMonth() + 1);
     const [prodTahun, setProdTahun] = useState<number | null>(now.getFullYear());
+    const [prodStartMonth, setProdStartMonth] = useState<number | null>(null);
+    const [prodStartYear, setProdStartYear] = useState<number | null>(null);
+    const [prodEndMonth, setProdEndMonth] = useState<number | null>(null);
+    const [prodEndYear, setProdEndYear] = useState<number | null>(null);
+
     const [chartBulan, setChartBulan] = useState<number | null>(now.getMonth() + 1);
     const [chartTahun, setChartTahun] = useState<number | null>(now.getFullYear());
+    const [chartStartMonth, setChartStartMonth] = useState<number | null>(null);
+    const [chartStartYear, setChartStartYear] = useState<number | null>(null);
+    const [chartEndMonth, setChartEndMonth] = useState<number | null>(null);
+    const [chartEndYear, setChartEndYear] = useState<number | null>(null);
     
     // Unit Filters
     const [padatUnit, setPadatUnit] = useState('Kg');
@@ -161,7 +171,7 @@ export function CategoryDashboardPage({
     useEffect(() => {
         let cancelled = false;
         setLoadingMat(true);
-        getCategorySummary(categorySlug, matBulan ?? undefined, matTahun ?? undefined)
+        getCategorySummary(categorySlug, matBulan, matTahun)
             .then(res => { if (!cancelled) setMatData(res); })
             .catch(console.error)
             .finally(() => { if (!cancelled) setLoadingMat(false); });
@@ -174,25 +184,25 @@ export function CategoryDashboardPage({
     useEffect(() => {
         let cancelled = false;
         setLoadingProd(true);
-        getCategorySummary(categorySlug, prodBulan ?? undefined, prodTahun ?? undefined)
+        getCategorySummary(categorySlug, prodBulan, prodTahun, prodStartMonth, prodStartYear, prodEndMonth, prodEndYear)
             .then(res => { if (!cancelled) setProdData(res); })
             .catch(console.error)
             .finally(() => { if (!cancelled) setLoadingProd(false); });
         return () => { cancelled = true; };
-    }, [categorySlug, prodBulan, prodTahun]);
+    }, [categorySlug, prodBulan, prodTahun, prodStartMonth, prodStartYear, prodEndMonth, prodEndYear]);
 
-    useEffect(() => { setProdPage(1); }, [produksiSearch, prodBulan, prodTahun]);
+    useEffect(() => { setProdPage(1); }, [produksiSearch, prodBulan, prodTahun, prodStartMonth, prodStartYear, prodEndMonth, prodEndYear]);
 
     // Fetch Chart Data (independent)
     useEffect(() => {
         let cancelled = false;
         setLoadingChart(true);
-        getCategorySummary(categorySlug, chartBulan ?? undefined, chartTahun ?? undefined)
+        getCategorySummary(categorySlug, chartBulan, chartTahun, chartStartMonth, chartStartYear, chartEndMonth, chartEndYear)
             .then(res => { if (!cancelled) setChartData(res); })
             .catch(console.error)
             .finally(() => { if (!cancelled) setLoadingChart(false); });
         return () => { cancelled = true; };
-    }, [categorySlug, chartBulan, chartTahun]);
+    }, [categorySlug, chartBulan, chartTahun, chartStartMonth, chartStartYear, chartEndMonth, chartEndYear]);
 
     // Fetch Material Balance Data (independent period)
     useEffect(() => {
@@ -270,7 +280,7 @@ export function CategoryDashboardPage({
 
                 if (padatBs > 0 || padatPg > 0 || (!isCairProd && (p.satuan || padatBs > 0 || padatPg > 0))) {
                     padatData.push({
-                        name: p.label.length > 12 ? p.label.substring(0, 12) + '…' : p.label,
+                        name: p.label.length > 20 ? p.label.substring(0, 20) + '…' : p.label,
                         fullName: p.label,
                         produksi: convertValue(padatBs, baseUnit, getUnitFamily(baseUnit).includes(padatUnit) ? padatUnit : baseUnit),
                         pengiriman: convertValue(padatPg, baseUnit, getUnitFamily(baseUnit).includes(padatUnit) ? padatUnit : baseUnit),
@@ -279,7 +289,7 @@ export function CategoryDashboardPage({
                 
                 if (cairBs > 0 || cairPg > 0 || (isCairProd && (p.satuan || cairBs > 0 || cairPg > 0))) {
                     cairData.push({
-                        name: p.label.length > 12 ? p.label.substring(0, 12) + '…' : p.label,
+                        name: p.label.length > 20 ? p.label.substring(0, 20) + '…' : p.label,
                         fullName: p.label,
                         produksi: convertValue(cairBs, baseUnit, getUnitFamily(baseUnit).includes(cairUnit) ? cairUnit : baseUnit),
                         pengiriman: convertValue(cairPg, baseUnit, getUnitFamily(baseUnit).includes(cairUnit) ? cairUnit : baseUnit),
@@ -524,7 +534,17 @@ export function CategoryDashboardPage({
                         </div>
                         <div>
                             <h2 className="text-sm font-semibold text-gray-900">Ringkasan Produksi</h2>
-                            <p className="text-xs text-gray-400">Data kumulatif per produk</p>
+                            <p className="text-xs text-gray-400">
+                                Data kumulatif per produk {
+                                    prodStartMonth && prodStartYear && prodEndMonth && prodEndYear
+                                        ? `(${MONTHS[prodStartMonth - 1]} ${prodStartYear} s/d ${MONTHS[prodEndMonth - 1]} ${prodEndYear})`
+                                        : prodBulan && prodTahun
+                                        ? `(${MONTHS[prodBulan - 1]} ${prodTahun})`
+                                        : prodTahun
+                                        ? `(Tahun ${prodTahun})`
+                                        : '(Seluruh Periode)'
+                                }
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -539,6 +559,16 @@ export function CategoryDashboardPage({
                                 year={prodTahun}
                                 onMonthChange={setProdBulan}
                                 onYearChange={setProdTahun}
+                                startMonth={prodStartMonth}
+                                startYear={prodStartYear}
+                                endMonth={prodEndMonth}
+                                endYear={prodEndYear}
+                                onRangeChange={(sm, sy, em, ey) => {
+                                    setProdStartMonth(sm);
+                                    setProdStartYear(sy);
+                                    setProdEndMonth(em);
+                                    setProdEndYear(ey);
+                                }}
                             />
                         </div>
 
@@ -673,7 +703,15 @@ export function CategoryDashboardPage({
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                     <div>
                         <h3 className="text-sm font-semibold text-gray-800">Produksi per Produk</h3>
-                        <p className="text-xs text-gray-400 mt-0.5">{chartBulan && chartTahun ? `${MONTHS[chartBulan - 1]} ${chartTahun}` : 'Seluruh Periode'}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                            {chartStartMonth && chartStartYear && chartEndMonth && chartEndYear
+                                ? `${MONTHS[chartStartMonth - 1]} ${chartStartYear} s/d ${MONTHS[chartEndMonth - 1]} ${chartEndYear}`
+                                : chartBulan && chartTahun
+                                ? `${MONTHS[chartBulan - 1]} ${chartTahun}`
+                                : chartTahun
+                                ? `Tahun ${chartTahun}`
+                                : 'Seluruh Periode'}
+                        </p>
                     </div>
                     <div className="flex items-center gap-2">
                         <AppPeriodFilter
@@ -681,6 +719,16 @@ export function CategoryDashboardPage({
                             year={chartTahun}
                             onMonthChange={setChartBulan}
                             onYearChange={setChartTahun}
+                            startMonth={chartStartMonth}
+                            startYear={chartStartYear}
+                            endMonth={chartEndMonth}
+                            endYear={chartEndYear}
+                            onRangeChange={(sm, sy, em, ey) => {
+                                setChartStartMonth(sm);
+                                setChartStartYear(sy);
+                                setChartEndMonth(em);
+                                setChartEndYear(ey);
+                            }}
                         />
                         <span className="flex items-center gap-1.5 text-xs ml-2"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />Produksi</span>
                         <span className="flex items-center gap-1.5 text-xs"><span className="w-2.5 h-2.5 rounded-full bg-blue-500" />Pengiriman</span>
@@ -703,10 +751,10 @@ export function CategoryDashboardPage({
                                 />
                             </div>
                             {productionChartDataPadat.length > 0 ? (
-                                <ResponsiveContainer width="100%" height={240}>
-                                    <BarChart data={productionChartDataPadat} barGap={4} barCategoryGap="20%">
+                                <ResponsiveContainer width="100%" height={280}>
+                                    <BarChart data={productionChartDataPadat} barGap={4} barCategoryGap="20%" margin={{ top: 20, bottom: 5 }}>
                                         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                                        <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                                        <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} interval={0} />
                                         <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} width={40} />
                                         <Tooltip
                                             contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', fontSize: 12 }}
@@ -721,7 +769,7 @@ export function CategoryDashboardPage({
                                     </BarChart>
                                 </ResponsiveContainer>
                             ) : (
-                                <div className="flex items-center justify-center h-[240px] text-sm text-gray-400">Belum ada data produksi padat</div>
+                                <div className="flex items-center justify-center h-[300px] text-sm text-gray-400">Belum ada data produksi padat</div>
                             )}
                         </div>
 
@@ -738,10 +786,10 @@ export function CategoryDashboardPage({
                                 />
                             </div>
                             {productionChartDataCair.length > 0 ? (
-                                <ResponsiveContainer width="100%" height={240}>
-                                    <BarChart data={productionChartDataCair} barGap={4} barCategoryGap="20%">
+                                <ResponsiveContainer width="100%" height={280}>
+                                    <BarChart data={productionChartDataCair} barGap={4} barCategoryGap="20%" margin={{ top: 20, bottom: 5 }}>
                                         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                                        <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                                        <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} interval={0} />
                                         <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} width={40} />
                                         <Tooltip
                                             contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', fontSize: 12 }}

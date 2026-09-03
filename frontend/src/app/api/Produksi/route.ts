@@ -25,7 +25,12 @@ export async function GET(request: Request) {
             return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
         }
 
-        if (!tabIdStr || !bulanStr || !tahunStr) {
+        const startMonthStr = searchParams.get('startMonth');
+        const startYearStr = searchParams.get('startYear');
+        const endMonthStr = searchParams.get('endMonth');
+        const endYearStr = searchParams.get('endYear');
+
+        if (!tabIdStr) {
             const batchMap: { [kode: string]: { bs: number } } = {};
             for (const r of filteredRecords) {
                 if (r.batch_kode && r.bs > 0) {
@@ -44,14 +49,36 @@ export async function GET(request: Request) {
         }
 
         const tabId = parseInt(tabIdStr, 10);
-        const bulan = parseInt(bulanStr, 10);
-        const tahun = parseInt(tahunStr, 10);
-
         const utcOffset = 7 * 60 * 60 * 1000;
-        const localStart = new Date(tahun, bulan - 1, 1);
-        const localEnd = new Date(tahun, bulan, 1);
-        const startUtc = new Date(localStart.getTime() - utcOffset);
-        const endUtc = new Date(localEnd.getTime() - utcOffset);
+        const now = new Date(new Date().getTime() + utcOffset);
+
+        let startUtc: Date;
+        let endUtc: Date;
+        let bulan = bulanStr ? parseInt(bulanStr, 10) : now.getUTCMonth() + 1;
+        let tahun = tahunStr ? parseInt(tahunStr, 10) : now.getUTCFullYear();
+
+        const hasRange = startMonthStr && startYearStr && endMonthStr && endYearStr;
+        const hasBulan = bulanStr && bulanStr !== 'null' && bulanStr !== 'all' && bulanStr !== 'undefined';
+        const hasTahun = tahunStr && tahunStr !== 'null' && tahunStr !== 'all' && tahunStr !== 'undefined';
+
+        if (hasRange) {
+            const sm = parseInt(startMonthStr, 10);
+            const sy = parseInt(startYearStr, 10);
+            const em = parseInt(endMonthStr, 10);
+            const ey = parseInt(endYearStr, 10);
+            startUtc = new Date(new Date(sy, sm - 1, 1).getTime() - utcOffset);
+            endUtc = new Date(new Date(ey, em, 1).getTime() - utcOffset);
+        } else if (hasBulan && hasTahun) {
+            startUtc = new Date(new Date(tahun, bulan - 1, 1).getTime() - utcOffset);
+            endUtc = new Date(new Date(tahun, bulan, 1).getTime() - utcOffset);
+        } else if (hasTahun) {
+            startUtc = new Date(new Date(tahun, 0, 1).getTime() - utcOffset);
+            endUtc = new Date(new Date(tahun + 1, 0, 1).getTime() - utcOffset);
+        } else {
+            // Seluruh Periode
+            startUtc = new Date(0);
+            endUtc = new Date('2099-12-31T23:59:59.999Z');
+        }
 
         // Filter for this tab
         const tabFilteredRecords = filteredRecords.filter((r: any) => 
@@ -67,67 +94,110 @@ export async function GET(request: Request) {
         const priorPs = priorRecords.reduce((sum: number, r: any) => sum + Number(r.ps || 0), 0);
         const priorPg = priorRecords.reduce((sum: number, r: any) => sum + Number(r.pg || 0), 0);
 
-        const daysInMonth = new Date(tahun, bulan, 0).getDate();
         const fullList = [];
-
         let runningKumulatif = priorBs;
         let runningStok = priorBs - priorPg;
         let initialBs = priorBs - priorPs;
 
-        for (let day = 1; day <= daysInMonth; day++) {
-            const date = new Date(tahun, bulan - 1, day);
+        if (hasBulan && hasTahun && !hasRange) {
+            const daysInMonth = new Date(tahun, bulan, 0).getDate();
+            for (let day = 1; day <= daysInMonth; day++) {
+                const date = new Date(tahun, bulan - 1, day);
 
-            const dayMatches = dbRecords.filter((r: any) => {
-                const localD = new Date(new Date(r.tanggal).getTime() + utcOffset);
-                return localD.getDate() === date.getDate() && localD.getMonth() === date.getMonth();
+                const dayMatches = dbRecords.filter((r: any) => {
+                    const localD = new Date(new Date(r.tanggal).getTime() + utcOffset);
+                    return localD.getDate() === date.getDate() && localD.getMonth() === date.getMonth() && localD.getFullYear() === date.getFullYear();
+                });
+
+                const bs = dayMatches.reduce((sum, r) => sum + Number(r.bs || 0), 0);
+                const ps = dayMatches.reduce((sum, r) => sum + Number(r.ps || 0), 0);
+                const coa = dayMatches.reduce((sum, r) => sum + Number(r.coa || 0), 0);
+                const pg = dayMatches.reduce((sum, r) => sum + Number(r.pg || 0), 0);
+                const ket = dayMatches.map((r: any) => r.keterangan).filter(Boolean).join(' | ') || "";
+                const id = dayMatches.find((r: any) => r.id)?.id ?? 0;
+                
+                const batchSet = new Set<string>();
+                dayMatches.forEach((r: any) => {
+                    if (r.batch_kode) batchSet.add(r.batch_kode);
+                });
+                const batchKode = Array.from(batchSet).join(', ');
+
+                const psBatchSet = new Set<string>();
+                dayMatches.forEach((r: any) => {
+                    if (r.ps_batch_kode) psBatchSet.add(r.ps_batch_kode);
+                });
+                const psBatchKode = Array.from(psBatchSet).join(', ');
+
+                const coaBatchSet = new Set<string>();
+                dayMatches.forEach((r: any) => {
+                    if (r.coa_batch_kode) coaBatchSet.add(r.coa_batch_kode);
+                });
+                const coaBatchKode = Array.from(coaBatchSet).join(', ');
+
+                runningKumulatif += bs;
+                runningStok += (bs - pg);
+
+                const yyyy = date.getFullYear();
+                const mm = String(date.getMonth() + 1).padStart(2, '0');
+                const dd = String(date.getDate()).padStart(2, '0');
+
+                fullList.push({
+                    id: id,
+                    tanggal: `${yyyy}-${mm}-${dd}`,
+                    bs: bs,
+                    ps: ps,
+                    coa: coa,
+                    pg: pg,
+                    kumulatif: runningKumulatif,
+                    stokAkhir: runningStok,
+                    keterangan: ket,
+                    batchKode: batchKode,
+                    psBatchKode: psBatchKode,
+                    coaBatchKode: coaBatchKode
+                });
+            }
+        } else {
+            // Multi-month, year, or all-period mode: Group dbRecords by YYYY-MM-DD
+            const dateMap = new Map<string, any[]>();
+            dbRecords.forEach((r: any) => {
+                const dateStr = r.tanggal ? r.tanggal.split('T')[0] : '';
+                if (!dateStr) return;
+                if (!dateMap.has(dateStr)) dateMap.set(dateStr, []);
+                dateMap.get(dateStr)!.push(r);
             });
 
-            const bs = dayMatches.reduce((sum, r) => sum + Number(r.bs || 0), 0);
-            const ps = dayMatches.reduce((sum, r) => sum + Number(r.ps || 0), 0);
-            const coa = dayMatches.reduce((sum, r) => sum + Number(r.coa || 0), 0);
-            const pg = dayMatches.reduce((sum, r) => sum + Number(r.pg || 0), 0);
-            const ket = dayMatches.map((r: any) => r.keterangan).filter(Boolean).join(' | ') || "";
-            const id = dayMatches.find((r: any) => r.id)?.id ?? 0;
-            
-            const batchSet = new Set<string>();
-            dayMatches.forEach((r: any) => {
-                if (r.batch_kode) batchSet.add(r.batch_kode);
-            });
-            const batchKode = Array.from(batchSet).join(', ');
+            const sortedDates = Array.from(dateMap.keys()).sort();
+            for (const dateStr of sortedDates) {
+                const dayMatches = dateMap.get(dateStr)!;
+                const bs = dayMatches.reduce((sum, r) => sum + Number(r.bs || 0), 0);
+                const ps = dayMatches.reduce((sum, r) => sum + Number(r.ps || 0), 0);
+                const coa = dayMatches.reduce((sum, r) => sum + Number(r.coa || 0), 0);
+                const pg = dayMatches.reduce((sum, r) => sum + Number(r.pg || 0), 0);
+                const ket = dayMatches.map((r: any) => r.keterangan).filter(Boolean).join(' | ') || "";
+                const id = dayMatches.find((r: any) => r.id)?.id ?? 0;
 
-            const psBatchSet = new Set<string>();
-            dayMatches.forEach((r: any) => {
-                if (r.ps_batch_kode) psBatchSet.add(r.ps_batch_kode);
-            });
-            const psBatchKode = Array.from(psBatchSet).join(', ');
+                const batchKode = Array.from(new Set(dayMatches.map((r: any) => r.batch_kode).filter(Boolean))).join(', ');
+                const psBatchKode = Array.from(new Set(dayMatches.map((r: any) => r.ps_batch_kode).filter(Boolean))).join(', ');
+                const coaBatchKode = Array.from(new Set(dayMatches.map((r: any) => r.coa_batch_kode).filter(Boolean))).join(', ');
 
-            const coaBatchSet = new Set<string>();
-            dayMatches.forEach((r: any) => {
-                if (r.coa_batch_kode) coaBatchSet.add(r.coa_batch_kode);
-            });
-            const coaBatchKode = Array.from(coaBatchSet).join(', ');
+                runningKumulatif += bs;
+                runningStok += (bs - pg);
 
-            runningKumulatif += bs;
-            runningStok += (bs - pg);
-
-            const yyyy = date.getFullYear();
-            const mm = String(date.getMonth() + 1).padStart(2, '0');
-            const dd = String(date.getDate()).padStart(2, '0');
-
-            fullList.push({
-                id: id,
-                tanggal: `${yyyy}-${mm}-${dd}`,
-                bs: bs,
-                ps: ps,
-                coa: coa,
-                pg: pg,
-                kumulatif: runningKumulatif,
-                stokAkhir: runningStok,
-                keterangan: ket,
-                batchKode: batchKode,
-                psBatchKode: psBatchKode,
-                coaBatchKode: coaBatchKode
-            });
+                fullList.push({
+                    id: id,
+                    tanggal: dateStr,
+                    bs: bs,
+                    ps: ps,
+                    coa: coa,
+                    pg: pg,
+                    kumulatif: runningKumulatif,
+                    stokAkhir: runningStok,
+                    keterangan: ket,
+                    batchKode: batchKode,
+                    psBatchKode: psBatchKode,
+                    coaBatchKode: coaBatchKode
+                });
+            }
         }
 
         // --- Calculate Batch WIP available globally ---

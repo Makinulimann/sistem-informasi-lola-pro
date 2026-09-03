@@ -45,7 +45,7 @@ const NON_PRODUCT_LABELS = new Set([
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { startDate, endDate, rkoYear, apiKey } = body;
+        const { startDate, endDate, rkoYear, tableAStartDate, tableAEndDate, apiKey } = body;
 
         // Validation: Tanggal Mulai Aktivitas & Tanggal Akhir Aktivitas required
         if (!startDate || !endDate || !startDate.trim() || !endDate.trim()) {
@@ -63,9 +63,9 @@ export async function POST(request: Request) {
         const actStartMs = new Date(startDate + 'T00:00:00.000Z').getTime();
         const actEndMs = new Date(endDate + 'T23:59:59.999Z').getTime();
 
-        // Date range for Table A (Cumulative Year-To-Date up to endDate): [YYYY-01-01, endDate]
-        const tableAStartMs = new Date(`${year}-01-01T00:00:00.000Z`).getTime();
-        const tableAEndMs = actEndMs;
+        // Date range for Table A (Cumulative Production up to end date or custom period)
+        const tableAStartMs = tableAStartDate ? new Date(tableAStartDate + 'T00:00:00.000Z').getTime() : new Date(`${year}-01-01T00:00:00.000Z`).getTime();
+        const tableAEndMs = tableAEndDate ? new Date(tableAEndDate + 'T23:59:59.999Z').getTime() : actEndMs;
 
         // 1. Fetch all required data in parallel
         const [
@@ -337,7 +337,13 @@ export async function POST(request: Request) {
             const kem = (v.kemasan || '').toLowerCase().replace('@', '').trim();
             const kemNoSpace = kem.replace(/\s+/g, '');
 
-            if (!kem) return true;
+            // If variant has no kemasan, it's a catch-all — but only if the record
+            // itself has no explicit variant tag. Otherwise skip.
+            if (!kem) {
+                const explicitKetVar = extractVariantFromKet(p.keterangan || '');
+                // If record has explicit variant tag, don't match to empty-kemasan variant
+                return !explicitKetVar;
+            }
 
             // 1. Direct check for extracted variant tag in keterangan (e.g. "[Varian: 5KG - Batch: B05]")
             const explicitKetVar = extractVariantFromKet(p.keterangan || '');
@@ -346,9 +352,11 @@ export async function POST(request: Request) {
                 if (explicitKetVar === kem || explicitNoSpace === kemNoSpace || explicitKetVar.includes(kem) || kem.includes(explicitKetVar)) {
                     return true;
                 }
+                // Explicit tag exists but doesn't match this variant's kemasan — reject
+                return false;
             }
 
-            // 2. Direct match in keterangan text
+            // 2. Direct match in keterangan text (for records without explicit [Varian:] tag)
             if (ket && (ket.includes(kem) || (kemNoSpace && ket.includes(kemNoSpace)))) {
                 return true;
             }
@@ -363,10 +371,19 @@ export async function POST(request: Request) {
             const slugProduksis = periodProduksis.filter((p: any) => p.product_slug === slug);
             const bsBatchCodes = new Set<string>();
 
+            // Separate variants with kemasan (specific) from those without (catch-all)
+            const specificVariants = variants.filter(v => (v.kemasan || '').trim() !== '');
+            const catchAllVariant = variants.find(v => (v.kemasan || '').trim() === '') || null;
+
             slugProduksis.forEach((p: any) => {
                 const bsVal = Number(p.bs) || 0;
                 if (bsVal > 0) {
-                    const matchedVar = variants.find(v => isExplicitVariantMatch(p, v)) || variants[0];
+                    // First try to match specific variants (with kemasan)
+                    let matchedVar = specificVariants.find(v => isExplicitVariantMatch(p, v));
+                    // If no specific match, fall back to catch-all (empty kemasan) or first variant
+                    if (!matchedVar) {
+                        matchedVar = catchAllVariant || variants[0];
+                    }
                     const tracking = resultRealization.get(matchedVar.id)!;
                     tracking.realProd += bsVal;
                     if (p.batch_kode) bsBatchCodes.add(p.batch_kode.toLowerCase());

@@ -119,6 +119,10 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
     // ─── State ───
     const [bulan, setBulan] = useState<number | null>(getInitialMonth);
     const [tahun, setTahun] = useState<number | null>(getInitialYear);
+    const [startMonth, setStartMonth] = useState<number | null>(null);
+    const [startYear, setStartYear] = useState<number | null>(null);
+    const [endMonth, setEndMonth] = useState<number | null>(null);
+    const [endYear, setEndYear] = useState<number | null>(null);
     const [search, setSearch] = useState('');
 
     // Tabs
@@ -263,7 +267,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
         setError(null);
         setDirtyRows({});
         try {
-            const result = await getProduksi(slug, activeTabId, bulan ?? undefined, tahun ?? undefined);
+            const result = await getProduksi(slug, activeTabId, bulan, tahun, startMonth, startYear, endMonth, endYear);
             setData(result.data);
             setSummary(result.summary);
             setAvailableBatches(result.availableBatches || []);
@@ -276,7 +280,7 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
         } finally {
             setLoading(false);
         }
-    }, [slug, activeTabId, bulan, tahun]);
+    }, [slug, activeTabId, bulan, tahun, startMonth, startYear, endMonth, endYear]);
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -445,7 +449,14 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
         return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
     };
 
-    const periodLabel = bulan && tahun ? `${BULAN_NAMES[bulan]} ${tahun}` : 'Seluruh Periode';
+    const BULAN_SHORT_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
+    const periodLabel = startMonth && startYear && endMonth && endYear
+        ? `${BULAN_SHORT_NAMES[startMonth - 1]} ${startYear} - ${BULAN_SHORT_NAMES[endMonth - 1]} ${endYear}`
+        : bulan && tahun
+        ? `${BULAN_NAMES[bulan]} ${tahun}`
+        : tahun
+        ? `Tahun ${tahun}`
+        : 'Seluruh Periode';
     const filtered = useMemo(() => {
         if (!search) return data;
         const q = search.toLowerCase();
@@ -563,6 +574,16 @@ export function ProduksiPage({ productCategory, productName, productSlug }: Prod
                             year={tahun}
                             onMonthChange={setBulan}
                             onYearChange={setTahun}
+                            startMonth={startMonth}
+                            startYear={startYear}
+                            endMonth={endMonth}
+                            endYear={endYear}
+                            onRangeChange={(sm, sy, em, ey) => {
+                                setStartMonth(sm);
+                                setStartYear(sy);
+                                setEndMonth(em);
+                                setEndYear(ey);
+                            }}
                         />
                         <AppSelect
                             prefixLabel="Satuan:"

@@ -88,6 +88,10 @@ export async function GET(request: Request) {
         const category = searchParams.get('category');
         const bulan = searchParams.get('bulan');
         const tahun = searchParams.get('tahun');
+        const startMonthStr = searchParams.get('startMonth');
+        const startYearStr = searchParams.get('startYear');
+        const endMonthStr = searchParams.get('endMonth');
+        const endYearStr = searchParams.get('endYear');
 
         if (!category) {
             return NextResponse.json({ message: 'category is required.' }, { status: 400 });
@@ -124,7 +128,6 @@ export async function GET(request: Request) {
             });
         }
 
-        // 2. Product labels
         // 2. Product labels and details
         const productDetailsMap: { [key: string]: { label: string, jenis: string, satuan: string, imageUrl: string } } = {};
         for (const menu of allMenus || []) {
@@ -148,10 +151,48 @@ export async function GET(request: Request) {
 
         // 3. Time bounds
         const utcOffset = 7 * 60 * 60 * 1000;
-        const localStart = new Date(targetTahun, targetBulan - 1, 1);
-        const localEnd = new Date(targetTahun, targetBulan, 1);
-        const startUtc = new Date(localStart.getTime() - utcOffset);
-        const endUtc = new Date(localEnd.getTime() - utcOffset);
+        let startUtc: Date;
+        let endUtc: Date;
+
+        const hasRange = startMonthStr && startYearStr && endMonthStr && endYearStr;
+        const hasBulan = bulan && bulan !== 'null' && bulan !== 'all' && bulan !== 'undefined';
+        const hasTahun = tahun && tahun !== 'null' && tahun !== 'all' && tahun !== 'undefined';
+
+        if (hasRange) {
+            const sm = parseInt(startMonthStr, 10);
+            const sy = parseInt(startYearStr, 10);
+            const em = parseInt(endMonthStr, 10);
+            const ey = parseInt(endYearStr, 10);
+
+            const localStart = new Date(sy, sm - 1, 1);
+            const localEnd = new Date(ey, em, 1);
+            startUtc = new Date(localStart.getTime() - utcOffset);
+            endUtc = new Date(localEnd.getTime() - utcOffset);
+        } else if (hasBulan && hasTahun) {
+            const b = parseInt(bulan!, 10);
+            const y = parseInt(tahun!, 10);
+            const localStart = new Date(y, b - 1, 1);
+            const localEnd = new Date(y, b, 1);
+            startUtc = new Date(localStart.getTime() - utcOffset);
+            endUtc = new Date(localEnd.getTime() - utcOffset);
+        } else if (hasTahun) {
+            const y = parseInt(tahun!, 10);
+            const localStart = new Date(y, 0, 1);
+            const localEnd = new Date(y + 1, 0, 1);
+            startUtc = new Date(localStart.getTime() - utcOffset);
+            endUtc = new Date(localEnd.getTime() - utcOffset);
+        } else if (hasBulan) {
+            const b = parseInt(bulan!, 10);
+            const y = now.getUTCFullYear();
+            const localStart = new Date(y, b - 1, 1);
+            const localEnd = new Date(y, b, 1);
+            startUtc = new Date(localStart.getTime() - utcOffset);
+            endUtc = new Date(localEnd.getTime() - utcOffset);
+        } else {
+            // Seluruh Periode (All time)
+            startUtc = new Date(0);
+            endUtc = new Date('2099-12-31T23:59:59.999Z');
+        }
 
         // Fetch all materials
         const { data: allProductMaterials } = await db.from<any>('product_materials').select('*').execute();
